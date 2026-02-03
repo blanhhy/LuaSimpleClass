@@ -1,6 +1,6 @@
 # LuaSimpleClass
 
-Luaclass 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
+[Luaclass](https://github.com/blanhhy/luaclass) 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
 
 ## 安装 & 导入
 
