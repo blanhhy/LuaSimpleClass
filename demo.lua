@@ -35,3 +35,38 @@ print(s1:isInstance(Person))  --> true
 print(s1:isInstance(Object))  --> true
 
 print(class.type(s1)) --> Student
+
+
+interface "CanEat" {"eat"}
+interface "CanFly" {"fly"}
+
+-- 错误的定义
+xpcall(function()
+class "Bird" : implements(CanEat, CanFly) {
+    eat = function()
+        print("Bird eats bugs")
+    end;
+}
+end, print)
+
+-- Output: class Bird implements <interface 'CanFly'> but dose not implement method fly().
+
+-- 正确的定义
+class "Bird" : implements(CanEat, CanFly) {
+    eat = function()
+        print("Bird eats bugs")
+    end;
+    fly = function()
+        print("Bird flies")
+    end;
+}
+
+local bird = Bird()
+bird:eat()
+bird:fly()
+
+-- 接口继承
+interface "BirdLike" : extends(CanEat, CanFly) {
+    "spawn";
+    "nest";
+}

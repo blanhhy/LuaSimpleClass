@@ -1,8 +1,9 @@
-local class = require "simpleclass.class"
-local super = require "simpleclass.super"
+class = require "simpleclass.class"
+super = require "simpleclass.super"
+interface = require "simpleclass.interface"
 
-_G.class = class
-_G.super = super
-_G.Object = class.base
-_G.isinstance = class.base.isInstance
-_G.issubclass = class.base.isExtends
+Object = class.base
+
+isinstance = Object.isInstance
+issubclass = Object.isExtends
+isimplenents = Object.isImplenents
