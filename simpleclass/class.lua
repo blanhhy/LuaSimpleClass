@@ -49,12 +49,14 @@ local class_MT = {
 
 setmetatable(Object, class_MT)
 
+
 local class = setmetatable({
-    env = _G; ---@class _G
+    env = {};
     mms = mm_names;
     cmt = class_MT;
 
     base = Object;
+    global = _G; ---@class _G
 
     type = function(val)
         local typ = type(val)
@@ -82,6 +84,10 @@ local class = setmetatable({
         clazz.__base = base
 
         if self.name ~= "<anonymous>" then
+            -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
+            if nil == self.global[self.name] or self.env[self.name] then
+                self.global[self.name] = clazz
+            end
             self.env[self.name] = clazz
         end
 
