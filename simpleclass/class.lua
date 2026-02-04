@@ -71,7 +71,7 @@ local class = setmetatable({
         return self
     end;
 
-    __call = function(self, clazz)
+    create = function(self, clazz)
         local base = self.base
 
         for i = 1, #self.mms do
@@ -101,5 +101,6 @@ local class = setmetatable({
 })
 
 class.__index = class
+class.__call  = class.create
 
 return class
