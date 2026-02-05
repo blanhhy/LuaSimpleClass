@@ -65,7 +65,7 @@ local bird = Bird()
 bird:eat() --> Bird eats bugs
 bird:fly() --> Bird is flying
 
--- 接口继承
+-- 接口组合
 interface "BirdLike" : extends(CanEat, CanFly) {
     "spawn";
     "nest";
