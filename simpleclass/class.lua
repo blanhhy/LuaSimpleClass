@@ -62,7 +62,7 @@ local mm_names = {
 
 
 local class_MT = {
-    __index = function(self, key) return self.__base and self.__base[key] end;
+    __index = function(self, key) return self.__base and self.__base[key] or nil end;
     __tostring = function(self) return self.__classname end;
     __call = function(self, ...) return self:new(...) end;
 }
