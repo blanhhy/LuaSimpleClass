@@ -82,11 +82,6 @@ end
 
 ---@param clazz table
 function class:def(clazz)
-    if self.onDef_impl_check then
-        local ok, err = self:onDef_impl_check(clazz)
-        if not ok then error(err, 2) end
-    end
-
     local base = self.base
 
     for i = 1, #self.mms do
@@ -98,6 +93,13 @@ function class:def(clazz)
     clazz.__index = clazz
     clazz.__base = base
 
+    setmetatable(clazz, self.cmt)
+
+    if self.onDef_impl_check then
+        local ok, err = self:onDef_impl_check(clazz)
+        if not ok then error(err, 2) end
+    end
+
     if self.name ~= "<anonymous>" then
         -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
         if nil == self.global[self.name] or self.env[self.name] then
@@ -106,7 +108,7 @@ function class:def(clazz)
         self.env[self.name] = clazz
     end
 
-    return setmetatable(clazz, self.cmt)
+    return clazz
 end
 
 local class_callable = {
