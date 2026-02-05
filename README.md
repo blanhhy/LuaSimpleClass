@@ -93,6 +93,22 @@ obj:foo() --> "foo from MyClass"
 >           --| improved foo
 > ```
 
+### 类型检查
+
+`class.type(obj)`
+- 返回对象的类
+- 如果是基本类型，返回 `type(obj)`
+
+`isinstance(obj, clazz_or_type)`
+- 判断对象是否为指定类或其子类
+- 也可以用于检查基本类型
+- 与对象方法 `obj:isInstance(clazz)` 等价
+
+`issubclass(sub_clazz, super_clazz)`
+- 判断子类是否为父类或其祖先类
+- 与类方法 `clazz:isExtends(base)` 等价
+- 注：同一个类会返回 `true`
+
 -------
 
 LuaSimpleClass 致力于简化 Lua 面向对象开发，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求。
