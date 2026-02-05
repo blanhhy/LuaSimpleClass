@@ -82,6 +82,11 @@ end
 
 ---@param clazz table
 function class:def(clazz)
+    if self.onDef_impl_check then
+        local ok, err = self:onDef_impl_check(clazz)
+        if not ok then error(err, 2) end
+    end
+
     local base = self.base
 
     for i = 1, #self.mms do
