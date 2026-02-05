@@ -8,6 +8,7 @@ local type, setmetatable, error
 local Interface = {
     env = class.env;
     global = _G; ---@class _G
+    __iname = "<anonymous>";
 }
 
 Interface.__index = Interface
@@ -57,6 +58,7 @@ function Interface:__tostring()
     :format(self.__iname)
 end
 
+---@param name? string
 local function interface(name)
     if not name then
     return setmetatable({
@@ -64,10 +66,8 @@ local function interface(name)
         classes = {}}, Interface)
     end
     local iface = {__iname = name, classes = {}}
-    -- print(name, nil == Interface.global[name], Interface.env[name])
     if nil == Interface.global[name] or Interface.env[name] then
         Interface.global[name] = iface
-        -- print(_G[name].__iname)
     end
     Interface.env[name] = iface
     return setmetatable(iface, Interface)
@@ -75,7 +75,6 @@ end
 
 function class:implements(...)
     self.ifaces = (...) and {...} or nil
-    -- print(...)
     return self
 end
 
