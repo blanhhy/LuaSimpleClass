@@ -33,11 +33,24 @@ function Object:isExtends(base)
 end
 
 function Object:isInstance(cls)
-    if not cls then return false end
     local typ = type(self)
-    if cls == typ then return true end
-    local obj_cls = typ == "table" and self.__class
-    return obj_cls and obj_cls:isExtends(cls)
+
+    if typ ~= "table" or type(cls) ~= "table" then
+        return cls == typ
+    end
+
+    if cls.check_impl then
+        ---@cast cls interface
+        return cls:check_impl(self)
+    end
+
+    local obj_cls = self.__class
+
+    if obj_cls then
+        return obj_cls:isExtends(cls) ---@type boolean
+    end
+
+    return false
 end
 
 local mm_names = {
