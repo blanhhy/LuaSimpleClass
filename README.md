@@ -62,7 +62,7 @@ obj:foo() --> "foo from MyClass"
 
 > 示例：匿名类
 > ```lua
-> local cls = class () {
+> local cls = class {
 >     foo = function(self)
 >         print("foo from anonymous class")
 >     end;
@@ -71,6 +71,8 @@ obj:foo() --> "foo from MyClass"
 > local obj = cls()
 > obj:foo() --> "foo from anonymous class"
 > ```
+
+注：定义有名类时如果传入空参数，空字符串，非字符串参数，一律会被解释为匿名类；如 `class () {}` 也能创建匿名类，这和 `class {}` 方式的不同之处在于，它可以像命名类一样用 `extends` `implements`
 
 ### 类的继承
 
