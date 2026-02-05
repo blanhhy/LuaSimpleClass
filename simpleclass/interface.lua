@@ -17,18 +17,15 @@ Interface.__index = Interface
 -- 接口组合
 function Interface:extends(...)
     local bases = {...}
-    local index = 1
-    local iface = bases[index]
-    local mname
-    while iface do
+    local iface, mname
+    for j = 1, #bases do
+        iface = bases[j]
         for i = 1, #iface do
             mname = iface[i]
             if not self[mname] then
             self[#self+1] = mname
             self[mname] = true
         end end
-        index = index + 1
-        iface = bases[index]
     end
     return self
 end
@@ -66,10 +63,22 @@ end
 ---@param name? string|table
 local function interface(name)
     local typ = type(name)
-    if typ ~= "string" then
-        local iface = typ == "table" and name or {} ---@type interface
+    if typ == "table" then
+        local iface = name ---@type interface
+        local count = 0
+        for i = 1, #iface do
+            local mname = iface[i]
+            if not self[mname] then
+            self[count+1] = mname
+            self[mname] = true
+            count = count + 1
+        end end
         iface.__iname = "<anonymous>"
         return setmetatable(iface, Interface)
+    elseif typ ~= "string" then
+        return setmetatable({
+        __iname = "<anonymous>"
+        }, Interface)
     end
     local iface = {__iname = name}
     if nil == Interface.global[name] or Interface.env[name] then
