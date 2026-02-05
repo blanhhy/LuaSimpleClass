@@ -10,7 +10,7 @@
 require "simpleclass"
 ```
 
-## 示例
+## 快速开始
 
 简单的情况用起来与 Luaclass 相差无几
 
@@ -27,27 +27,72 @@ local obj = MyClass()
 obj:foo() --> "foo from MyClass"
 ```
 
-## 特性 & 限制
+## 特性
 
-- 定义类：依旧是 `class "<name>" {<body>}` 语法
-- 构造函数：依旧是 `__init`，无需返回值
-- 实例化：依旧 `clazz()` 和 `clazz:new()` 均可
-- 继承：使用 `extends` 关键字，且仅支持单继承
+### 类
 
+类是 LuaSimpleClass 的核心，类是生成对象的蓝图，使多个对象共享相同的方法，同时在构造函数中规定对象应有的属性
+
+- 定义命名类：语法为 `class "<name>" {<body>}`
+
+> 命名类创建后位于 `class.env` 环境中，同名的类会覆盖之前的定义；同时，如果此时 `_G` 中没有其他同名变量，会自动创建全局变量 `<name>` 指向该类
+
+- 构造函数：方法签名为 `__init(self, ...) --> nil`
+- 实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
+
+> 示例：命名类
+> ```lua
+> class "MyNamedClass" {
+>     __init = function(self, arg1, arg2)
+>         self.arg1 = arg1
+>         self.arg2 = arg2
+>     end;
+>     print = function(self)
+>         print(self.arg1, self.arg2)
+>     end;
+> }
+> 
+> local obj = MyNamedClass("hello", "world")
+> obj:print() --> "hello world"
+> ```
+
+- 匿名类：无名的类，不会注册到任何环境
+
+> 示例：匿名类
+> ```lua
+> local cls = class () {
+>     foo = function(self)
+>         print("foo from anonymous class")
+>     end;
+> }
+> 
+> local obj = cls()
+> obj:foo() --> "foo from anonymous class"
+> ```
+
+### 类的继承
+
+- 单继承：本模块仅支持单继承，使用 `extends` 关键字
+
+> `extends` 接受类名字符串，因此匿名类不能作为父类；但匿名类可以继承其他类，这一点与 Java 类似
+
+- `super`：接收 `self` 参数，如 `super(self):__init()`
+
+> 示例：单继承
 > ```lua
 > class "MySubClass" : extends "MyClass" {
 >     ---@Override
 >     foo = function(self)
+>         super(self):foo() -- call parent's foo
 >         print("improved foo")
 >     end;
 > }
+> 
+> local obj = MySubClass()
+> obj:foo() --> foo from MySubClass
+>           --| improved foo
 > ```
 
-- 获取类型：使用 `class.type(obj)`，因为没有元类
-- `super`：接收 `self` 参数，如 `super(self):__init()`
-- 判断类型：全局 `isinstance` 函数或 `:isInstance` 方法
-- 匿名类：`clazz = class () {<body>}`，生命周期自行管理
+-------
 
-没有访问控制，没有命名空间（都是全局类，匿名类除外），高级功能如声明模式、抽象类等都没有
-
-LuaSimpleClass 致力于简化 Lua 面向对象开发，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求。同时，由于实现很简单，所以性能可能比 Luaclass 好
+LuaSimpleClass 致力于简化 Lua 面向对象开发，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求。
