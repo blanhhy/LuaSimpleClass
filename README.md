@@ -37,6 +37,8 @@ obj:foo() --> "foo from MyClass"
 
 > 命名类创建后位于 `class.env` 环境中，同名的类会覆盖之前的定义；同时，如果此时 `_G` 中没有其他同名变量，会自动创建全局变量 `<name>` 指向该类
 
+- 静态方法: 没有 `self` 参数的函数，用 `.` 调用
+- 对象方法: 第一个参数为 `self` 的方法，用 `:` 调用
 - 构造函数：方法签名为 `__init(self, ...) --> nil`
 - 实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
 
@@ -93,6 +95,62 @@ obj:foo() --> "foo from MyClass"
 >           --| improved foo
 > ```
 
+### 接口
+
+接口是一组方法签名，定义了类必须实现的方法
+
+接口不是类，不能实例化
+
+接口可以被类实现，可以检查类是否实现了接口，这与继承相似；同时接口之间也存在类似继承的关系，但不会形成继承链
+
+- 接口定义：使用 `interface`，语法类似于类定义
+- 匿名接口：类似于匿名类
+
+> 命名接口同样在 `class.env` 中，与命名类的处理规则完全相同
+
+> 示例：接口定义
+> ```lua
+> interface "CanFly" {
+>     "fly"; -- only method names
+> }
+> ```
+
+- 接口实现：使用 `implements` 关键字，类可以实现多个接口
+
+> `implements` 接受不定数量的接口（对象本身），无论接口有没有名字都可以
+
+> 示例：接口实现
+> ```lua
+> class "Bird" : implements(CanFly) {
+>     fly = function(self)
+>         print("bird is flying")
+>     end;
+> }
+> 
+> local obj = Bird()
+> obj:fly() --> "bird is flying"
+> ```
+
+### 接口组合
+
+定义接口时使用 `extends` 关键字可以组合多个接口
+
+> 示例：接口组合
+> ```lua
+> interface "CanEat" {
+>     "eat";
+> }
+> 
+> interface "BirdLike" : extends(CanEat, CanFly) {
+>     "spawn";
+>     "nest";
+> }
+> ```
+
+如上，组合其他接口的同时，还可以定义新的方法
+
+实际上空接口的 `{}` 可以省略，这一点和定义类不同
+
 ### 类型检查
 
 `class.type(obj)`
@@ -100,7 +158,7 @@ obj:foo() --> "foo from MyClass"
 - 如果是基本类型，返回 `type(obj)`
 
 `isinstance(obj, clazz_or_type)`
-- 判断对象是否为指定类或其子类
+- 判断对象是否为指定类或其子类，或接口
 - 也可以用于检查基本类型
 - 与对象方法 `obj:isInstance(clazz)` 等价
 
@@ -109,7 +167,11 @@ obj:foo() --> "foo from MyClass"
 - 与类方法 `clazz:isExtends(base)` 等价
 - 注：同一个类会返回 `true`
 
-上面几个方法接受或返回的类都是对象本身
+`cls:isImplements(...interface)`
+- 判断类是否实现了指定接口，可以多个
+- 没有对应的全局函数（我认为没有必要）
+
+上面几个方法接受或返回的类或接口都是对象本身
 
 -------
 
