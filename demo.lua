@@ -53,20 +53,38 @@ end, print)
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {
-    eat = function()
-        print("Bird eats bugs")
+    eat = function(self)
+        print(self:getClass():toString().." eats bugs")
     end;
-    fly = function()
-        print("Bird flies")
+    fly = function(self)
+        print(self:getClass():toString().." is flying")
     end;
 }
 
 local bird = Bird()
-bird:eat()
-bird:fly()
+bird:eat() --> Bird eats bugs
+bird:fly() --> Bird is flying
 
 -- 接口继承
 interface "BirdLike" : extends(CanEat, CanFly) {
     "spawn";
     "nest";
 }
+
+-- 同时进行继承与实现接口
+class "Eagle" : extends "Bird" : implements(BirdLike) {
+    spawn = function(self)
+        print(self:getClass():toString().." is spawning")
+    end;
+    nest = function(self)
+        print(self:getClass():toString().." is nesting")
+    end;
+}
+
+local eagle = Eagle()
+eagle:eat()   --> Eagle eats bugs
+eagle:fly()   --> Eagle is flying
+eagle:spawn() --> Eagle is spawning
+eagle:nest()  --> Eagle is nesting
+
+print(eagle:isInstance(BirdLike))  --> true
