@@ -63,11 +63,13 @@ function Interface:__tostring()
     :format(self.__iname)
 end
 
----@param name? string
+---@param name? string|table
 local function interface(name)
-    if not name then return setmetatable(
-            {__iname = "<anonymous>"},
-            Interface)
+    local typ = type(name)
+    if typ ~= "string" then
+        local iface = typ == "table" and name or {} ---@type interface
+        iface.__iname = "<anonymous>"
+        return setmetatable(iface, Interface)
     end
     local iface = {__iname = name}
     if nil == Interface.global[name] or Interface.env[name] then
