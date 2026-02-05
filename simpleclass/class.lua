@@ -5,10 +5,9 @@ local type, setmetatable
 
 local Object = {
     __classname = "Object";
-    __class = "class";
+    __class = false;
     __base = false;
     __tostring = function(self) return ("<%s object>"):format(self.__class) end;
-    isInstance = function(self, cls) return self.__class:isExtends(cls) end;
     getClass = function(self) return self.__class end;
     toString = tostring;
     is = rawequal;
@@ -26,12 +25,19 @@ end
 
 ---@classmethod
 function Object:isExtends(base)
-    repeat if
-        self == base
-    then return true end
+    while type(self) == "table" do
+        if self == base then return true end
         self = self.__base
-    until not self
+    end
     return false
+end
+
+function Object:isInstance(cls)
+    if not cls then return false end
+    local typ = type(self)
+    if cls == typ then return true end
+    local obj_cls = typ == "table" and self.__class
+    return obj_cls and obj_cls:isExtends(cls)
 end
 
 local mm_names = {
@@ -41,6 +47,7 @@ local mm_names = {
     "__tostring"
 }
 
+
 local class_MT = {
     __index = function(self, key) return self.__base and self.__base[key] end;
     __tostring = function(self) return self.__classname end;
@@ -49,12 +56,13 @@ local class_MT = {
 
 setmetatable(Object, class_MT)
 
-
-local class = setmetatable({
+---@class class_creator
+local class = {
     env = {};
     mms = mm_names;
     cmt = class_MT;
 
+    name = "<anonymous>";
     base = Object;
     global = _G; ---@class _G
 
@@ -65,42 +73,51 @@ local class = setmetatable({
         end
         return typ
     end;
+}
 
-    extends = function(self, basename)
-        self.base = self.env[basename]
-        return self
-    end;
+function class:extends(basename)
+    self.base = self.env[basename]
+    return self
+end
 
-    create = function(self, clazz)
-        local base = self.base
+---@param clazz table
+function class:def(clazz)
+    local base = self.base
 
-        for i = 1, #self.mms do
-            local mm = self.mms[i]
-            if not clazz[mm] then clazz[mm] = base[mm] end
-        end
-
-        clazz.__classname = self.name
-        clazz.__index = clazz
-        clazz.__base = base
-
-        if self.name ~= "<anonymous>" then
-            -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
-            if nil == self.global[self.name] or self.env[self.name] then
-                self.global[self.name] = clazz
-            end
-            self.env[self.name] = clazz
-        end
-
-        return setmetatable(clazz, self.cmt)
-    end;
-}, {
-    __call = function(self, name)
-        name = name or "<anonymous>"
-        return setmetatable({name = name}, self)
+    for i = 1, #self.mms do
+        local mm = self.mms[i]
+        if not clazz[mm] then clazz[mm] = base[mm] end
     end
-})
+
+    clazz.__classname = self.name
+    clazz.__index = clazz
+    clazz.__base = base
+
+    if self.name ~= "<anonymous>" then
+        -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
+        if nil == self.global[self.name] or self.env[self.name] then
+            self.global[self.name] = clazz
+        end
+        self.env[self.name] = clazz
+    end
+
+    return setmetatable(clazz, self.cmt)
+end
+
+local class_callable = {
+    __call = function(self, name)
+        local typ = type(name)
+        if typ == "table" then
+            return self:def(name)
+        end
+        return setmetatable({
+            name = type(name) == "string" and name ~= '' and
+            name or "<anonymous>"
+        }, self)
+    end
+}
 
 class.__index = class
-class.__call  = class.create
+class.__call  = class.def
 
-return class
+return setmetatable(class, class_callable)
