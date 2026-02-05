@@ -109,6 +109,8 @@ obj:foo() --> "foo from MyClass"
 - 与类方法 `clazz:isExtends(base)` 等价
 - 注：同一个类会返回 `true`
 
+上面几个方法接受或返回的类都是对象本身
+
 -------
 
 LuaSimpleClass 致力于简化 Lua 面向对象开发，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求。
