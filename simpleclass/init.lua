@@ -8,4 +8,3 @@ Object = class.base
 
 isinstance = Object.isInstance
 issubclass = Object.isExtends
-isimplenents = Object.isImplenents
