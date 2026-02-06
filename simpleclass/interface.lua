@@ -68,9 +68,9 @@ local function interface(name)
         local count = 0
         for i = 1, #iface do
             local mname = iface[i]
-            if not self[mname] then
-            self[count+1] = mname
-            self[mname] = true
+            if not iface[mname] then
+            iface[count+1] = mname
+            iface[mname] = true
             count = count + 1
         end end
         iface.__iname = "<anonymous>"
