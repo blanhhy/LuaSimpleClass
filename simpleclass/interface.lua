@@ -1,13 +1,13 @@
----@class class_creator
-local class = require "simpleclass.class"
-local Object = class.base
+local M      = require "simpleclass.m" ---@class simpleclass
+local cc     = M.creator               ---@class class_creator
+local Object = M.env.Object
 
 local type, setmetatable, error
     = type, setmetatable, error
 
 ---@class interface
 local Interface = {
-    env = class.env;
+    env = M.env;
     global = _G; ---@class _G
     __iname = "<anonymous>";
 }
@@ -61,7 +61,7 @@ function Interface:__tostring()
 end
 
 ---@param name? string|table
-local function interface(name)
+function M.interface(name)
     local typ = type(name)
     if typ == "table" then
         local iface = name ---@type interface
@@ -88,12 +88,12 @@ local function interface(name)
     return setmetatable(iface, Interface)
 end
 
-function class:implements(...)
+function cc:implements(...)
     self.ifaces = (...) and {...} or nil
     return self
 end
 
-function class:onDef_impl_check(clazz)
+function cc:onDef_impl_check(clazz)
     if not self.ifaces then return true end
     for i = 1, #self.ifaces do
         local iface = self.ifaces[i]
@@ -116,4 +116,4 @@ function Object:isImplements(...)
     return true
 end
 
-return interface
+return M

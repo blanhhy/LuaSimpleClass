@@ -1,3 +1,5 @@
+local M = require "simpleclass.m" ---@class simpleclass
+
 local type, setmetatable, error
     = type, setmetatable, error
 
@@ -18,7 +20,7 @@ local Super = {
 
 setmetatable(Super, {__mode = 'k'})
 
-local function super(obj)
+function M.super(obj)
     local valid = obj and (Super[obj] or type(obj) == "table" and obj.__base)
     if not valid then error("super: invalid object", 2) end
     local proxy = Super[obj] or setmetatable({
@@ -26,7 +28,7 @@ local function super(obj)
         __super = obj.__base,
     }, Super)
     Super[obj] = proxy -- 缓存代理对象，防止方法反复调用后产生许多临时对象
-    return proxy
+    return proxy ---@type table
 end
 
-return super
+return M

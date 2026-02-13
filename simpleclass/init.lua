@@ -1,10 +1,16 @@
 ---@diagnostic disable: lowercase-global
+---@class simpleclass
+local M = require "simpleclass.local"
 
-class = require "simpleclass.class"
-super = require "simpleclass.super"
-interface = require "simpleclass.interface"
+class = M.class
+super = M.super
+interface = M.interface
+cls_type = M.type
 
-Object = class.base
+local Object = M.object
 
+Object = Object
 isinstance = Object.isInstance
 issubclass = Object.isExtends
+
+return M

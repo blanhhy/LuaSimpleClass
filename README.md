@@ -10,6 +10,12 @@
 require "simpleclass"
 ```
 
+这会将所有模块接口注册到 `_G`，如果你不希望这样，可以只：
+
+```lua
+local simpleclass = require "simpleclass.local"
+```
+
 ## 快速开始
 
 简单的情况用起来与 Luaclass 相差无几
@@ -19,7 +25,7 @@ require "simpleclass"
 
 class "MyClass" {
     foo = function(self)
-        print("foo from "..class.type(self))
+        print("foo from "..cls_type(self))
     end;
 }
 
@@ -155,9 +161,10 @@ obj:foo() --> "foo from MyClass"
 
 ### 类型检查
 
-`class.type(obj)`
+`cls_type(obj)`
 - 返回对象的类
 - 如果是基本类型，返回 `type(obj)`
+- 这是它在 `_G` 中的名字（因为 `_G` 已有 `type` ），在模块中名为 `type`
 
 `isinstance(obj, clazz_or_type)`
 - 判断对象是否为指定类或其子类，或接口
