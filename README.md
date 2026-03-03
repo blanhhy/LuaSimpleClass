@@ -157,7 +157,7 @@ obj:foo() --> "foo from MyClass"
 
 如上，组合其他接口的同时，还可以定义新的方法
 
-实际上空接口的 `{}` 可以省略，这一点和定义类不同
+实际上，不同于定义类，空接口的 `{}` 完全可以省略
 
 ### 类型检查
 
@@ -166,12 +166,12 @@ obj:foo() --> "foo from MyClass"
 - 如果是基本类型，返回 `type(obj)`
 - 这是它在 `_G` 中的名字（因为 `_G` 已有 `type` ），在模块中名为 `type`
 
-`isinstance(obj, clazz_or_type)`
+`isinstance(obj, cls_or_type)`
 - 判断对象是否为指定类或其子类，或接口
 - 也可以用于检查基本类型
 - 与对象方法 `obj:isInstance(clazz)` 等价
 
-`issubclass(sub_clazz, super_clazz)`
+`issubclass(sub_cls, super_cls)`
 - 判断子类是否为父类或其祖先类
 - 与类方法 `clazz:isExtends(base)` 等价
 - 注：同一个类会返回 `true`
