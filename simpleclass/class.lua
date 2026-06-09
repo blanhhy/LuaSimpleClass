@@ -9,7 +9,7 @@ local type, setmetatable, error
 ---@class class_creator
 local cc = {
     name = "<anonymous>";
-    base = require("simpleclass.object");
+    base = require("simpleclass.object").object;
 }
 
 function cc:extends(basename)

@@ -1,6 +1,6 @@
 local M      = require "simpleclass.m" ---@class simpleclass
 local cc     = M.creator               ---@class class_creator
-local Object = M.env.Object
+local object = M.env.object
 
 local type, setmetatable, error
     = type, setmetatable, error
@@ -107,7 +107,7 @@ end
 
 ---@return boolean
 ---@return integer? arg_index if false
-function Object:isImplements(...)
+function object:isImplements(...)
     local ifaces = {...}
     for i = 1, #ifaces do
         if not ifaces[i]:check_impl(self) then

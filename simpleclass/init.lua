@@ -7,10 +7,10 @@ super = M.super
 interface = M.interface
 cls_type = M.type
 
-local Object = M.object
+local object = M.object
 
-Object = Object
-isinstance = Object.isInstance
-issubclass = Object.isExtends
+object = object
+isinstance = object.isInstance
+issubclass = object.isExtends
 
 return M

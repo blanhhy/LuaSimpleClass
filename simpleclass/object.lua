@@ -3,8 +3,8 @@ local M = require "simpleclass.m" ---@class simpleclass
 local type, setmetatable
     = type, setmetatable
 
-local Object = {
-    __classname = "Object";
+local object = {
+    __classname = "object";
     __class = false;
     __base = false;
     __tostring = function(self) return ("<%s object>"):format(self.__class) end;
@@ -13,10 +13,10 @@ local Object = {
     is = rawequal;
 }
 
-Object.__index = Object
+object.__index = object
 
 ---@classmethod
-function Object:new(...)
+function object:new(...)
     local obj = setmetatable({__class = self}, self)
     local init = self.__init
     if type(init) == "function" then init(obj,...) end
@@ -24,7 +24,7 @@ function Object:new(...)
 end
 
 ---@classmethod
-function Object:isExtends(base)
+function object:isExtends(base)
     while type(self) == "table" do
         if self == base then return true end
         self = self.__base
@@ -32,7 +32,7 @@ function Object:isExtends(base)
     return false
 end
 
-function Object:isInstance(cls)
+function object:isInstance(cls)
     local typ = type(self)
 
     if typ ~= "table" or type(cls) ~= "table" then
@@ -53,8 +53,8 @@ function Object:isInstance(cls)
     return false
 end
 
-setmetatable(Object, M.cmt)
-M.env.Object = Object
-M.object = Object
+setmetatable(object, M.cmt)
+M.env.object = object
+M.object = object
 
 return M
