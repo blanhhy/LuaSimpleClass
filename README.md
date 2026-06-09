@@ -164,7 +164,7 @@ obj:foo() --> "foo from MyClass"
 `cls_type(obj)`
 - 返回对象的类
 - 如果是基本类型，返回 `type(obj)`
-- 这是它在 `_G` 中的名字（因为 `_G` 已有 `type` ），在模块中名为 `type`
+- 这是它在 `_G` 中的名字（因为 `_G` 已有 `type`），在模块中名为 `type`
 
 `isinstance(obj, cls_or_type)`
 - 判断对象是否为指定类或其子类，或接口
