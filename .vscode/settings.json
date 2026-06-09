@@ -1,0 +1,6 @@
+{
+    "Lua.misc.parameters": [
+        "--develop=true"
+    ],
+    "Lua.runtime.plugin": "simpleclass.plugin.lua"
+}
