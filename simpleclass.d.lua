@@ -37,3 +37,5 @@ object = {}
 ---@field __class class                         # The class of the object
 ---@field __init function?                      # The constructor
 local obj = {}
+
+function obj:getClass() return self.__class end
