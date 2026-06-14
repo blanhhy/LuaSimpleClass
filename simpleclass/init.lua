@@ -9,7 +9,7 @@ cls_type = M.type
 
 local object = M.object
 
-object = object
+_G.object = object ---@type class
 isinstance = object.isInstance
 issubclass = object.isExtends
 

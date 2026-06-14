@@ -1,6 +1,5 @@
 require "simpleclass"
 
-
 class "Person" {
     __init = function(self, name, age)
         self.name = name
@@ -33,7 +32,7 @@ s1:sayHello()
 
 print(s1:isInstance(Student)) --> true
 print(s1:isInstance(Person))  --> true
-print(s1:isInstance(Object))  --> true
+print(s1:isInstance(object))  --> true
 
 print(cls_type(s1)) --> Student
 
