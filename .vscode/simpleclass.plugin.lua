@@ -82,18 +82,103 @@ local function skipCommentsAndWhitespace(body, i)
     return i
 end
 
+local function isWordBoundary(body, pos, n)
+    if pos <= 1 or pos > n then return true end
+    local c = body:sub(pos, pos)
+    return not c:match('[%w_]')
+end
+
+local function findKeywordEnd(body, startPos, n)
+    local pos = startPos
+    while pos <= n do
+        local c = body:sub(pos, pos)
+        if c == '"' or c == "'" then
+            local q = c
+            pos = pos + 1
+            while pos <= n and body:sub(pos, pos) ~= q do
+                pos = pos + 1
+            end
+            pos = pos + 1
+        elseif c == '-' and pos < n and body:sub(pos + 1, pos + 1) == '-' then
+            while pos <= n and body:sub(pos, pos) ~= '\n' do
+                pos = pos + 1
+            end
+        elseif c == '[' and pos < n and body:sub(pos + 1, pos + 1) == '[' then
+            pos = pos + 2
+            while pos <= n and not (body:sub(pos, pos + 1) == ']]') do
+                pos = pos + 1
+            end
+            pos = pos + 2
+        else
+            local rest = body:sub(pos, math.min(pos + 30, n))
+            if rest:find('^function[%s%(]') then
+                pos = pos + 8
+                local depth = 1
+                while pos <= n and depth > 0 do
+                    local rest2 = body:sub(pos, math.min(pos + 30, n))
+                    if isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 7) == 'function' and isWordBoundary(body, pos + 8, n) then
+                        depth = depth + 1
+                        pos = pos + 8
+                    elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 2) == 'end' and isWordBoundary(body, pos + 3, n) then
+                        depth = depth - 1
+                        if depth == 0 then
+                            return pos + 2
+                        end
+                        pos = pos + 3
+                    else
+                        pos = pos + 1
+                    end
+                end
+                return pos
+            elseif isWordBoundary(body, pos - 1, n) then
+                local kw = body:sub(pos, pos + 1)
+                if body:sub(pos, pos + 1) == 'if' and isWordBoundary(body, pos + 2, n) then
+                    pos = pos + 2
+                    local depth = 1
+                    while pos <= n and depth > 0 do
+                        if isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 7) == 'function' and isWordBoundary(body, pos + 8, n) then
+                            depth = depth + 1; pos = pos + 8
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 2) == 'end' and isWordBoundary(body, pos + 3, n) then
+                            depth = depth - 1; if depth == 0 then return pos + 2 end; pos = pos + 3
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 1) == 'if' and isWordBoundary(body, pos + 2, n) then
+                            depth = depth + 1; pos = pos + 2
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 2) == 'for' and isWordBoundary(body, pos + 3, n) then
+                            depth = depth + 1; pos = pos + 3
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 4) == 'while' and isWordBoundary(body, pos + 5, n) then
+                            depth = depth + 1; pos = pos + 5
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 1) == 'do' and isWordBoundary(body, pos + 2, n) then
+                            depth = depth + 1; pos = pos + 2
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 5) == 'repeat' and isWordBoundary(body, pos + 6, n) then
+                            depth = depth + 1; pos = pos + 6
+                        elseif isWordBoundary(body, pos - 1, n) and body:sub(pos, pos + 4) == 'until' and isWordBoundary(body, pos + 5, n) then
+                            depth = depth - 1; if depth == 0 then return pos + 4 end; pos = pos + 5
+                        else
+                            pos = pos + 1
+                        end
+                    end
+                    return pos
+                end
+            end
+            pos = pos + 1
+        end
+    end
+    return n
+end
+
 local function parseMethods(body)
     local methods = {}
+    local fields = {}
     local n = #body
     local i = 1
     while i <= n do
         i = skipCommentsAndWhitespace(body, i)
         if i > n then break end
-        local nameStart = i
-        local name, after = body:match('^([%w_]+)%s*=%s*(.*)', i)
+
+        local name, afterFieldStart = body:match('^([%w_]+)%s*=%s*()', i)
         if not name then
             break
         end
+
         local commentLines = {}
         local ci = i - 1
         while ci >= 1 do
@@ -117,11 +202,12 @@ local function parseMethods(body)
                 break
             end
         end
-        local funcKw = after:match('^function%s*%(')
-        if funcKw then
-            local eqPos = body:find('=', i, true)
-            local funcWordStart = body:find('function', eqPos + 1, true)
-            local parenStart = body:find('(', funcWordStart, true)
+
+        local rest = body:sub(afterFieldStart, math.min(afterFieldStart + 30, n))
+        local funcMatchStart, funcMatchEnd = rest:find('^function%s*%(')
+
+        if funcMatchStart then
+            local parenStart = afterFieldStart + funcMatchEnd - 1
             local parenDepth = 1
             local j = parenStart + 1
             while j <= n and parenDepth > 0 do
@@ -134,11 +220,8 @@ local function parseMethods(body)
                     if parenDepth == 0 then break end
                     j = j + 1
                 elseif c == '"' or c == "'" then
-                    local q = c
-                    j = j + 1
-                    while j <= n and body:sub(j, j) ~= q do
-                        j = j + 1
-                    end
+                    local q = c; j = j + 1
+                    while j <= n and body:sub(j, j) ~= q do j = j + 1 end
                     j = j + 1
                 else
                     j = j + 1
@@ -146,59 +229,73 @@ local function parseMethods(body)
             end
             local params = body:sub(parenStart + 1, j - 1)
             local funcBodyStart = j + 1
-            local braceDepth = 0
+
+            local depth = 1
             local k = funcBodyStart
-            while k <= n do
+            while k <= n and depth > 0 do
                 local c = body:sub(k, k)
                 if c == '"' or c == "'" then
-                    local q = c
-                    k = k + 1
-                    while k <= n and body:sub(k, k) ~= q do
-                        k = k + 1
-                    end
+                    local q = c; k = k + 1
+                    while k <= n and body:sub(k, k) ~= q do k = k + 1 end
                     k = k + 1
                 elseif c == '-' and k < n and body:sub(k + 1, k + 1) == '-' then
-                    while k <= n and body:sub(k, k) ~= '\n' do
-                        k = k + 1
-                    end
-                elseif c == '{' then
-                    braceDepth = braceDepth + 1
-                    k = k + 1
-                elseif c == '}' then
-                    braceDepth = braceDepth - 1
-                    if braceDepth < 0 then
-                        k = k + 1
-                        break
-                    end
-                    k = k + 1
-                elseif braceDepth == 0 then
-                    local kw_end = body:sub(k, k + 2)
-                    if kw_end == 'end' then
-                        local before = k > 1 and body:sub(k - 1, k - 1) or ' '
-                        local after_ch = k + 3 <= n and body:sub(k + 3, k + 3) or ' '
-                        if (before == ' ' or before == '\n' or before == '\t' or before == ';') and
-                           (after_ch == ' ' or after_ch == '\n' or after_ch == '\t' or after_ch == ';' or after_ch == ',' or after_ch == '}' or after_ch == '') then
-                            break
-                        end
-                    end
-                    k = k + 1
+                    while k <= n and body:sub(k, k) ~= '\n' do k = k + 1 end
+                elseif c == '[' and k < n and body:sub(k + 1, k + 1) == '[' then
+                    k = k + 2
+                    while k <= n and body:sub(k, k + 1) ~= ']]' do k = k + 1 end
+                    k = k + 2
                 else
-                    k = k + 1
+                    if isWordBoundary(body, k - 1, n) then
+                        if body:sub(k, k + 7) == 'function' and isWordBoundary(body, k + 8, n) then
+                            depth = depth + 1; k = k + 8
+                        elseif body:sub(k, k + 1) == 'if' and isWordBoundary(body, k + 2, n) then
+                            depth = depth + 1; k = k + 2
+                        elseif body:sub(k, k + 2) == 'for' and isWordBoundary(body, k + 3, n) then
+                            depth = depth + 1; k = k + 3
+                        elseif body:sub(k, k + 4) == 'while' and isWordBoundary(body, k + 5, n) then
+                            depth = depth + 1; k = k + 5
+                        elseif body:sub(k, k + 5) == 'repeat' and isWordBoundary(body, k + 6, n) then
+                            depth = depth + 1; k = k + 6
+                        elseif body:sub(k, k + 4) == 'until' and isWordBoundary(body, k + 5, n) then
+                            depth = depth - 1; if depth == 0 then k = k + 5; break end; k = k + 5
+                        elseif body:sub(k, k + 2) == 'end' and isWordBoundary(body, k + 3, n) then
+                            depth = depth - 1
+                            if depth == 0 then
+                                k = k + 3
+                                break
+                            end
+                            k = k + 3
+                        else
+                            k = k + 1
+                        end
+                    else
+                        k = k + 1
+                    end
                 end
             end
-            local funcBody = body:sub(funcBodyStart, k - 1)
+
+            local funcBody = body:sub(funcBodyStart, k - 4)
             methods[#methods + 1] = {
                 name = name,
                 params = params,
                 body = funcBody,
                 docs = commentLines,
             }
-            i = k + 3
+            i = k
         else
-            i = i + #name + 1 + #after
+            fields[#fields + 1] = {
+                name = name,
+                docs = commentLines,
+            }
+            local lineEnd = body:find('[\n;]', afterFieldStart)
+            if lineEnd then
+                i = lineEnd + 1
+            else
+                i = n + 1
+            end
         end
     end
-    return methods
+    return methods, fields
 end
 
 local function getFirstParamName(params)
@@ -356,17 +453,28 @@ function OnSetText(uri, text)
             if not className then
                 pos = nextPos + 5
             else
-                local methods = parseMethods(body)
+                local methods, fields = parseMethods(body)
                 local parent = parentName or 'object'
                 local out = {}
                 out[#out + 1] = '---@class ' .. className .. ' : ' .. parent
                 out[#out + 1] = '---@operator call:' .. className
                 out[#out + 1] = className .. ' = {}'
+
+                local newMethod = nil
                 local initMethod = nil
                 for _, m in ipairs(methods) do
+                    if m.name == 'new' then newMethod = m end
                     if m.name == '__init' then initMethod = m end
                 end
-                if initMethod then
+
+                if newMethod then
+                    local paramStr = stripFirstParam(newMethod.params)
+                    for _, docLine in ipairs(newMethod.docs) do
+                        out[#out + 1] = docLine
+                    end
+                    out[#out + 1] = '---@diagnostic disable-next-line: unused-local'
+                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self end'
+                elseif initMethod then
                     local paramStr = stripFirstParam(initMethod.params)
                     for _, docLine in ipairs(initMethod.docs) do
                         out[#out + 1] = docLine
@@ -376,25 +484,37 @@ function OnSetText(uri, text)
                 else
                     out[#out + 1] = 'function ' .. className .. ':new()return self end'
                 end
-                for _, m in ipairs(methods) do
-                    local firstParam = getFirstParamName(m.params)
-                    for _, docLine in ipairs(m.docs) do
+
+                for _, f in ipairs(fields) do
+                    for _, docLine in ipairs(f.docs) do
                         out[#out + 1] = docLine
                     end
-                    if firstParam == 'self' then
-                        local cleanParams = stripFirstParam(m.params)
-                        out[#out + 1] = 'function ' .. className .. ':' .. m.name .. '(' .. cleanParams .. ')'
-                    else
-                        out[#out + 1] = 'function ' .. className .. '.' .. m.name .. '(' .. m.params .. ')'
-                    end
-                    if m.body and #m.body > 0 then
-                        local trimmed = trimBody(m.body)
-                        if #trimmed > 0 then
-                            out[#out + 1] = trimmed
-                        end
-                    end
-                    out[#out + 1] = 'end'
+                    out[#out + 1] = className .. '.' .. f.name .. ' = nil'
                 end
+
+                for _, m in ipairs(methods) do
+                    if m.name == 'new' then
+                    else
+                        local firstParam = getFirstParamName(m.params)
+                        for _, docLine in ipairs(m.docs) do
+                            out[#out + 1] = docLine
+                        end
+                        if firstParam == 'self' then
+                            local cleanParams = stripFirstParam(m.params)
+                            out[#out + 1] = 'function ' .. className .. ':' .. m.name .. '(' .. cleanParams .. ')'
+                        else
+                            out[#out + 1] = 'function ' .. className .. '.' .. m.name .. '(' .. m.params .. ')'
+                        end
+                        if m.body and #m.body > 0 then
+                            local trimmed = trimBody(m.body)
+                            if #trimmed > 0 then
+                                out[#out + 1] = trimmed
+                            end
+                        end
+                        out[#out + 1] = 'end'
+                    end
+                end
+
                 diffs[#diffs + 1] = {
                     start  = classEnd + 1,
                     finish = classEnd,

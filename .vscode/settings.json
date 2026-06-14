@@ -1,3 +1,6 @@
 {
-    "Lua.runtime.plugin": "./.vscode/simpleclass.plugin.lua"
+    "Lua.runtime.plugin": ".vscode/simpleclass.plugin.lua",
+    "Lua.diagnostics.disable": [
+        "deprecated"
+    ]
 }
