@@ -2,6 +2,9 @@
 
 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
 
+> Note:
+> `simpleclass` 的类型结构比 `luaclass` 更简单，因此有更好的 LS 类型推导支持！
+
 ## 安装 & 导入
 
 同样的，下载主文件夹 `simpleclass` 到模块目录，然后在 Lua 代码中导入即可
@@ -181,6 +184,18 @@ obj:foo() --> "foo from MyClass"
 - 没有对应的全局函数（我认为没有必要）
 
 上面几个方法接受或返回的类或接口都是对象本身
+
+### 类型推导
+
+`simpleclass` 与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型系统有良好的兼容性，只需在工作区中配置：
+
+```json
+{
+    "Lua.runtime.plugin": ".vscode/simpleclass.plugin.lua"
+}
+```
+
+并且保持 `simpleclass` 文件夹在 LS 支持的模块目录中，即可让 LS 自动推导由 `simpleclass` 定义的类和接口的类型
 
 -------
 
