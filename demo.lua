@@ -1,6 +1,8 @@
 require "simpleclass"
 
 class "Person" {
+    ---@param name string
+    ---@param age integer
     __init = function(self, name, age)
         self.name = name
         self.age = age
@@ -11,6 +13,9 @@ class "Person" {
 }
 
 class "Student" : extends "Person" {
+    ---@param name string
+    ---@param age integer
+    ---@param grade string
     __init = function(self, name, age, grade)
         super(self):__init(name, age)
         self.grade = grade
@@ -20,7 +25,7 @@ class "Student" : extends "Person" {
     end;
 }
 
-local p1 = Person:new("John", 25)
+local p1 = Person("John", 25)
 p1:sayHello()
 
 -- Output: Hello, my name is John and I am 25 years old.
@@ -35,7 +40,6 @@ print(s1:isInstance(Person))  --> true
 print(s1:isInstance(object))  --> true
 
 print(cls_type(s1)) --> Student
-
 
 interface "CanEat" {"eat"}
 interface "CanFly" {"fly"}

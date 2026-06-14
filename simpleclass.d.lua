@@ -10,7 +10,8 @@ function proto:isExtends(base) end
 
 ---Check if the class implements the interface
 ---@param interface interface
----@return boolean
+---@return boolean  ok
+---@return integer? arg_index if not ok
 function proto:isImplements(interface) end
 
 ---Check if the object is an instance of the class or interface
@@ -25,7 +26,6 @@ function proto:toString() end
 ---Create a new object of the class
 ---@return object
 function proto:new() end
-
 
 ---@class class : simpleclass.proto, metatable  # A reflection of a class
 ---@field __classname string                    # The name of the class

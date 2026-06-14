@@ -1,5 +1,5 @@
 local M      = require "simpleclass.m" ---@class simpleclass
-local cc     = M.creator               ---@class class_creator
+local cc     = M.creator               ---@class simpleclass.creator
 local object = M.env.object
 
 local type, setmetatable, error
@@ -14,7 +14,9 @@ local Interface = {
 
 Interface.__index = Interface
 
--- 接口组合
+---Extend the interface with other interfaces
+---@param ... interface
+---@return interface
 function Interface:extends(...)
     local bases = {...}
     local iface, mname
@@ -60,7 +62,9 @@ function Interface:__tostring()
     :format(self.__iname)
 end
 
+---Define a new interface
 ---@param name? string|table
+---@return interface
 function M.interface(name)
     local typ = type(name)
     if typ == "table" then
@@ -88,6 +92,8 @@ function M.interface(name)
     return setmetatable(iface, Interface)
 end
 
+---Implements the interfaces
+---@param ... interface
 function cc:implements(...)
     self.ifaces = (...) and {...} or nil
     return self

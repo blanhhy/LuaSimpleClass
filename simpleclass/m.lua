@@ -20,6 +20,15 @@ local M = {
     cmt = class_MT;
 }
 
+---Get the type of a value, considering classes as special types  
+---eg: 
+---```lua
+---cls_type(Eagle()) => Eagle
+---cls_type("Hello") => "string"
+---```
+---@param val object
+---@return class
+---@overload fun(val):type
 function M.type(val)
     local typ = type(val)
     if typ == "table" and val.__class then

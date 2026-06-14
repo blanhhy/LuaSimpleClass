@@ -24,7 +24,6 @@ function object:new(...)
 end
 
 ---@classmethod
----@param base class
 ---@return boolean
 function object:isExtends(base)
     while type(self) == "table" do

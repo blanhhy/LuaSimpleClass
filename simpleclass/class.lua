@@ -6,12 +6,15 @@ local M = require "simpleclass.m" ---@class simpleclass
 local type, setmetatable, error
     = type, setmetatable, error
 
----@class class_creator
+---@class simpleclass.creator
+---@operator call:simpleclass.creator
 local cc = {
     name = "<anonymous>";
     base = require("simpleclass.object").object;
 }
 
+---Single inheritance keyword
+---@param basename? string
 function cc:extends(basename)
     self.base = M.env[basename]
     return self
@@ -53,6 +56,22 @@ cc.__call  = cc.def
 
 M.creator = cc
 
+---Define a new class  
+---eg:
+---```lua
+---class "MyClass" : extends "MyBaseClass" {
+---    __init = function(self)
+---        super(self):__init()
+---    end
+---}
+---```
+---or anonymous:
+---```lua
+---local MyAnonymousClass = class {}
+---```
+---@param name? string
+---@return simpleclass.creator
+---@overload fun(body:table):class
 function M.class(name)
     local typ = type(name)
     if typ == "table" then
