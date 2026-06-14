@@ -235,7 +235,7 @@ local function findClassKeyword(text, from)
         local cstart = text:find('class', pos, true)
         if not cstart then return nil end
         local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_]') then
+        if not before:match('[%w_.]') then
             local afterStart = cstart + 5
             local restStart = afterStart
             while restStart <= n and text:sub(restStart, restStart):match('%s') do
@@ -257,7 +257,7 @@ local function findInterfaceKeyword(text, from)
         local cstart = text:find('interface', pos, true)
         if not cstart then return nil end
         local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_]') then
+        if not before:match('[%w_.]') then
             local afterStart = cstart + 9
             local restStart = afterStart
             while restStart <= n and text:sub(restStart, restStart):match('%s') do
@@ -413,8 +413,9 @@ function OnTransformAst(uri, ast)
     local classes = {}
     local function walkClasses(node)
         if not node or type(node) ~= 'table' then return end
+        local callNode
         if node.type == 'call' then
-            local callNode = node.node
+            callNode = node.node
             if callNode and callNode[1] == 'class' then
                 local args = node.args
                 if args and #args >= 2 then
