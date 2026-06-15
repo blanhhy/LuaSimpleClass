@@ -187,12 +187,10 @@ obj:foo() --> "foo from MyClass"
 
 ### 类型推导
 
-`simpleclass` 与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型系统有良好的兼容性，只需在工作区中配置：
+`simpleclass` 与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型系统有良好的兼容性，只需复制本仓库提供的 `simpleclass.plugin.lua` 插件，在 LS 配置中添加：
 
 ```json
-{
-    "Lua.runtime.plugin": ".vscode/simpleclass.plugin.lua"
-}
+"runtime.plugin": ".luals/simpleclass.plugin.lua"
 ```
 
 并且保持 `simpleclass` 文件夹在 LS 支持的模块目录中，即可让 LS 自动推导由 `simpleclass` 定义的类和接口的类型

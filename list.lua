@@ -1,3 +1,4 @@
+---@diagnostic disable: deprecated
 if not class then
     require "simpleclass"
 end
