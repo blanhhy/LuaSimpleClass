@@ -1,6 +1,7 @@
 ---@meta
 
 ---@class class                # A reflection of a class
+---@operator call:object       # Instantiation
 ---@field __classname string   # The name of the class
 ---@field __base class         # The base class of the class
 local class = {} -- A virtual variable to declare methods
