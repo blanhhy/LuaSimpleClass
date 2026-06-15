@@ -7,7 +7,7 @@ local type, setmetatable, error
     = type, setmetatable, error
 
 ---@class simpleclass.creator
----@operator call:simpleclass.creator
+---@operator call:class
 local cc = {
     name = "<anonymous>";
     base = require("simpleclass.object").object;
@@ -21,6 +21,7 @@ function cc:extends(basename)
 end
 
 ---@param clazz table
+---@return class
 function cc:def(clazz)
     local base = self.base
 
