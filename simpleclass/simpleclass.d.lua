@@ -14,8 +14,9 @@ function proto:isExtends(base) end
 ---@return integer? arg_index if not ok
 function proto:isImplements(interface) end
 
----Check if the object is an instance of the class or interface
----@param cls class|interface
+---Check if the object is an instance of the class or interface  
+---(also compatible with lua type)
+---@param cls class|interface|type
 ---@return boolean
 function proto:isInstance(cls) end
 

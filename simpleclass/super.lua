@@ -20,6 +20,15 @@ local Super = {
 
 setmetatable(Super, {__mode = 'k'})
 
+---@class simpleclass.super # A proxy object to call superclass methods
+---@field self object       # The object to call the method on
+---@field __super class     # The superclass of the object
+---@field [string] function # Methods of the superclass
+
+---To call superclass methods  
+---eg: `super(self):__init()`
+---@param obj object|class
+---@return simpleclass.super
 function M.super(obj)
     local valid = obj and (Super[obj] or type(obj) == "table" and obj.__base)
     if not valid then error("super: invalid object", 2) end
@@ -28,7 +37,7 @@ function M.super(obj)
         __super = obj.__base,
     }, Super)
     Super[obj] = proxy -- 缓存代理对象，防止方法反复调用后产生许多临时对象
-    return proxy ---@type table
+    return proxy
 end
 
 return M

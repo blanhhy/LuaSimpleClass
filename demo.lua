@@ -35,9 +35,10 @@ s1:sayHello()
 
 -- Output: Hello, my name is Jane and I am a senior year old student.
 
-print(s1:isInstance(Student)) --> true
-print(s1:isInstance(Person))  --> true
-print(s1:isInstance(object))  --> true
+print(s1:isInstance(Student))  --> true
+print(s1:isInstance(Person))   --> true
+print(s1:isInstance(object))   --> true
+print(isinstance(s1, "table")) --> true
 
 print(cls_type(s1)) --> Student
 
