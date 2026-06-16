@@ -304,18 +304,39 @@ local function findClassKeyword(text, from)
     while pos <= n do
         local cstart = text:find('class', pos, true)
         if not cstart then return nil end
-        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_.]') then
-            local afterStart = cstart + 5
-            local restStart = afterStart
-            while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                restStart = restStart + 1
-            end
-            if restStart <= n and text:sub(restStart, restStart) == '"' then
-                return cstart
+        local scanPos = pos
+        while scanPos < cstart do
+            local c = text:sub(scanPos, scanPos)
+            if c == '"' or c == "'" then
+                local q = c; scanPos = scanPos + 1
+                while scanPos <= n and text:sub(scanPos, scanPos) ~= q and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
+                scanPos = scanPos + 1
+            elseif c == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
+                while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
+            elseif c == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
+                scanPos = scanPos + 2
+                while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do scanPos = scanPos + 1 end
+                scanPos = scanPos + 2
+            else
+                scanPos = scanPos + 1
             end
         end
-        pos = cstart + 1
+        if scanPos > cstart then
+            pos = cstart + 1
+        else
+            local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
+            if not before:match('[%w_.]') then
+                local afterStart = cstart + 5
+                local restStart = afterStart
+                while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                    restStart = restStart + 1
+                end
+                if restStart <= n and text:sub(restStart, restStart) == '"' then
+                    return cstart
+                end
+            end
+            pos = cstart + 1
+        end
     end
     return nil
 end
@@ -326,18 +347,39 @@ local function findInterfaceKeyword(text, from)
     while pos <= n do
         local cstart = text:find('interface', pos, true)
         if not cstart then return nil end
-        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_.]') then
-            local afterStart = cstart + 9
-            local restStart = afterStart
-            while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                restStart = restStart + 1
-            end
-            if restStart <= n and text:sub(restStart, restStart) == '"' then
-                return cstart
+        local scanPos = pos
+        while scanPos < cstart do
+            local c = text:sub(scanPos, scanPos)
+            if c == '"' or c == "'" then
+                local q = c; scanPos = scanPos + 1
+                while scanPos <= n and text:sub(scanPos, scanPos) ~= q and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
+                scanPos = scanPos + 1
+            elseif c == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
+                while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
+            elseif c == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
+                scanPos = scanPos + 2
+                while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do scanPos = scanPos + 1 end
+                scanPos = scanPos + 2
+            else
+                scanPos = scanPos + 1
             end
         end
-        pos = cstart + 1
+        if scanPos > cstart then
+            pos = cstart + 1
+        else
+            local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
+            if not before:match('[%w_.]') then
+                local afterStart = cstart + 9
+                local restStart = afterStart
+                while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                    restStart = restStart + 1
+                end
+                if restStart <= n and text:sub(restStart, restStart) == '"' then
+                    return cstart
+                end
+            end
+            pos = cstart + 1
+        end
     end
     return nil
 end
