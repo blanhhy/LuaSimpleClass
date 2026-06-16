@@ -20,6 +20,7 @@ class "Student" : extends "Person" {
         super(self):__init(name, age)
         self.grade = grade
     end;
+    ---@override
     sayHello = function(self)
         print("Hello, my name is ".. self.name.. " and I am a ".. self.grade.. " year old student.")
     end;

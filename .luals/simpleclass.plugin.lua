@@ -197,12 +197,20 @@ local function parseMethods(body)
                 end
             end
 
+            local isOverride = false
+            for _, doc in ipairs(commentLines) do
+                if doc:match('^%-%-%-@[Oo]verride') then
+                    isOverride = true
+                    break
+                end
+            end
             local funcBody = body:sub(funcBodyStart, k - 4)
             methods[#methods + 1] = {
                 name = name,
                 params = params,
                 body = funcBody,
                 docs = commentLines,
+                isOverride = isOverride,
             }
             i = k
         else
@@ -436,6 +444,25 @@ function OnSetText(uri, text)
                         end
                         out[#out + 1] = 'end'
                     end
+                end
+
+                local overrideMethods = {}
+                for _, m in ipairs(methods) do
+                    if m.isOverride and m.name ~= 'new' then
+                        overrideMethods[#overrideMethods + 1] = m
+                    end
+                end
+                if #overrideMethods > 0 and parentName then
+                    out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
+                    out[#out + 1] = 'local function __ls_check__()'
+                    out[#out + 1] = '    ---@class ' .. className .. '.__base : ' .. parentName
+                    out[#out + 1] = '    local _ = {}'
+                    out[#out + 1] = '    local override_method'
+                    for _, m in ipairs(overrideMethods) do
+                        out[#out + 1] = '    override_method = _.' .. m.name
+                    end
+                    out[#out + 1] = '    return override_method'
+                    out[#out + 1] = 'end'
                 end
 
                 diffs[#diffs + 1] = {
