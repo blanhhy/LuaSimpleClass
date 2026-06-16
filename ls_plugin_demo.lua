@@ -78,4 +78,32 @@ make_person_say_hello(s1)
 make_person_say_hello(p1)
 
 -- 试试分别向make_person_say_hello函数传递s1和p1，键入时观察类型提示
--- 你会发现一切正常
+-- 你会发现一切正常，因为它们都是Test_Person
+
+interface "Test_CanFly" {"fly"}
+
+class "Test_Bird" : implements(Test_CanFly) {
+    fly = function(self)
+        print(self:getClass():toString().." is flying")
+    end;
+}
+
+class "Test_Plane" : implements(Test_CanFly) {
+    fly = function(self)
+        print(self:getClass():toString().." is flying")
+    end;
+}
+
+local bird = Test_Bird()
+local plane = Test_Plane()
+
+---@param flyable Test_CanFly
+local function make_fly(flyable)
+    flyable:fly()
+end
+
+make_fly(bird)
+make_fly(plane)
+
+-- 试试分别向 make_fly 函数传递bird和plane，键入时观察类型提示
+-- 你会发现一切正常，因为它们都是Test_CanFly
