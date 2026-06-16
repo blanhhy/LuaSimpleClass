@@ -1,14 +1,17 @@
 ---@meta
 
----@class class                # A reflection of a class
----@operator call:object       # Instantiation
----@field __classname string   # The name of the class
----@field __base class         # The base class of the class
+---@class class                     # A reflection of a class
+---@operator call:class.instance    # Instantiation
+---@field __classname string        # The name of the class
+---@field __base class              # The base class of the class
 local class = {} -- A virtual variable to declare methods
 
----@class object : class       # The root class
----@field __class class        # The class of the object
----@field __init function?     # The constructor
+---@class class.instance : object   # Reflection of a class instance
+---@field [string] any              # unknown fields
+
+---@class object : class            # The root class
+---@field __class class             # The class of the object
+---@field __init function?          # The constructor
 object = {} -- Base class of all classes
 
 ---Check if the class extends the base class
