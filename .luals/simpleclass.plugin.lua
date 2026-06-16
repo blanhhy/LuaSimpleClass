@@ -452,10 +452,10 @@ function OnSetText(uri, text)
                         overrideMethods[#overrideMethods + 1] = m
                     end
                 end
-                if #overrideMethods > 0 and parentName then
+                if #overrideMethods > 0 then
                     out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
                     out[#out + 1] = 'local function __ls_check__()'
-                    out[#out + 1] = '    ---@class ' .. className .. '.__base : ' .. parentName
+                    out[#out + 1] = '    ---@class ' .. parent
                     out[#out + 1] = '    local _ = {}'
                     out[#out + 1] = '    local override_method'
                     for _, m in ipairs(overrideMethods) do
