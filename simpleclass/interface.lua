@@ -62,6 +62,8 @@ function Interface:__tostring()
     :format(self.__iname)
 end
 
+M = M ---@class simpleclass
+
 ---Define a new interface
 ---@param name? string|table
 ---@return interface
