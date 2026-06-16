@@ -506,4 +506,9 @@ class "list" {
 -- eg: slice = arr(1, 3[, 1])
 list.__call = list.sub
 
+---操作符标注
+---@class list
+---@operator concat(list): list
+---@operator mul(integer): list
+
 return list
