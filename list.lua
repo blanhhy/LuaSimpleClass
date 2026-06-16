@@ -71,6 +71,8 @@ class "list" {
     -- 可以从参数列表或已有的数组来创建数组, 也可以创建空数组
     ---@Override
     ---@Classmethod
+    ---@param ... any
+    ---@overload fun(self:list, array:any[])
     new = function(self, ...)
         local nargs = select('#', ...)
 
@@ -225,6 +227,8 @@ class "list" {
     end;
 
     -- 填充数组的某块区域为指定值
+    ---@param i? integer
+    ---@param j? integer
     fill = function(self, value, i, j)
         if nil == value then
             error("Cannot add nil into a list", 2)
@@ -254,6 +258,7 @@ class "list" {
     -- 查找方法
 
     -- 找到第一个匹配的索引, 返回 nil 则表示没有找到
+    ---@return integer?
     index = function(self, value)
         if nil == value then
             error("non-nil value expected.", 2)
@@ -265,6 +270,7 @@ class "list" {
     end;
 
     -- 找到最后一个匹配的索引, 返回 nil 则表示没有找到
+    ---@return integer?
     lastIndex = function(self, value)
         if nil == value then
             error("non-nil value expected.", 2)
@@ -276,6 +282,7 @@ class "list" {
     end;
 
     -- 找到所有匹配的索引, 返回值是包含所有索引的 list 对象
+    ---@return list
     indices = function(self, value)
         if nil == value then
             error("non-nil value expected.", 2)
@@ -308,13 +315,14 @@ class "list" {
 
     -- 复制数组, 是直接以自己为参数 new 一个新的
     copy = function(self)
-        return list.new(self)
+        return list:new(self)
     end;
 
     -- 数组切片, 得到一个新的数组
     ---@param i? integer 起始索引
     ---@param j? integer 结束索引
     ---@param step? integer 切片的步长
+    ---@return list
     sub = function(self, i, j, step)
         i = i and list.chkidx(i, self.length, self.length) or 1
         j = j and list.chkidx(j, self.length, self.length) or self.length
@@ -335,6 +343,7 @@ class "list" {
 
     -- 复制数组 n 次, 得到一个新的数组
     ---@param n integer
+    ---@return list
     rep = function(self, n)
         if type(n) ~= "number" or Int(n) ~= n then
             error(("<integer> expected, got <%s>."):format(n))
@@ -354,6 +363,7 @@ class "list" {
     end;
 
     -- 获取去重数组
+    ---@return list
     unique = function(self)
         local unique = setmetatable({__class = list}, list)
         local seen = {}
@@ -372,6 +382,7 @@ class "list" {
 
     -- 获取值的集合, 返回一个 table
     -- 键是所有的值, 值是它们第一次出现的索引
+    ---@return table<any, integer>
     values = function(self)
         local values = {}
         for i = self.length, 1, -1 do
