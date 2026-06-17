@@ -124,4 +124,4 @@ function object:isImplements(...)
     return true
 end
 
-return M
+return M.interface

@@ -40,4 +40,4 @@ function M.super(obj)
     return proxy
 end
 
-return M
+return M.super

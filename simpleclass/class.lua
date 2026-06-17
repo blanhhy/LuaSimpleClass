@@ -10,7 +10,7 @@ local type, setmetatable, error
 ---@operator call:class
 local cc = {
     name = "<anonymous>";
-    base = require("simpleclass.object").object;
+    base = require("simpleclass.object");
 }
 
 ---Single inheritance keyword
@@ -84,4 +84,4 @@ function M.class(name)
     }, cc)
 end
 
-return M
+return M.class

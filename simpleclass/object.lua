@@ -58,4 +58,4 @@ setmetatable(object, M.cmt)
 M.env.object = object
 M.object = object
 
-return M
+return object
