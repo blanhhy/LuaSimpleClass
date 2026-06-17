@@ -13,7 +13,21 @@ local object = {
     is = rawequal;
 }
 
-object.__index = object
+function object:__index(key)
+    local getter = type(key) == "string" and self.__class["get." .. key]
+    if getter and type(getter) == "function" then
+        return getter(self)
+    end
+    return self.__class[key]
+end
+
+function object:__newindex(key, value)
+    local setter = type(key) == "string" and self.__class["set." .. key]
+    if setter and type(setter) == "function" then
+        setter(self, value)
+    end
+    return rawset(self, key, value)
+end
 
 ---@classmethod
 function object:new(...)

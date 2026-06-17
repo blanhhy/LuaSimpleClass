@@ -95,3 +95,23 @@ eagle:nest()  --> Eagle is nesting
 
 print(Eagle:isImplements(BirdLike)) --> true
 print(eagle:isInstance(BirdLike))   --> true
+
+-- 使用getter和setter
+class "Account" {
+    ---@param balance? number
+    __init = function(self, balance)
+        self._balance = balance or 0
+    end;
+    ['get.balance'] = function(self)
+        return self._balance
+    end;
+    ['set.balance'] = function(self, value)
+        self._balance = value
+    end;
+}
+
+local account = Account(100)
+print(account.balance) --> 100
+
+account.balance = 200
+print(account.balance) --> 200

@@ -31,7 +31,6 @@ function cc:def(clazz)
     end
 
     clazz.__classname = self.name
-    clazz.__index = clazz
     clazz.__base = base
 
     setmetatable(clazz, M.cmt)

@@ -32,6 +32,39 @@ local function findBraceEnd(text, startPos)
     return nil
 end
 
+local function parseClassBlock(text, startPos)
+    local n = #text
+    local pos = startPos
+    local classKwEnd = pos + 4
+    local restStart = classKwEnd + 1
+    while restStart <= n and text:sub(restStart, restStart):match('%s') do
+        restStart = restStart + 1
+    end
+    if restStart > n or text:sub(restStart, restStart) ~= '"' then
+        return nil
+    end
+    local nameStart = restStart + 1
+    local nameEnd = text:find('"', nameStart, true)
+    if not nameEnd then return nil end
+    local className = text:sub(nameStart, nameEnd - 1)
+    pos = nameEnd + 1
+    local parentName = nil
+    local extStart, extEnd = text:find('^%s*:?%s*extends?%s*"', pos)
+    if extStart then
+        local pnameStart = extEnd + 1
+        local pnameEnd = text:find('"', pnameStart, true)
+        if pnameEnd then
+            parentName = text:sub(pnameStart, pnameEnd - 1)
+            pos = pnameEnd + 1
+        end
+    end
+    local braceStart = text:find('{', pos)
+    if not braceStart then return nil end
+    local braceEnd = findBraceEnd(text, braceStart)
+    if not braceEnd then return nil end
+    return className, parentName, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1)
+end
+
 local function skipCommentsAndWhitespace(body, i)
     local n = #body
     while i <= n do
@@ -55,81 +88,6 @@ local function isWordBoundary(body, pos, n)
     return not c:match('[%w_]')
 end
 
-local function parseClassBlock(text, startPos)
-    local n = #text
-    local pos = startPos
-    local classKwEnd = pos + 4
-    local restStart = classKwEnd + 1
-    while restStart <= n and text:sub(restStart, restStart):match('%s') do
-        restStart = restStart + 1
-    end
-    if restStart > n or text:sub(restStart, restStart) ~= '"' then
-        return nil
-    end
-    local nameStart = restStart + 1
-    local nameEnd = text:find('"', nameStart, true)
-    if not nameEnd then return nil end
-    local className = text:sub(nameStart, nameEnd - 1)
-    pos = nameEnd + 1
-    local parentName = nil
-    local implementsList = {}
-
-    while pos <= n do
-        pos = skipCommentsAndWhitespace(text, pos)
-        if pos > n then break end
-        local c = text:sub(pos, pos)
-        if c == ':' then
-            local extStart, extEnd = text:find('^:%s*extends?%s*"', pos)
-            if extStart then
-                local pnameStart = extEnd + 1
-                local pnameEnd = text:find('"', pnameStart, true)
-                if pnameEnd then
-                    parentName = text:sub(pnameStart, pnameEnd - 1)
-                    pos = pnameEnd + 1
-                else
-                    pos = pos + 1
-                end
-            else
-                local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
-                if impStart then
-                    local parenStart = impEnd
-                    local parenDepth = 1
-                    local j = parenStart + 1
-                    while j <= n and parenDepth > 0 do
-                        local cc = text:sub(j, j)
-                        if cc == '(' then parenDepth = parenDepth + 1; j = j + 1
-                        elseif cc == ')' then parenDepth = parenDepth - 1; if parenDepth == 0 then break end; j = j + 1
-                        elseif cc == '"' or cc == "'" then
-                            local q = cc; j = j + 1
-                            while j <= n and text:sub(j, j) ~= q do j = j + 1 end
-                            j = j + 1
-                        else
-                            j = j + 1
-                        end
-                    end
-                    local inside = text:sub(parenStart + 1, j - 1)
-                    for iname in inside:gmatch('[%w_]+') do
-                        implementsList[#implementsList + 1] = iname
-                    end
-                    pos = j + 1
-                else
-                    pos = pos + 1
-                end
-            end
-        elseif c == '{' then
-            break
-        else
-            pos = pos + 1
-        end
-    end
-
-    local braceStart = text:find('{', pos)
-    if not braceStart then return nil end
-    local braceEnd = findBraceEnd(text, braceStart)
-    if not braceEnd then return nil end
-    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1)
-end
-
 local function parseMethods(body)
     local methods = {}
     local fields = {}
@@ -139,9 +97,31 @@ local function parseMethods(body)
         i = skipCommentsAndWhitespace(body, i)
         if i > n then break end
 
-        local name, afterFieldStart = body:match('^([%w_]+)%s*=%s*()', i)
+        local name, afterFieldStart
+        do
+            local n1, p1 = body:match('^([%w_]+)%s*=%s*()', i)
+            local n2, p2 = body:match("^%['([^']+)'%]%s*=%s*()", i)
+            local n3, p3 = body:match('^%"([^"]+)"%]%s*=%s*()', i)
+            if n1 then
+                name = n1; afterFieldStart = p1
+            elseif n2 then
+                name = n2; afterFieldStart = p2
+            elseif n3 then
+                name = n3; afterFieldStart = p3
+            end
+        end
         if not name then
             break
+        end
+
+        local isGetter = false
+        local isSetter = false
+        if name:match('^get%.(.+)$') then
+            isGetter = true
+            name = name:match('^get%.(.+)$')
+        elseif name:match('^set%.(.+)$') then
+            isSetter = true
+            name = name:match('^set%.(.+)$')
         end
 
         local commentLines = {}
@@ -239,26 +219,22 @@ local function parseMethods(body)
                 end
             end
 
-            local isOverride = false
-            for _, doc in ipairs(commentLines) do
-                if doc:match('^%-%-%-@[Oo]verride') then
-                    isOverride = true
-                    break
-                end
-            end
             local funcBody = body:sub(funcBodyStart, k - 4)
             methods[#methods + 1] = {
                 name = name,
                 params = params,
                 body = funcBody,
                 docs = commentLines,
-                isOverride = isOverride,
+                isGetter = isGetter,
+                isSetter = isSetter,
             }
             i = k
         else
             fields[#fields + 1] = {
                 name = name,
                 docs = commentLines,
+                isGetter = isGetter,
+                isSetter = isSetter,
             }
             local lineEnd = body:find('[\n;]', afterFieldStart)
             if lineEnd then
@@ -304,39 +280,18 @@ local function findClassKeyword(text, from)
     while pos <= n do
         local cstart = text:find('class', pos, true)
         if not cstart then return nil end
-        local scanPos = pos
-        while scanPos < cstart do
-            local c = text:sub(scanPos, scanPos)
-            if c == '"' or c == "'" then
-                local q = c; scanPos = scanPos + 1
-                while scanPos <= n and text:sub(scanPos, scanPos) ~= q and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
-                scanPos = scanPos + 1
-            elseif c == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
-                while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
-            elseif c == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
-                scanPos = scanPos + 2
-                while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do scanPos = scanPos + 1 end
-                scanPos = scanPos + 2
-            else
-                scanPos = scanPos + 1
+        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
+        if not before:match('[%w_.]') then
+            local afterStart = cstart + 5
+            local restStart = afterStart
+            while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                restStart = restStart + 1
+            end
+            if restStart <= n and text:sub(restStart, restStart) == '"' then
+                return cstart
             end
         end
-        if scanPos > cstart then
-            pos = cstart + 1
-        else
-            local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-            if not before:match('[%w_.]') then
-                local afterStart = cstart + 5
-                local restStart = afterStart
-                while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                    restStart = restStart + 1
-                end
-                if restStart <= n and text:sub(restStart, restStart) == '"' then
-                    return cstart
-                end
-            end
-            pos = cstart + 1
-        end
+        pos = cstart + 1
     end
     return nil
 end
@@ -347,39 +302,18 @@ local function findInterfaceKeyword(text, from)
     while pos <= n do
         local cstart = text:find('interface', pos, true)
         if not cstart then return nil end
-        local scanPos = pos
-        while scanPos < cstart do
-            local c = text:sub(scanPos, scanPos)
-            if c == '"' or c == "'" then
-                local q = c; scanPos = scanPos + 1
-                while scanPos <= n and text:sub(scanPos, scanPos) ~= q and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
-                scanPos = scanPos + 1
-            elseif c == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
-                while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do scanPos = scanPos + 1 end
-            elseif c == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
-                scanPos = scanPos + 2
-                while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do scanPos = scanPos + 1 end
-                scanPos = scanPos + 2
-            else
-                scanPos = scanPos + 1
+        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
+        if not before:match('[%w_.]') then
+            local afterStart = cstart + 9
+            local restStart = afterStart
+            while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                restStart = restStart + 1
+            end
+            if restStart <= n and text:sub(restStart, restStart) == '"' then
+                return cstart
             end
         end
-        if scanPos > cstart then
-            pos = cstart + 1
-        else
-            local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-            if not before:match('[%w_.]') then
-                local afterStart = cstart + 9
-                local restStart = afterStart
-                while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                    restStart = restStart + 1
-                end
-                if restStart <= n and text:sub(restStart, restStart) == '"' then
-                    return cstart
-                end
-            end
-            pos = cstart + 1
-        end
+        pos = cstart + 1
     end
     return nil
 end
@@ -401,55 +335,25 @@ local function parseInterfaceBlock(text, startPos)
     local iname = text:sub(nameStart, nameEnd - 1)
     pos = nameEnd + 1
 
-    local parentInterfaces = {}
-    local fields = {}
-
     while pos <= n do
-        pos = skipCommentsAndWhitespace(text, pos)
-        if pos > n then break end
         local c = text:sub(pos, pos)
-        if c == ':' then
-            local extStart, extEnd = text:find('^:%s*extends%s*%(', pos)
-            if extStart then
-                local parenStart = extEnd
-                local parenDepth = 1
-                local j = parenStart + 1
-                while j <= n and parenDepth > 0 do
-                    local cc = text:sub(j, j)
-                    if cc == '(' then parenDepth = parenDepth + 1; j = j + 1
-                    elseif cc == ')' then parenDepth = parenDepth - 1; if parenDepth == 0 then break end; j = j + 1
-                    elseif cc == '"' or cc == "'" then
-                        local q = cc; j = j + 1
-                        while j <= n and text:sub(j, j) ~= q do j = j + 1 end
-                        j = j + 1
-                    else
-                        j = j + 1
-                    end
-                end
-                local inside = text:sub(parenStart + 1, j - 1)
-                for pname in inside:gmatch('[%w_]+') do
-                    parentInterfaces[#parentInterfaces + 1] = pname
-                end
-                pos = j + 1
-            else
-                pos = pos + 1
-            end
-        elseif c == '{' then
+        if c == '{' then
             local braceEnd = findBraceEnd(text, pos)
             if not braceEnd then return nil end
-            local body = text:sub(pos + 1, braceEnd - 1)
-            for field in body:gmatch('"([%w_]+)"') do
-                fields[#fields + 1] = field
-            end
-            return iname, parentInterfaces, fields, startPos, braceEnd
+            return iname, startPos, braceEnd
         elseif c == '\n' or c == ';' then
-            return iname, parentInterfaces, fields, startPos, pos - 1
+            return iname, startPos, pos - 1
+        elseif c == '-' and pos < n and text:sub(pos + 1, pos + 1) == '-' then
+            while pos <= n and text:sub(pos, pos) ~= '\n' do
+                pos = pos + 1
+            end
+            return iname, startPos, pos - 1
         else
             pos = pos + 1
         end
     end
 
-    return iname, parentInterfaces, fields, startPos, n
+    return iname, startPos, n
 end
 
 function OnSetText(uri, text)
@@ -481,42 +385,27 @@ function OnSetText(uri, text)
         end
 
         if isInterface then
-            local iname, parentInterfaces, fields, iStart, iEnd = parseInterfaceBlock(text, nextPos)
+            local iname, iStart, iEnd = parseInterfaceBlock(text, nextPos)
             if not iname then
                 pos = nextPos + 9
             else
-                local out = {}
-                local classLine = '---@class ' .. iname
-                if #parentInterfaces > 0 then
-                    classLine = classLine .. ' : ' .. table.concat(parentInterfaces, ', ')
-                end
-                out[#out + 1] = classLine
-                for _, f in ipairs(fields) do
-                    out[#out + 1] = '---@field ' .. f .. ' function'
-                end
-                out[#out + 1] = iname .. ' = {__iname="' .. iname .. '"} ---@class interface.' .. iname .. ' : interface'
+                local annotation = iname .. ' = {__iname="' .. iname .. '"} ---@class interface.' .. iname .. ' : interface'
                 diffs[#diffs + 1] = {
                     start  = iEnd + 1,
                     finish = iEnd,
-                    text   = '\n' .. table.concat(out, '\n'),
+                    text   = '\n' .. annotation,
                 }
                 pos = iEnd + 1
             end
         else
-            local className, parentName, implementsList, classStart, classEnd, body = parseClassBlock(text, nextPos)
+            local className, parentName, classStart, classEnd, body = parseClassBlock(text, nextPos)
             if not className then
                 pos = nextPos + 5
             else
                 local methods, fields = parseMethods(body)
                 local parent = parentName or 'object'
                 local out = {}
-                local classLine = '---@class ' .. className .. ' : ' .. parent
-                if #implementsList > 0 then
-                    classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
-                end
-                out[#out + 1] = classLine
-                out[#out + 1] = '---@field __class ' .. className
-                out[#out + 1] = '---@field __base ' .. parent
+                out[#out + 1] = '---@class ' .. className .. ' : ' .. parent
                 out[#out + 1] = '---@operator call:' .. className
                 out[#out + 1] = className .. ' = {}'
 
@@ -553,7 +442,27 @@ function OnSetText(uri, text)
                 end
 
                 for _, m in ipairs(methods) do
+                    if m.isGetter then
+                        local attrName = m.name
+                        out[#out + 1] = className .. '.' .. attrName .. ' = ('
+                        out[#out + 1] = '    ---@param self ' .. className
+                        out[#out + 1] = '    function(' .. m.params .. ')'
+                        if m.body and #m.body > 0 then
+                            local trimmed = trimBody(m.body)
+                            if #trimmed > 0 then
+                                for line in trimmed:gmatch('([^\n]+)') do
+                                    out[#out + 1] = '    ' .. line
+                                end
+                            end
+                        end
+                        out[#out + 1] = '    end'
+                        out[#out + 1] = ')(' .. className .. ')'
+                    end
+                end
+
+                for _, m in ipairs(methods) do
                     if m.name == 'new' then
+                    elseif m.isGetter or m.isSetter then
                     else
                         local firstParam = getFirstParamName(m.params)
                         for _, docLine in ipairs(m.docs) do
@@ -573,24 +482,6 @@ function OnSetText(uri, text)
                         end
                         out[#out + 1] = 'end'
                     end
-                end
-
-                local overrideMethods = {}
-                for _, m in ipairs(methods) do
-                    if m.isOverride and m.name ~= 'new' then
-                        overrideMethods[#overrideMethods + 1] = m
-                    end
-                end
-                if #overrideMethods > 0 then
-                    out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
-                    out[#out + 1] = 'local function __ls_check__()'
-                    out[#out + 1] = '    local base = ' .. parent
-                    out[#out + 1] = '    local _'
-                    for _, m in ipairs(overrideMethods) do
-                        out[#out + 1] = '    _ = base.' .. m.name
-                    end
-                    out[#out + 1] = '    return _'
-                    out[#out + 1] = 'end'
                 end
 
                 diffs[#diffs + 1] = {
