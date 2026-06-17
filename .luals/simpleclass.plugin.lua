@@ -515,6 +515,8 @@ function OnSetText(uri, text)
                     classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
                 end
                 out[#out + 1] = classLine
+                out[#out + 1] = '---@field __class ' .. className
+                out[#out + 1] = '---@field __base ' .. parent
                 out[#out + 1] = '---@operator call:' .. className
                 out[#out + 1] = className .. ' = {}'
 
@@ -582,13 +584,12 @@ function OnSetText(uri, text)
                 if #overrideMethods > 0 then
                     out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
                     out[#out + 1] = 'local function __ls_check__()'
-                    out[#out + 1] = '    ---@class ' .. parent
-                    out[#out + 1] = '    local _ = {}'
-                    out[#out + 1] = '    local override_method'
+                    out[#out + 1] = '    local base = ' .. parent
+                    out[#out + 1] = '    local _'
                     for _, m in ipairs(overrideMethods) do
-                        out[#out + 1] = '    override_method = _.' .. m.name
+                        out[#out + 1] = '    _ = base.' .. m.name
                     end
-                    out[#out + 1] = '    return override_method'
+                    out[#out + 1] = '    return _'
                     out[#out + 1] = 'end'
                 end
 

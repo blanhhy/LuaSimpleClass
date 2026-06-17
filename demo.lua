@@ -48,14 +48,14 @@ interface "CanFly" {"fly"}
 
 -- 错误的定义
 xpcall(function()
-class "Bird" : implements(CanEat, CanFly) {
+class "Bird_wrong" : implements(CanEat, CanFly) {
     eat = function()
         print("Bird eats bugs")
     end;
 }
 end, print)
 
--- Output: class Bird implements <interface 'CanFly'> but dose not implement method fly().
+-- Output: class Bird_wrong implements <interface 'CanFly'> but dose not implement method fly().
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {
