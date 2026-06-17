@@ -2,6 +2,8 @@
 ---@class simpleclass
 local M = require "simpleclass.local"
 
+M._GLOBAL = true
+
 class = M.class
 super = M.super
 interface = M.interface
