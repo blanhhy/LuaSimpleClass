@@ -17,7 +17,7 @@ class "Student" : extends "Person" {
     ---@param age integer
     ---@param grade string
     __init = function(self, name, age, grade)
-        super(self):__init(name, age)
+        super(Student, self):__init(name, age)
         self.grade = grade
     end;
     ---@override
@@ -115,3 +115,16 @@ print(account.balance) --> 100
 
 account.balance = 200
 print(account.balance) --> 200
+
+class "CollageStudent" : extends "Student" {
+    ---@param name string
+    ---@param age integer
+    ---@param grade string
+    __init = function(self, name, age, grade)
+        super(CollageStudent, self):__init(name, age, grade)
+    end;
+}
+
+local c1 = CollageStudent("Alice", 22, "junior")
+c1:sayHello()
+-- Output: Hello, my name is Alice and I am a junior year old student.

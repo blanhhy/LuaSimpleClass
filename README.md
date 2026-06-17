@@ -89,14 +89,14 @@ obj:foo() --> "foo from MyClass"
 
 > `extends` 接受类名字符串，因此匿名类不能作为父类；但匿名类可以继承其他类，这一点与 Java 类似
 
-- `super`：接收 `self` 参数，如 `super(self):__init()`
+- `super`：接收当前类与 `self`，如 `super(MySubclass, self):__init()`
 
 > 示例：单继承
 > ```lua
 > class "MySubClass" : extends "MyClass" {
 >     ---@Override
 >     foo = function(self)
->         super(self):foo() -- call parent's foo
+>         super(MySubclass, self):foo() -- call parent's foo
 >         print("improved foo")
 >     end;
 > }
