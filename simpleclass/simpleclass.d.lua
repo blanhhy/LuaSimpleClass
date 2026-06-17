@@ -4,6 +4,7 @@
 ---@operator call:class.instance    # Instantiation
 ---@field __classname string        # The name of the class
 ---@field __base class              # The base class of the class
+---@field __tostring function       # The tostring method of the class
 local class = {} -- A virtual variable to declare methods
 
 ---@class class.instance : object   # Reflection of a class instance
@@ -41,3 +42,5 @@ function class:new() end
 
 ---Get the class of the object
 function object:getClass() return self.__class end
+
+object.is = rawequal
