@@ -36,6 +36,8 @@ local obj = MyClass()
 obj:foo() --> "foo from MyClass"
 ```
 
+详细指导参考下方 [特性说明](##-特性) 或 [演示脚本](https://github.com/blanhhy/LuaSimpleClass/blob/main/demo.lua)
+
 ## 特性
 
 ### 类
@@ -128,8 +130,6 @@ obj:foo() --> "foo from MyClass"
 
 - 接口实现：使用 `implements` 关键字，类可以实现多个接口
 
-> `implements` 接受不定数量的接口（对象本身），无论接口有没有名字都可以
-
 > 示例：接口实现
 > ```lua
 > class "Bird" : implements(CanFly) {
@@ -206,14 +206,10 @@ obj:foo() --> "foo from MyClass"
 > Warnning:  
 > 静态推导依赖于 LuaSimpleClass DSL，如果你使用了非全局的导入方式，则需要在每个文件中手动 local 所用到的模块接口，使得函数名与全局导入时匹配
 
-### 提示
+## 提示
 
 接口模块是独立可选的，默认导入。如果要取消包含接口相关功能，只需从 `local.lua` 中删去这一行
 
 ```lua
 require "simpleclass.interface"
 ```
-
--------
-
-LuaSimpleClass 致力于简化 Lua 面向对象编程，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求
