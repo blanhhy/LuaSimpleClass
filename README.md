@@ -3,7 +3,7 @@
 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
 
 > Note:
-> `simpleclass` 的类型结构比 `luaclass` 更简单，因此有更好的 LS 类型推导支持！
+> `simpleclass` 的类型结构比 `luaclass` 更简单，因此有更好的 LS 类型推导支持
 
 ## 安装 & 导入
 
@@ -187,14 +187,33 @@ obj:foo() --> "foo from MyClass"
 
 ### 类型推导
 
-`simpleclass` 与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型系统有良好的兼容性，只需复制本仓库提供的 `simpleclass.plugin.lua` 插件，在 LS 配置中添加：
+`simpleclass` 提供了与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 兼容的类型推导插件，下面是一个参考的 LS 配置：
 
 ```json
 "runtime.plugin": ".luals/simpleclass.plugin.lua"
 ```
 
-并且保持 `simpleclass` 文件夹在 LS 支持的模块目录中，即可让 LS 自动推导由 `simpleclass` 定义的类和接口的类型
+复制插件脚本，并且保持 `simpleclass` 文件夹在 LS 支持的模块目录中即可
+
+大致的功能：
+
+- 为新建的类和接口生成 @class 标注
+- 自动包含用户定义的类成员（包括 Getter 对应的属性）
+- 自动生成 new 方法的签名
+- 自动分析继承链与接口
+- 提供 @override，用于检查超类上是否有同名方法
+
+> Warnning:  
+> 静态推导依赖于 LuaSimpleClass DSL，如果你使用了非全局的导入方式，则需要在每个文件中手动 local 所用到的模块接口，使得函数名与全局导入时匹配
+
+### 提示
+
+接口模块是独立可选的，默认导入。如果要取消包含接口相关功能，只需从 `local.lua` 中删去这一行
+
+```lua
+require "simpleclass.interface"
+```
 
 -------
 
-LuaSimpleClass 致力于简化 Lua 面向对象开发，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求。
+LuaSimpleClass 致力于简化 Lua 面向对象编程，减少样板代码，虽然功能不多，但能满足 Lua 中多数情况下的需求

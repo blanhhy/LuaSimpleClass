@@ -1,9 +1,17 @@
 ---@diagnostic disable: deprecated
-if not class then
-    require "simpleclass"
-end
+---仿 Python 的 list 类
+---@class list
 
--- 仿 Python 的 list 类
+local class = class
+local cls_type = cls_type
+local isinstance = isinstance
+
+if not class then
+    local m = require "simpleclass"
+    class = m.class
+    cls_type = m.type
+    isinstance = m.object.isInstance
+end
 
 local isJIT = pcall(require, "jit")
 local is5_5 = _VERSION >= "Lua 5.5"
@@ -22,8 +30,6 @@ local Int = math.floor
 local type, tostring, setmetatable = type, tostring, setmetatable
 local insert, concat, remove = table.insert, table.concat, table.remove
 local unpack = table.unpack or unpack
-
-local isinstance, cls_type = isinstance, cls_type
 
 class "list" {
     -- 静态属性

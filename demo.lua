@@ -1,5 +1,8 @@
 require "simpleclass"
 
+--#==========================================
+--# 基础使用
+--#==========================================
 class "Person" {
     ---@param name string
     ---@param age integer
@@ -43,6 +46,25 @@ print(isinstance(s1, "table")) --> true
 
 print(cls_type(s1)) --> Student
 
+--#==========================================
+--# 深层继承
+--#==========================================
+class "CollageStudent" : extends "Student" {
+    ---@param name string
+    ---@param age integer
+    ---@param grade string
+    __init = function(self, name, age, grade)
+        super(CollageStudent, self):__init(name, age, grade)
+    end;
+}
+
+local c1 = CollageStudent("Alice", 22, "junior")
+c1:sayHello()
+-- Output: Hello, my name is Alice and I am a junior year old student.
+
+--#==========================================
+--# 接口使用
+--#==========================================
 interface "CanEat" {"eat"}
 interface "CanFly" {"fly"}
 
@@ -96,7 +118,9 @@ eagle:nest()  --> Eagle is nesting
 print(Eagle:isImplements(BirdLike)) --> true
 print(eagle:isInstance(BirdLike))   --> true
 
--- 使用getter和setter
+--#==========================================
+--# Getter / Setter
+--#==========================================
 class "Account" {
     ---@param balance? number
     __init = function(self, balance)
@@ -115,16 +139,3 @@ print(account.balance) --> 100
 
 account.balance = 200
 print(account.balance) --> 200
-
-class "CollageStudent" : extends "Student" {
-    ---@param name string
-    ---@param age integer
-    ---@param grade string
-    __init = function(self, name, age, grade)
-        super(CollageStudent, self):__init(name, age, grade)
-    end;
-}
-
-local c1 = CollageStudent("Alice", 22, "junior")
-c1:sayHello()
--- Output: Hello, my name is Alice and I am a junior year old student.
