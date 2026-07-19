@@ -1,13 +1,13 @@
 local M      = require "simpleclass.m" ---@class simpleclass
 local cc     = M.creator               ---@class simpleclass.creator
-local object = M.env.object
+local object = M._ENV.object
 
 local type, setmetatable, error
     = type, setmetatable, error
 
 ---@class interface
 local Interface = {
-    env = M.env;
+    _ENV = M._ENV;
     global = _G; ---@class _G
     __iname = "<anonymous>";
 }
@@ -87,10 +87,10 @@ function M.interface(name)
         }, Interface)
     end
     local iface = {__iname = name}
-    if nil == Interface.global[name] or Interface.env[name] then
+    if nil == Interface.global[name] or Interface._ENV[name] then
         Interface.global[name] = iface
     end
-    Interface.env[name] = iface
+    Interface._ENV[name] = iface
     return setmetatable(iface, Interface)
 end
 
@@ -107,7 +107,7 @@ function cc:onDef_impl_check(clazz)
         local iface = self.ifaces[i]
         local ok, mname = iface:check_impl(clazz)
         if not ok then return false,
-        ("class %s implements %s but dose not implement method %s().")
+        ("class %s implements %s but dose not implement method '%s'.")
         :format(self.name, iface, mname, iface)
     end end
     return true

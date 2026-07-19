@@ -77,7 +77,7 @@ class "Bird_wrong" : implements(CanEat, CanFly) {
 }
 end, print)
 
--- Output: class Bird_wrong implements <interface 'CanFly'> but dose not implement method fly().
+-- Output: class Bird_wrong implements <interface 'CanFly'> but dose not implement method 'fly'.
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {

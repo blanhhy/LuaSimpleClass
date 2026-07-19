@@ -16,7 +16,7 @@ local cc = {
 ---Single inheritance keyword
 ---@param basename? string
 function cc:extends(basename)
-    self.base = M.env[basename]
+    self.base = M._ENV[basename]
     return self
 end
 
@@ -25,15 +25,15 @@ end
 function cc:def(clazz)
     local base = self.base
 
-    for i = 1, #M.mms do
-        local mm = M.mms[i]
+    for i = 1, #M._MMS do
+        local mm = M._MMS[i]
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
     clazz.__classname = self.name
     clazz.__base = base
 
-    setmetatable(clazz, M.cmt)
+    setmetatable(clazz, M._CMT)
 
     if self.onDef_impl_check then
         local ok, err = self:onDef_impl_check(clazz)
@@ -42,10 +42,10 @@ function cc:def(clazz)
 
     if M._GLOBAL and self.name ~= "<anonymous>" then
         -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
-        if nil == G[self.name] or M.env[self.name] then
+        if nil == G[self.name] or M._ENV[self.name] then
             G[self.name] = clazz
         end
-        M.env[self.name] = clazz
+        M._ENV[self.name] = clazz
     end
 
     return clazz

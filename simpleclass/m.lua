@@ -15,9 +15,9 @@ local mm_names = {
 
 ---@class simpleclass
 local M = {
-    env = {};
-    mms = mm_names;
-    cmt = class_MT;
+    _ENV = {};
+    _MMS = mm_names;
+    _CMT = class_MT;
 }
 
 M._GLOBAL = false

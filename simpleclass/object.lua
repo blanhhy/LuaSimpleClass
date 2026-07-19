@@ -68,8 +68,8 @@ function object:isInstance(cls)
     return false
 end
 
-setmetatable(object, M.cmt)
-M.env.object = object
+setmetatable(object, M._CMT)
+M._ENV.object = object
 M.object = object
 
 return object
