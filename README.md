@@ -36,7 +36,7 @@ local obj = MyClass()
 obj:foo() --> "foo from MyClass"
 ```
 
-详细指导参考下方 [特性说明](##-特性) 或 [演示脚本](https://github.com/blanhhy/LuaSimpleClass/blob/main/demo.lua)
+详细指导参考下方 [特性说明](#特性) 或 [演示脚本](demo.lua)
 
 ## 特性
 
