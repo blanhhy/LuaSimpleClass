@@ -67,7 +67,7 @@ M.creator = cc
 ---```
 ---or anonymous:
 ---```lua
----local MyAnonymousClass = class {}
+---local cls = class {}
 ---```
 ---@param name? string
 ---@return simpleclass.creator
