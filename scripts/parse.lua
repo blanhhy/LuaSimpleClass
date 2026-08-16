@@ -8,7 +8,7 @@ local plugin = {
 ---@class parse.lua.args
 ---@field file    string? Path to the input file.
 ---@field text    string? Text to parse.
----@field output  string? Path to the output file.
+---@field output  string? Path to the output file. Default is stdout.
 ---@field diff    boolean? Whether to show diffs only. Default is false.
 ---@field lines   integer? Context lines to show in diffs. Default is 3.
 local args = {}
