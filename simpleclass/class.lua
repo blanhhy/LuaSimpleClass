@@ -40,7 +40,7 @@ function cc:def(clazz)
         if not ok then error(err, 2) end
     end
 
-    if M._GLOBAL and self.name ~= "<anonymous>" then
+    if M.AUTO_GLOBAL and self.name ~= "<anonymous>" then
         -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
         if nil == G[self.name] or M._ENV[self.name] then
             G[self.name] = clazz

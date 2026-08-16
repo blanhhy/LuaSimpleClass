@@ -13,11 +13,7 @@
 require "simpleclass"
 ```
 
-这会将所有模块接口注册到 `_G`，如果你不希望这样，可以只：
-
-```lua
-local simpleclass = require "simpleclass.local"
-```
+默认全局导入，这会将所有模块接口注册到 `_G`，如果你不希望这样，可以禁用 [全局导入](#全局导入)
 
 ## 快速开始
 
@@ -46,7 +42,7 @@ obj:foo() --> "foo from MyClass"
 
 - 定义命名类：语法为 `class "<name>" {<body>}`
 
-> 命名类创建后位于 `class._ENV` 环境中，同名的类会覆盖之前的定义；同时，在全局模式下，如果此时 `_G` 中**没有其他同名变量**，会自动创建全局变量 `<name>` 指向该类
+> 命名类创建后位于 `class._ENV` 环境中，同名的类会覆盖之前的定义；如果设置了 `simpleclass.AUTO_GLOBAL = true`，还会检测 `_G` 中是否有同名非类变量，若无则为类注册全局变量
 
 - 静态方法: 没有 `self` 参数的函数，用 `.` 调用
 - 对象方法: 第一个参数为 `self` 的方法，用 `:` 调用
@@ -54,6 +50,7 @@ obj:foo() --> "foo from MyClass"
 - 实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
 
 > 示例：命名类
+>
 > ```lua
 > class "MyNamedClass" {
 >     __init = function(self, arg1, arg2)
@@ -64,7 +61,7 @@ obj:foo() --> "foo from MyClass"
 >         print(self.arg1, self.arg2)
 >     end;
 > }
-> 
+>
 > local obj = MyNamedClass("hello", "world")
 > obj:print() --> "hello world"
 > ```
@@ -72,13 +69,14 @@ obj:foo() --> "foo from MyClass"
 - 匿名类：无名的类，不会注册到任何环境
 
 > 示例：匿名类
+>
 > ```lua
 > local cls = class {
 >     foo = function(self)
 >         print("foo from anonymous class")
 >     end;
 > }
-> 
+>
 > local obj = cls()
 > obj:foo() --> "foo from anonymous class"
 > ```
@@ -94,6 +92,7 @@ obj:foo() --> "foo from MyClass"
 - `super`：接收当前类与 `self`，如 `super(MySubclass, self):__init()`
 
 > 示例：单继承
+>
 > ```lua
 > class "MySubClass" : extends "MyClass" {
 >     ---@Override
@@ -102,7 +101,7 @@ obj:foo() --> "foo from MyClass"
 >         print("improved foo")
 >     end;
 > }
-> 
+>
 > local obj = MySubClass()
 > obj:foo() --> foo from MySubClass
 >           --| improved foo
@@ -122,6 +121,7 @@ obj:foo() --> "foo from MyClass"
 > 命名接口同样在 `class._ENV` 中，与命名类的处理规则完全相同
 
 > 示例：接口定义
+>
 > ```lua
 > interface "CanFly" {
 >     "fly"; -- only method names
@@ -131,13 +131,14 @@ obj:foo() --> "foo from MyClass"
 - 接口实现：使用 `implements` 关键字，类可以实现多个接口
 
 > 示例：接口实现
+>
 > ```lua
 > class "Bird" : implements(CanFly) {
 >     fly = function(self)
 >         print("bird is flying")
 >     end;
 > }
-> 
+>
 > local obj = Bird()
 > obj:fly() --> "bird is flying"
 > ```
@@ -147,11 +148,12 @@ obj:foo() --> "foo from MyClass"
 定义接口时使用 `extends` 关键字可以组合多个接口
 
 > 示例：接口组合
+>
 > ```lua
 > interface "CanEat" {
 >     "eat";
 > }
-> 
+>
 > interface "BirdLike" : extends(CanEat, CanFly) {
 >     "spawn";
 >     "nest";
@@ -165,21 +167,25 @@ obj:foo() --> "foo from MyClass"
 ### 类型检查
 
 `cls_type(obj)`
+
 - 返回对象的类
 - 如果是基本类型，返回 `type(obj)`
 - 这是它在 `_G` 中的名字（因为 `_G` 已有 `type`），在模块中名为 `type`
 
 `isinstance(obj, cls_or_type)`
+
 - 判断对象是否为指定类或其子类，或接口
 - 也可以用于检查基本类型
 - 与对象方法 `obj:isInstance(clazz)` 等价
 
 `issubclass(sub_cls, super_cls)`
+
 - 判断子类是否为父类或其祖先类
 - 与类方法 `clazz:isExtends(base)` 等价
 - 注：同一个类会返回 `true`
 
 `cls:isImplements(...interface)`
+
 - 判断类是否实现了指定接口，可以多个
 - 没有对应的全局函数（我认为没有必要）
 
@@ -203,13 +209,59 @@ obj:foo() --> "foo from MyClass"
 - 自动分析继承链与接口
 - 提供 @override，用于检查超类上是否有同名方法
 
-> Warnning:  
-> 静态推导依赖于 LuaSimpleClass DSL，如果你使用了非全局的导入方式，则需要在每个文件中手动 local 所用到的模块接口，使得函数名与全局导入时匹配
+> Warnning:
+> 静态推导依赖于 LuaSimpleClass DSL，如果非全局导入，则需要在每个文件中手动 local 所用到的模块接口，使得函数名与全局导入时匹配
 
-## 提示
+## 配置项
 
-接口模块是独立可选的，默认导入。如果要裁剪接口相关功能，只需从 `local.lua` 中删去这一行
+### 全局导入
 
-```lua
-require "simpleclass.interface"
-```
+自动注册模块接口到 `_G` 中，同时启用 [自动全局类](#自动全局类)
+
+如果不想污染全局环境，设为 `false` 即可
+
+- 类别：导入时选项
+- 字段：`init.lua` 中的 `options.GLOBAL_IMPORT`
+- 默认：`true`
+
+### 包含接口
+
+包含接口相关功能
+
+如果要裁剪接口模块，设为 `false` 即可
+
+- 类别：导入时选项
+- 字段：`init.lua` 中的 `options.INTERFACE_INCLUDED`
+- 默认：`true`
+
+### 默认接口功能
+
+[接口功能](#接口功能) 的初始值
+
+如果设为 `"lexical"`，可以实现只包含 LS 功能，而无运行时
+
+- 类别：导入时选项
+- 字段：`init.lua` 中的 `options.DEFAULT_I_FEATURE`
+- 默认：`"general"`
+
+### 自动全局类
+
+定义类时，检查全局变量名是否空闲，自动注册全局变量
+
+- 类别：运行时选项
+- 字段：`simpleclass.AUTO_GLOBAL`
+- 初始：和 [全局导入](#全局导入) 一致
+
+### 接口功能
+
+`general` 为启用全部功能
+`nocheck` 可跳过运行时接口检查（总返回 `true`）
+`lexical` 仅保留词法要素供 LS 分析，不含任何运行时功能
+
+`nocheck` 适用于临时关闭检查，和 `general` 可以安全切换，而 `lexical` 则具有不可逆性（因新创建的接口实为 `nil`）
+
+如果已经使用了接口想弃用，可以设置为 `"lexical"`，以免解释器语法错误
+
+- 类别：运行时选项
+- 字段：`simpleclass.I_FEATURE`
+- 初始：和 [默认接口功能](#默认接口功能) 一致

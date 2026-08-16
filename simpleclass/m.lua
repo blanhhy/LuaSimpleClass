@@ -20,8 +20,6 @@ local M = {
     _CMT = class_MT;
 }
 
-M._GLOBAL = false
-
 ---Get the type of a value, considering classes as special types  
 ---eg: 
 ---```lua
