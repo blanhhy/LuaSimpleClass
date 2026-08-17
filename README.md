@@ -221,7 +221,7 @@ obj:foo() --> "foo from MyClass"
 如果不想污染全局环境，设为 `false` 即可
 
 - 类别：导入时选项
-- 字段：`init.lua` 中的 `options.GLOBAL_IMPORT`
+- 字段：[init.lua](simpleclass/init.lua) 中的 `options.GLOBAL_IMPORT`
 - 默认：`true`
 
 ### 包含接口
@@ -231,7 +231,7 @@ obj:foo() --> "foo from MyClass"
 如果要裁剪接口模块，设为 `false` 即可
 
 - 类别：导入时选项
-- 字段：`init.lua` 中的 `options.INTERFACE_INCLUDED`
+- 字段：[init.lua](simpleclass/init.lua) 中的 `options.INTERFACE_INCLUDED`
 - 默认：`true`
 
 ### 默认接口功能
@@ -241,7 +241,7 @@ obj:foo() --> "foo from MyClass"
 如果设为 `"lexical"`，可以实现只包含 LS 功能，而无运行时
 
 - 类别：导入时选项
-- 字段：`init.lua` 中的 `options.DEFAULT_I_FEATURE`
+- 字段：[init.lua](simpleclass/init.lua) 中的 `options.DEFAULT_I_FEATURE`
 - 默认：`"general"`
 
 ### 自动全局类
