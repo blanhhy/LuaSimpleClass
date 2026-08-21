@@ -220,7 +220,7 @@ obj:foo() --> "foo from MyClass"
 
 如果不想污染全局环境，设为 `false` 即可
 
-- 类别：导入时选项
+- 类别：**导入时**选项
 - 字段：[init.lua](simpleclass/init.lua) 中的 `options.GLOBAL_IMPORT`
 - 默认：`true`
 
@@ -230,7 +230,7 @@ obj:foo() --> "foo from MyClass"
 
 如果要裁剪接口模块，设为 `false` 即可
 
-- 类别：导入时选项
+- 类别：**导入时**选项
 - 字段：[init.lua](simpleclass/init.lua) 中的 `options.INTERFACE_INCLUDED`
 - 默认：`true`
 
@@ -240,7 +240,7 @@ obj:foo() --> "foo from MyClass"
 
 如果设为 `"lexical"`，可以实现只包含 LS 功能，而无运行时
 
-- 类别：导入时选项
+- 类别：**导入时**选项
 - 字段：[init.lua](simpleclass/init.lua) 中的 `options.DEFAULT_I_FEATURE`
 - 默认：`"general"`
 
@@ -248,20 +248,20 @@ obj:foo() --> "foo from MyClass"
 
 定义类时，检查全局变量名是否空闲，如果为空闲则自动注册到全局变量
 
-- 类别：运行时选项
+- 类别：**运行时**选项
 - 字段：`simpleclass.AUTO_GLOBAL`
 - 初始：和 [全局导入](#全局导入) 一致
 
 ### 接口功能
 
-`general` 为启用全部功能
-`nocheck` 可跳过运行时接口检查（总返回 `true`）
-`lexical` 仅保留词法要素供 LS 分析，不含任何运行时功能
+`general` 为启用全部功能  
+`nocheck` 可跳过运行时接口检查（总返回 `true`）  
+`lexical` 仅保留词法要素供 LS 分析，不含任何运行时功能  
 
-`nocheck` 适用于临时关闭检查，和 `general` 可以安全切换，而 `lexical` 则具有不可逆性（因新创建的接口实为 `nil`）
+`nocheck` 适用于临时关闭检查，和 `general` 可以安全互换；而 `lexical` 期间跳过的对象创建不补回，具有一定不可逆性
 
-如果已经使用了接口想弃用，可以设置为 `"lexical"`，以免解释器语法错误
+如果已经使用了接口想弃用，可以只设置为 `"lexical"`，以免既有 DSL 报错
 
-- 类别：运行时选项
+- 类别：**运行时**选项
 - 字段：`simpleclass.I_FEATURE`
 - 初始：和 [默认接口功能](#默认接口功能) 一致
