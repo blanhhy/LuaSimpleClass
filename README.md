@@ -254,11 +254,7 @@ obj:foo() --> "foo from MyClass"
 
 ### 接口功能
 
-`general` 为启用全部功能  
-`nocheck` 可跳过运行时接口检查（总返回 `true`）  
-`lexical` 仅保留词法要素供 LS 分析，不含任何运行时功能  
-
-`nocheck` 适用于临时关闭检查，和 `general` 可以安全互换；而 `lexical` 期间跳过的对象创建不补回，具有一定不可逆性
+`general` 为启用全部功能；`nocheck` 可跳过运行时接口检查（总返回 `true`），适用于临时关闭检查，和 `general` 可以安全互换；`lexical` 仅保留词法要素供 LS 分析，不含任何运行时功能，期间跳过的对象创建不补回，具有一定不可逆性
 
 如果已经使用了接口想弃用，可以只设置为 `"lexical"`，以免既有 DSL 报错
 
