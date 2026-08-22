@@ -583,6 +583,48 @@ local function parseInterfaceBlock(text, startPos)
     return iname, extendsList, fields, startPos, n
 end
 
+-- 类体元方法键 → LuaLS 支持的 @operator 操作符名（仅算术 / .. / len / unm / call 支持）
+-- eq/lt/le/tostring 无对应操作符；__call 与构造器 call 冲突故跳过
+local PL_OP_FROM_META = {
+    __add = 'add', __sub = 'sub', __mul = 'mul', __div = 'div', __mod = 'mod',
+    __pow = 'pow', __idiv = 'idiv', __band = 'band', __bor = 'bor', __bxor = 'bxor',
+    __shl = 'shl', __shr = 'shr', __concat = 'concat', __unm = 'unm',
+    __bnot = 'bnot', __len = 'len',
+}
+
+-- 从参数列表字符串提取参数名（含 self）
+local function pl_paramNames(params)
+    local names = {}
+    for p in (params or ''):gmatch('[%w_]+') do
+        names[#names + 1] = p
+    end
+    return names
+end
+
+-- 从某方法的 docs 注解中返回 `@return <type>`，无则 nil
+local function pl_methodReturn(docs)
+    for _, dl in ipairs(docs or {}) do
+        local ret = dl:match('^%-%-%-@return%s+([%S]+)')
+        if ret then return ret end
+    end
+    return nil
+end
+
+-- 若除首参外所有参数都已标注 `@param <名> <类型>`，返回第 2 参数类型（二元操作符操作数）
+local function pl_operatorOperand(docs, params)
+    local names = pl_paramNames(params)
+    if #names < 2 then return nil end
+    local typeOf = {}
+    for _, dl in ipairs(docs or {}) do
+        local pn, pt = dl:match('^%-%-%-@param%s+([%w_]+)%s+([%S]+)')
+        if pn and pt then typeOf[pn] = pt end
+    end
+    for i = 2, #names do
+        if not typeOf[names[i]] then return nil end
+    end
+    return typeOf[names[2]]
+end
+
 function OnSetText(uri, text)
     local hasClass = findClassKeyword(text, 1)
     local hasInterface = findInterfaceKeyword(text, 1)
@@ -653,6 +695,36 @@ function OnSetText(uri, text)
                 out[#out + 1] = '---@field __class ' .. className
                 out[#out + 1] = '---@field __base ' .. parent
                 out[#out + 1] = '---@operator call:' .. className
+                -- 元方法 → @operator 标注（元方法带 @return 才生成；参数全标注则附操作数类型）
+                for _, m in ipairs(methods) do
+                    local opName = PL_OP_FROM_META[m.name]
+                    if opName then
+                        -- 用户已在元方法上方手写 ---@operator → 原样透传，跳过自动重构
+                        local hadUserOp = false
+                        for _, dl in ipairs(m.docs or {}) do
+                            local userOp = dl:match('^%-%-%-@operator%s+(.+)')
+                            if userOp then
+                                out[#out + 1] = '---@operator ' .. userOp
+                                hadUserOp = true
+                            end
+                        end
+                        if not hadUserOp then
+                            local ret = pl_methodReturn(m.docs)
+                            if ret then
+                                if m.name == '__len' or #pl_paramNames(m.params) < 2 then
+                                    out[#out + 1] = '---@operator ' .. opName .. ': ' .. ret
+                                else
+                                    local operand = pl_operatorOperand(m.docs, m.params)
+                                    if operand then
+                                        out[#out + 1] = ('---@operator %s(%s): %s'):format(opName, operand, ret)
+                                    else
+                                        out[#out + 1] = '---@operator ' .. opName .. ': ' .. ret
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
                 out[#out + 1] = className .. ' = {}'
 
                 local newMethod = nil

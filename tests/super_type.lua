@@ -1,7 +1,7 @@
 -- super() 父类锚定（注入基类存在性检查）：super(Student, self) 调用的方法若父类无同名方法，
 -- 在注入的检查块中触发 undefined-field（line 22 = 注入块 base_method=_.__nonexistent_base）。
 -- 有效调用 super(...):__init 不应报警。
--- expect: 22:undefined-field
+-- expect: 26:undefined-field
 require "simpleclass"
 
 class "Person_qwceuirgqf" {

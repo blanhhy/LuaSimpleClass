@@ -433,6 +433,9 @@ class "list" {
     -- 元方法
 
     -- 连接两个数组, 得到一个新的数组
+    ---@param arr1 list
+    ---@param arr2 list
+    ---@return list
     __concat = function(arr1, arr2)
         if not isinstance(arr1, list) or not isinstance(arr2, list) then
             error(("attempt to concat list with a %s value")
@@ -454,6 +457,7 @@ class "list" {
 
     -- 类 Python 的数组重复操作
     -- eg: arr = list(1, 2) * 3
+    ---@operator mul(integer): list
     __mul = function(left, right)
         if not isinstance(left, list) then
             return right:rep(left)
@@ -511,10 +515,5 @@ class "list" {
 -- 让切片语法更简洁
 -- eg: slice = arr(1, 3[, 1])
 list.__call = list.sub
-
----操作符标注
----@class list
----@operator concat(list): list
----@operator mul(integer): list
 
 return list
