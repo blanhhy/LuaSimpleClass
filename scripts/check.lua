@@ -232,6 +232,76 @@ local function parse_object_from_text(text, open_brace_pos)
     return obj, close_pos
 end
 
+-- 递归解析 pos 处的一个 JSON 值，返回 value, nextPos（nextPos 指向该值之后）。
+-- 支持字符串/数字/布尔/数组/嵌套对象，正确处理字符串转义与注释不在此层处理。
+local function parse_value_at(text, pos)
+    local n = #text
+    local i = pos
+    while i <= n and text:sub(i, i):match('%s') do i = i + 1 end
+    local c = text:sub(i, i)
+    if c == '"' then
+        local j = i + 1
+        while j <= n do
+            local ch = text:sub(j, j)
+            if ch == '\\' then
+                j = j + 1
+            elseif ch == '"' then
+                break
+            end
+            j = j + 1
+        end
+        return parse_simple_value(text:sub(i, j)), j + 1
+    elseif c == '[' then
+        local close = find_matching_brace(text, i)
+        local arr, p = {}, i + 1
+        while p < close do
+            while p < close and (text:sub(p, p):match('%s') or text:sub(p, p) == ',') do p = p + 1 end
+            if p >= close then break end
+            local v, nxt = parse_value_at(text, p)
+            arr[#arr + 1] = v
+            p = nxt
+        end
+        return arr, close + 1
+    elseif c == '{' then
+        local close = find_matching_brace(text, i)
+        local obj, p = {}, i + 1
+        while p < close do
+            while p < close and text:sub(p, p):match('%s') do p = p + 1 end
+            if p >= close then break end
+            if text:sub(p, p) == '"' then
+                local k, kend = parse_value_at(text, p)
+                p = kend
+                while p < close and text:sub(p, p):match('%s') do p = p + 1 end
+                if p < close and text:sub(p, p) == ':' then p = p + 1 end
+                local v, nxt = parse_value_at(text, p)
+                if v ~= nil then
+                    ---@type table|string|number|boolean
+                    local val = v
+                    obj[tostring(k)] = val
+                end
+                p = nxt
+            else
+                p = p + 1
+            end
+        end
+        return obj, close + 1
+    elseif c == 't' and text:sub(i, i + 3) == 'true' then
+        return true, i + 4
+    elseif c == 'f' and text:sub(i, i + 4) == 'false' then
+        return false, i + 5
+    elseif c == 'n' and text:sub(i, i + 3) == 'null' then
+        return nil, i + 4
+    else
+        local j = i
+        while j <= n and not text:sub(j, j):match('[%s,]') do
+            if text:sub(j, j) == '}' or text:sub(j, j) == ']' then break end
+            j = j + 1
+        end
+        local tok = trim(text:sub(i, j - 1))
+        return (tok ~= '' and (tonumber(tok) or tok)) or nil, j
+    end
+end
+
 local function extract_settings(settings_path, prefix)
     if not settings_path or not file_exists(settings_path) then return nil end
     local f = io.open(settings_path, "r")
@@ -291,29 +361,50 @@ local function extract_settings(settings_path, prefix)
                 end
 
                 if c == '[' then
-                    local arr = parse_array_from_text(content, val_start)
-                    if arr then tbl[parts[#parts]] = arr end
-                    search_start = val_start + 1
+                    local v, nxt = parse_value_at(content, val_start)
+                    tbl[parts[#parts]] = v
+                    search_start = nxt
                 elseif c == '{' then
-                    local obj = parse_object_from_text(content, val_start)
-                    if obj then
-                        for ok, ov in pairs(obj) do
-                            if not tbl[parts[#parts]] then tbl[parts[#parts]] = {} end
-                            tbl[parts[#parts]][ok] = ov
+                    local v, nxt = parse_value_at(content, val_start)
+                    if type(v) == 'table' then
+                        local target = tbl[parts[#parts]]
+                        if type(target) == 'table' then
+                            -- 浅合并到已存在的成员（同键覆盖）
+                            for kk, vv in pairs(v) do target[kk] = vv end
+                        else
+                            tbl[parts[#parts]] = v
                         end
+                    else
+                        tbl[parts[#parts]] = v
                     end
-                    search_start = val_start + 1
+                    search_start = nxt
                 elseif c == '"' or c == 't' or c == 'f' or c == 'n' or c == '-' or c:match('%d') then
-                    local end_pos = #content
-                    local next_comma = content:find(',', val_start)
-                    local next_brace = content:find('}', val_start)
-                    local next_newline = content:find('\n', val_start)
-                    for _, p in ipairs({next_comma, next_brace, next_newline}) do
-                        if p and p < end_pos and p > val_start then end_pos = p end
+                    local end_pos
+                    if c == '"' then
+                        -- 字符串值：推进到闭引号之后，避免读到值内部的下一个键
+                        end_pos = val_start + 1
+                        while end_pos <= #content do
+                            local ch = content:sub(end_pos, end_pos)
+                            if ch == '\\' then
+                                end_pos = end_pos + 1
+                            elseif ch == '"' then
+                                end_pos = end_pos + 1
+                                break
+                            end
+                            end_pos = end_pos + 1
+                        end
+                    else
+                        end_pos = #content
+                        local next_comma = content:find(',', val_start)
+                        local next_brace = content:find('}', val_start)
+                        local next_newline = content:find('\n', val_start)
+                        for _, p in ipairs({next_comma, next_brace, next_newline}) do
+                            if p and p < end_pos and p > val_start then end_pos = p end
+                        end
                     end
                     local val_str = content:sub(val_start, end_pos - 1)
                     tbl[parts[#parts]] = parse_simple_value(val_str)
-                    search_start = val_start + 1
+                    search_start = end_pos
                 else
                     search_start = val_start + 1
                 end
