@@ -681,3 +681,82 @@ function OnSetText(uri, text)
     if #diffs == 0 then return nil end
     return diffs
 end
+
+-- ===== [实验] OnTransformAst 自注入：把原始 self 参数绑定为类类型 =====
+-- 通过 luadoc.buildAndBindDoc 注入虚拟 @param self <ClassName>，markVirtual 标记，
+-- 设计目标是让编辑器对原始方法体里的 self 悬停出类型。
+-- 注：仅作诊断层面的对照实验，最终是否保留待定。
+local ok_luadoc, luadoc   = pcall(require, 'parser.luadoc')
+local ok_guide,  guide    = pcall(require, 'parser.guide')
+
+local function t_buildComment(t, value, pos)
+    return {
+        type    = 'comment.short',
+        start   = pos,
+        finish  = pos,
+        text    = '-@' .. t .. ' ' .. value,
+        virtual = true,
+    }
+end
+
+-- 复用文本解析：定位 class 调用（callee 链含 getglobal 'class'）并取类名
+local function t_getClassName(outerCall)
+    local callee = outerCall and outerCall.node
+    while callee do
+        if callee.type == 'call' then
+            if callee.node and callee.node.type == 'getglobal'
+            and guide.getKeyName(callee.node) == 'class' then
+                local nameNode = callee.args and callee.args[1]
+                if nameNode and nameNode.type == 'string' then
+                    return guide.getLiteral(nameNode)
+                end
+                return nil
+            end
+            callee = callee.node
+        elseif callee.type == 'getmethod' then
+            callee = callee.node
+        else
+            callee = nil
+        end
+    end
+    return nil
+end
+
+local function t_injectSelf(ast, classname, tableNode)
+    if not tableNode or tableNode.type ~= 'table' then
+        return
+    end
+    for i = 1, #tableNode do
+        local field = tableNode[i]
+        local value = field and field.value
+        if value and value.type == 'function' and value.args then
+            for j = 1, #value.args do
+                local p = value.args[j]
+                if guide.getKeyName(p) == 'self' then
+                    luadoc.buildAndBindDoc(
+                        ast, value,
+                        t_buildComment('param', ('self %s'):format(classname), p.start - 1))
+                    break
+                end
+            end
+        end
+    end
+end
+
+function OnTransformAst(uri, ast)
+    if ok_luadoc and ok_guide and type(ast) == 'table' and ast.type == 'main' then
+        guide.eachSource(ast, function(node)
+            if node.type == 'call' and node.args then
+                local classname = t_getClassName(node)
+                if classname then
+                    for _, a in ipairs(node.args) do
+                        if a.type == 'table' then
+                            t_injectSelf(ast, classname, a)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    return ast
+end
