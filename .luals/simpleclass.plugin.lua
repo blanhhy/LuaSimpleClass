@@ -736,22 +736,48 @@ function OnSetText(uri, text)
                 end
                 out[#out + 1] = '---@diagnostic enable: undefined-field'
 
+                -- 收集需要在基类上做"存在性检查"的方法名：
+                -- (a) 标注 ---@override 的方法；(b) 方法体内通过 `super(X, self):name()` 调用的方法。
+                -- 用父类类型 `---@class <parent>` 访问这些名字，若基类无同名方法则触发 undefined-field。
                 local overrideMethods = {}
                 for _, m in ipairs(methods) do
                     if m.isOverride and m.name ~= 'new' then
                         overrideMethods[#overrideMethods + 1] = m
                     end
                 end
-                if #overrideMethods > 0 and parentName then
+                local superCalled = {}
+                for _, m in ipairs(methods) do
+                    if m.body then
+                        for mname in m.body:gmatch('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*([%w_]+)') do
+                            superCalled[mname] = true
+                        end
+                    end
+                end
+                local baseCheckNames = {}
+                local seen = {}
+                for _, m in ipairs(overrideMethods) do
+                    if not seen[m.name] then
+                        seen[m.name] = true
+                        baseCheckNames[#baseCheckNames + 1] = m.name
+                    end
+                end
+                for mname in pairs(superCalled) do
+                    if not seen[mname] then
+                        seen[mname] = true
+                        baseCheckNames[#baseCheckNames + 1] = mname
+                    end
+                end
+                table.sort(baseCheckNames)
+                if #baseCheckNames > 0 and parentName then
                     out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
                     out[#out + 1] = 'local function __ls_check__()'
                     out[#out + 1] = '    ---@class ' .. parentName
                     out[#out + 1] = '    local _ = {}'
-                    out[#out + 1] = '    local override_method'
-                    for _, m in ipairs(overrideMethods) do
-                        out[#out + 1] = '    override_method = _.' .. m.name
+                    out[#out + 1] = '    local base_method'
+                    for _, nm in ipairs(baseCheckNames) do
+                        out[#out + 1] = '    base_method = _.' .. nm
                     end
-                    out[#out + 1] = '    return override_method'
+                    out[#out + 1] = '    return base_method'
                     out[#out + 1] = 'end'
                 end
 
