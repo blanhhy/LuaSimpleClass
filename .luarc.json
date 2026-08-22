@@ -1,3 +1,6 @@
 {
-    "runtime.plugin": ".luals/simpleclass.plugin.lua"
+    "runtime.plugin": ".luals/simpleclass.plugin.lua",
+    "workspace": {
+        "ignoreDir": ["tests"]
+    }
 }
