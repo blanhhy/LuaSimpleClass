@@ -1,4 +1,4 @@
-# LuaSimpleClass
+# Lua Simple Class
 
 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
 
@@ -7,7 +7,7 @@
 
 ## 安装 & 导入
 
-同样的，下载主文件夹 `simpleclass` 到模块目录，然后在 Lua 代码中导入即可
+`simpleclass` 是纯 Lua 实现的，只需要下载 [此文件夹](simpleclass)，然后在 Lua 代码中导入即可
 
 ```lua
 require "simpleclass"
@@ -24,12 +24,12 @@ require "simpleclass"
 
 class "MyClass" {
     foo = function(self)
-        print("foo from "..cls_type(self))
+        print("foo from", self:getClass())
     end;
 }
 
 local obj = MyClass()
-obj:foo() --> "foo from MyClass"
+obj:foo() --> "foo from    MyClass"
 ```
 
 详细指导参考下方 [特性说明](#特性) 或 [演示脚本](demo.lua)
@@ -38,7 +38,7 @@ obj:foo() --> "foo from MyClass"
 
 ### 类
 
-类是 LuaSimpleClass 的核心，类是生成对象的蓝图，使多个对象共享相同的方法，同时在构造函数中规定对象应有的属性
+类是 simpleclass 的核心，类是生成对象的蓝图，使多个对象共享相同的方法，同时在构造函数中规定对象应有的属性
 
 - 定义命名类：语法为 `class "<name>" {<body>}`
 
@@ -85,11 +85,11 @@ obj:foo() --> "foo from MyClass"
 
 ### 类的继承
 
-- 单继承：本模块仅支持单继承，使用 `extends` 关键字
+- 单继承：simpleclass 仅支持单继承，使用 `extends` 关键字
 
 > `extends` 接受类名字符串，因此匿名类不能作为父类；但匿名类可以继承其他类，这一点与 Java 类似
 
-- `super`：接收当前类与 `self`，如 `super(MySubclass, self):__init()`
+- `super`：接收当前类与 `self`，如 `super(subclass, self):__init()`
 
 > 示例：单继承
 >
@@ -97,7 +97,7 @@ obj:foo() --> "foo from MyClass"
 > class "MySubClass" : extends "MyClass" {
 >     ---@Override
 >     foo = function(self)
->         super(MySubclass, self):foo() -- call parent's foo
+>         super(MySubClass, self):foo() -- call parent's foo
 >         print("improved foo")
 >     end;
 > }
@@ -113,7 +113,7 @@ obj:foo() --> "foo from MyClass"
 
 接口不是类，不能实例化
 
-接口可以被类实现，可以检查类是否实现了接口，这与继承相似；同时接口之间也存在类似继承的关系，但不会形成继承链
+接口可以被类实现，可以检查类是否实现了方法；同时接口之间也存在类似继承的关系，但不会形成继承链
 
 - 接口定义：使用 `interface`，语法类似于类定义
 - 匿名接口：类似于匿名类
@@ -170,7 +170,7 @@ obj:foo() --> "foo from MyClass"
 
 - 返回对象的类
 - 如果是基本类型，返回 `type(obj)`
-- 这是它在 `_G` 中的名字（因为 `_G` 已有 `type`），在模块中名为 `type`
+- 这是它在 `_G` 中的名称（因为 `_G.type` 已存在），在模块中名为 `type`
 
 `isinstance(obj, cls_or_type)`
 
@@ -189,28 +189,30 @@ obj:foo() --> "foo from MyClass"
 - 判断类是否实现了指定接口，可以多个
 - 没有对应的全局函数（我认为没有必要）
 
-上面几个方法接受或返回的类或接口都是对象本身
+上面几个方法接受或返回的类/接口都是对象本身
 
 ### 类型推导
 
-`simpleclass` 提供了与 [lua-language-server](https://github.com/LuaLS/lua-language-server) 兼容的类型推导插件，下面是一个参考的 LS 配置：
+`simpleclass` 提供了适用于 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型推导插件，下面是一个参考的 `.luarc.json` 配置：
 
 ```json
-"runtime.plugin": ".luals/simpleclass.plugin.lua"
+{
+  "runtime.plugin": ".luals/simpleclass.plugin.lua"
+}
 ```
 
-复制插件脚本，并且保持 `simpleclass` 文件夹在 LS 支持的模块目录中即可
+复制插件脚本，并且保持 `simpleclass` 文件夹在 LS 支持的模块目录（工作目录或指定第三方库目录）中即可
 
 大致的功能：
 
-- 为新建的类和接口生成 @class 标注
-- 自动包含用户定义的类成员（包括 Getter 对应的属性）
-- 自动生成 new 方法的签名
-- 自动分析继承链与接口
-- 提供 @override，用于检查超类上是否有同名方法
+- 为新建的类和接口自动生成 `@class` 注解
+- 自动包含用户定义的类成员（含 Getter 对应属性）
+- 自动生成 `new` 方法的签名注解
+- 自动分析继承链与接口，保证多态性
+- 提供 `@override`，用于检查基类上是否有同名方法
 
 > Warnning:
-> 静态推导依赖于 LuaSimpleClass DSL，如果非全局导入，则需要在每个文件中手动 local 所用到的模块接口，使得函数名与全局导入时匹配
+> 静态推导依赖于 LuaSimpleClass DSL，如果非全局导入，则需要在每个文件中手动 `local` 所用到的模块接口，使得函数名与全局导入时匹配
 
 ## 配置项
 
