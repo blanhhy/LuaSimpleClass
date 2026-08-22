@@ -314,13 +314,55 @@ local function findClassKeyword(text, from)
         if not cstart then return nil end
         local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
         if not before:match('[%w_.]') then
-            local afterStart = cstart + 5
-            local restStart = afterStart
-            while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                restStart = restStart + 1
+            local isInStringOrComment = false
+            local scanPos = pos
+            while scanPos < cstart do
+                local sc = text:sub(scanPos, scanPos)
+                if sc == '"' or sc == "'" then
+                    local q = sc
+                    scanPos = scanPos + 1
+                    while scanPos <= n and text:sub(scanPos, scanPos) ~= q do
+                        if text:sub(scanPos, scanPos) == '\n' then
+                            break
+                        end
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                    scanPos = scanPos + 1
+                elseif sc == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
+                    while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                elseif sc == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
+                    scanPos = scanPos + 2
+                    while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                    scanPos = scanPos + 2
+                else
+                    scanPos = scanPos + 1
+                end
             end
-            if restStart <= n and text:sub(restStart, restStart) == '"' then
-                return cstart
+            if not isInStringOrComment then
+                local afterStart = cstart + 5
+                local restStart = afterStart
+                while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                    restStart = restStart + 1
+                end
+                if restStart <= n and text:sub(restStart, restStart) == '"' then
+                    return cstart
+                end
             end
         end
         pos = cstart + 1
@@ -336,13 +378,55 @@ local function findInterfaceKeyword(text, from)
         if not cstart then return nil end
         local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
         if not before:match('[%w_.]') then
-            local afterStart = cstart + 9
-            local restStart = afterStart
-            while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                restStart = restStart + 1
+            local isInStringOrComment = false
+            local scanPos = pos
+            while scanPos < cstart do
+                local sc = text:sub(scanPos, scanPos)
+                if sc == '"' or sc == "'" then
+                    local q = sc
+                    scanPos = scanPos + 1
+                    while scanPos <= n and text:sub(scanPos, scanPos) ~= q do
+                        if text:sub(scanPos, scanPos) == '\n' then
+                            break
+                        end
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                    scanPos = scanPos + 1
+                elseif sc == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
+                    while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                elseif sc == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
+                    scanPos = scanPos + 2
+                    while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do
+                        scanPos = scanPos + 1
+                    end
+                    if scanPos >= cstart then
+                        isInStringOrComment = true
+                        break
+                    end
+                    scanPos = scanPos + 2
+                else
+                    scanPos = scanPos + 1
+                end
             end
-            if restStart <= n and text:sub(restStart, restStart) == '"' then
-                return cstart
+            if not isInStringOrComment then
+                local afterStart = cstart + 9
+                local restStart = afterStart
+                while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                    restStart = restStart + 1
+                end
+                if restStart <= n and text:sub(restStart, restStart) == '"' then
+                    return cstart
+                end
             end
         end
         pos = cstart + 1
