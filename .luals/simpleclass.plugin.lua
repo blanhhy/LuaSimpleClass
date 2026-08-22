@@ -3,6 +3,55 @@
 ---@field finish integer
 ---@field text   string
 
+-- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
+
+-- 跳过一段短字符串（含 \ 转义）。i 指向开引号 " 或 '，返回闭引号后的位置
+local function skipShortString(text, i)
+    local n = #text
+    local q = text:sub(i, i)
+    i = i + 1
+    while i <= n do
+        local c = text:sub(i, i)
+        if c == '\\' then
+            i = i + 2
+        elseif c == q then
+            return i + 1
+        else
+            i = i + 1
+        end
+    end
+    return n + 1
+end
+
+-- 若 text 从 pos 起是长括号 `[[` 或 `[=[`，跳到其闭合 `]]`/`]=]` 之后；否则返回 nil
+local function skipLongBracket(text, pos)
+    local n = #text
+    if text:sub(pos, pos) ~= '[' then return nil end
+    local eq = 0
+    local j = pos + 1
+    while j <= n and text:sub(j, j) == '=' do eq = eq + 1; j = j + 1 end
+    if j > n or text:sub(j, j) ~= '[' then return nil end
+    local close = ']' .. string.rep('=', eq) .. ']'
+    local idx = text:find(close, j + 1, true)
+    if idx then return idx + #close end
+    return n + 1
+end
+
+-- 跳过注释：`--[[...]]` 块注释或 `--...` 行注释。i 指向 '-'，返回注释结束后的位置
+local function skipComment(text, i)
+    local n = #text
+    local after = i + 2
+    if after <= n and text:sub(after, after) == '[' then
+        local e = skipLongBracket(text, after)
+        if e then return e end
+    end
+    local j = i
+    while j <= n and text:sub(j, j) ~= '\n' do
+        j = j + 1
+    end
+    return j
+end
+
 local function findBraceEnd(text, startPos)
     local depth = 0
     local n = #text
@@ -10,24 +59,24 @@ local function findBraceEnd(text, startPos)
     while i <= n do
         local c = text:sub(i, i)
         if c == '"' or c == "'" then
-            local q = c
-            i = i + 1
-            while i <= n and text:sub(i, i) ~= q do
-                i = i + 1
-            end
-        elseif c == '-' and i < n and text:sub(i + 1, i + 1) == '-' then
-            while i <= n and text:sub(i, i) ~= '\n' do
-                i = i + 1
-            end
+            i = skipShortString(text, i)
+        elseif c == '[' and (text:sub(i + 1, i + 1) == '[' or text:sub(i + 1, i + 1) == '=') then
+            local e = skipLongBracket(text, i)
+            i = e or (i + 1)
+        elseif c == '-' and text:sub(i + 1, i + 1) == '-' then
+            i = skipComment(text, i)
         elseif c == '{' then
             depth = depth + 1
+            i = i + 1
         elseif c == '}' then
             depth = depth - 1
             if depth == 0 then
                 return i
             end
+            i = i + 1
+        else
+            i = i + 1
         end
-        i = i + 1
     end
     return nil
 end
@@ -38,10 +87,8 @@ local function skipCommentsAndWhitespace(body, i)
         local c = body:sub(i, i)
         if c:match('%s') or c == ';' or c == ',' then
             i = i + 1
-        elseif c == '-' and i < n and body:sub(i + 1, i + 1) == '-' then
-            while i <= n and body:sub(i, i) ~= '\n' do
-                i = i + 1
-            end
+        elseif c == '-' and body:sub(i + 1, i + 1) == '-' then
+            i = skipComment(body, i)
         else
             break
         end
@@ -109,6 +156,34 @@ local function isWordBoundary(body, pos, n)
     if pos <= 1 or pos > n then return true end
     local c = body:sub(pos, pos)
     return not c:match('[%w_]')
+end
+
+-- 找字段值的结束位置：跳过字符串/注释/嵌套括号，返回顶层 `;` 或换行（depth==0）处的下标。
+-- 用于支持跨行 table/表达式作为字段值（否则单行截断会切错类体）。
+local function findFieldEnd(body, start)
+    local n = #body
+    local i = start
+    local depth = 0
+    while i <= n do
+        local c = body:sub(i, i)
+        if c == '"' or c == "'" then
+            i = skipShortString(body, i)
+        elseif c == '[' and (body:sub(i + 1, i + 1) == '[' or body:sub(i + 1, i + 1) == '=') then
+            local e = skipLongBracket(body, i)
+            i = e or (i + 1)
+        elseif c == '-' and body:sub(i + 1, i + 1) == '-' then
+            i = skipComment(body, i)
+        elseif c == '{' or c == '(' or c == '[' then
+            depth = depth + 1; i = i + 1
+        elseif c == '}' or c == ')' or c == ']' then
+            if depth > 0 then depth = depth - 1 end; i = i + 1
+        elseif (c == '\n' or c == ';') and depth == 0 then
+            return i
+        else
+            i = i + 1
+        end
+    end
+    return n + 1
 end
 
 local function parseMethods(body)
@@ -188,9 +263,12 @@ local function parseMethods(body)
                     if parenDepth == 0 then break end
                     j = j + 1
                 elseif c == '"' or c == "'" then
-                    local q = c; j = j + 1
-                    while j <= n and body:sub(j, j) ~= q do j = j + 1 end
-                    j = j + 1
+                    j = skipShortString(body, j)
+                elseif c == '[' and (body:sub(j + 1, j + 1) == '[' or body:sub(j + 1, j + 1) == '=') then
+                    local e = skipLongBracket(body, j)
+                    j = e or (j + 1)
+                elseif c == '-' and body:sub(j + 1, j + 1) == '-' then
+                    j = skipComment(body, j)
                 else
                     j = j + 1
                 end
@@ -198,36 +276,44 @@ local function parseMethods(body)
             local params = body:sub(parenStart + 1, j - 1)
             local funcBodyStart = j + 1
 
+            -- 方法体深度匹配：`function/if/for/while/repeat/do` 开块，`end` 关块，`repeat...until` 特判
+            -- 独立 `do`（非 while/for 尾部）也会开块，避免 `do return end` 提前截断方法体
             local depth = 1
+            local lastKw = ''
             local k = funcBodyStart
             while k <= n and depth > 0 do
                 local c = body:sub(k, k)
                 if c == '"' or c == "'" then
-                    local q = c; k = k + 1
-                    while k <= n and body:sub(k, k) ~= q do k = k + 1 end
-                    k = k + 1
-                elseif c == '-' and k < n and body:sub(k + 1, k + 1) == '-' then
-                    while k <= n and body:sub(k, k) ~= '\n' do k = k + 1 end
-                elseif c == '[' and k < n and body:sub(k + 1, k + 1) == '[' then
-                    k = k + 2
-                    while k <= n and body:sub(k, k + 1) ~= ']]' do k = k + 1 end
-                    k = k + 2
+                    k = skipShortString(body, k)
+                elseif c == '[' and (body:sub(k + 1, k + 1) == '[' or body:sub(k + 1, k + 1) == '=') then
+                    local e = skipLongBracket(body, k)
+                    k = e or (k + 1)
+                elseif c == '-' and body:sub(k + 1, k + 1) == '-' then
+                    k = skipComment(body, k)
                 else
                     if isWordBoundary(body, k - 1, n) then
                         if body:sub(k, k + 7) == 'function' and isWordBoundary(body, k + 8, n) then
-                            depth = depth + 1; k = k + 8
+                            depth = depth + 1; lastKw = 'function'; k = k + 8
                         elseif body:sub(k, k + 1) == 'if' and isWordBoundary(body, k + 2, n) then
-                            depth = depth + 1; k = k + 2
+                            depth = depth + 1; lastKw = 'if'; k = k + 2
                         elseif body:sub(k, k + 2) == 'for' and isWordBoundary(body, k + 3, n) then
-                            depth = depth + 1; k = k + 3
+                            depth = depth + 1; lastKw = 'for'; k = k + 3
                         elseif body:sub(k, k + 4) == 'while' and isWordBoundary(body, k + 5, n) then
-                            depth = depth + 1; k = k + 5
+                            depth = depth + 1; lastKw = 'while'; k = k + 5
                         elseif body:sub(k, k + 5) == 'repeat' and isWordBoundary(body, k + 6, n) then
-                            depth = depth + 1; k = k + 6
+                            depth = depth + 1; lastKw = 'repeat'; k = k + 6
+                        elseif body:sub(k, k + 1) == 'do' and isWordBoundary(body, k + 2, n) then
+                            -- while/for 尾部的 do 已由 while/for 计了一次，这里不能再加
+                            if lastKw ~= 'while' and lastKw ~= 'for' then depth = depth + 1 end
+                            lastKw = 'do'; k = k + 2
+                        elseif body:sub(k, k + 3) == 'then' and isWordBoundary(body, k + 4, n) then
+                            lastKw = 'then'; k = k + 4
                         elseif body:sub(k, k + 4) == 'until' and isWordBoundary(body, k + 5, n) then
-                            depth = depth - 1; if depth == 0 then k = k + 5; break end; k = k + 5
+                            depth = depth - 1; lastKw = 'until'
+                            if depth == 0 then k = k + 5; break end
+                            k = k + 5
                         elseif body:sub(k, k + 2) == 'end' and isWordBoundary(body, k + 3, n) then
-                            depth = depth - 1
+                            depth = depth - 1; lastKw = 'end'
                             if depth == 0 then
                                 k = k + 3
                                 break
@@ -268,12 +354,7 @@ local function parseMethods(body)
                 isGetter = isGetter,
                 isSetter = isSetter,
             }
-            local lineEnd = body:find('[\n;]', afterFieldStart)
-            if lineEnd then
-                i = lineEnd + 1
-            else
-                i = n + 1
-            end
+            i = findFieldEnd(body, afterFieldStart)
         end
     end
     return methods, fields
@@ -606,6 +687,11 @@ function OnSetText(uri, text)
                     out[#out + 1] = className .. '.' .. f.name .. ' = nil'
                 end
 
+                -- 方法体已由 OnTransformAst 自注入在原始代码处完成了字段/类型检查，
+                -- 重发的副本仅用于登记方法签名与返回类型，其 body 诊断会与原始重复，
+                -- 故在此作用域内关闭 body 级诊断，避免重复报警（enable 在重发区末尾恢复）。
+                out[#out + 1] = '---@diagnostic disable: undefined-field'
+
                 for _, m in ipairs(methods) do
                     if m.isGetter then
                         local attrName = m.name
@@ -648,6 +734,7 @@ function OnSetText(uri, text)
                         out[#out + 1] = 'end'
                     end
                 end
+                out[#out + 1] = '---@diagnostic enable: undefined-field'
 
                 local overrideMethods = {}
                 for _, m in ipairs(methods) do
