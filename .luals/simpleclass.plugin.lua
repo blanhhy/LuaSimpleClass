@@ -682,14 +682,22 @@ function OnSetText(uri, text)
     return diffs
 end
 
--- ===== [实验] OnTransformAst 自注入：把原始 self 参数绑定为类类型 =====
--- 通过 luadoc.buildAndBindDoc 注入虚拟 @param self <ClassName>，markVirtual 标记，
--- 设计目标是让编辑器对原始方法体里的 self 悬停出类型。
--- 注：仅作诊断层面的对照实验，最终是否保留待定。
-local ok_luadoc, luadoc   = pcall(require, 'parser.luadoc')
-local ok_guide,  guide    = pcall(require, 'parser.guide')
+-- ==================================== OnTransformAst 自注入 ====================================
+-- 通过 luadoc.buildAndBindDoc 把原始 DSL 方法体里的 self 参数绑定为类类型。
+-- 目的：让编辑器对原始 `foo = function(self)` 中的 self 悬停出类型，并参与 field 检查。
+-- 这与 OnSetText 的"方法体重发"互补（后者只类型化重发副本，不作用于原始 self）。
+-- markVirtual 标记保证不污染高亮。
+-- 注：parser.luadoc / parser.guide 是 LuaLS 内部模块，用 pcall + ok_ 兜底，缺省时静默降级。
 
-local function t_buildComment(t, value, pos)
+local ok_luadoc, luadoc = pcall(require, 'parser.luadoc')
+local ok_guide,  guide  = pcall(require, 'parser.guide')
+
+---构造一个虚拟的短注释节点
+---@param t string   注释标签，如 "param"
+---@param value string 注释内容
+---@param pos integer
+---@return table
+local function pl_buildComment(t, value, pos)
     return {
         type    = 'comment.short',
         start   = pos,
@@ -699,8 +707,10 @@ local function t_buildComment(t, value, pos)
     }
 end
 
--- 复用文本解析：定位 class 调用（callee 链含 getglobal 'class'）并取类名
-local function t_getClassName(outerCall)
+---沿 callee 链向上解析 class 调用，取回类名（即 `class "Name"` 中的 Name）
+---@param outerCall table 外层 call 节点
+---@return string?
+local function pl_getClassName(outerCall)
     local callee = outerCall and outerCall.node
     while callee do
         if callee.type == 'call' then
@@ -722,7 +732,11 @@ local function t_getClassName(outerCall)
     return nil
 end
 
-local function t_injectSelf(ast, classname, tableNode)
+---遍历类体 table，给每个方法的 self 参数绑定 `@param self <类名>`
+---@param ast table  AST 根
+---@param classname string
+---@param tableNode table 类体 table 节点
+local function pl_injectSelf(ast, classname, tableNode)
     if not tableNode or tableNode.type ~= 'table' then
         return
     end
@@ -735,7 +749,7 @@ local function t_injectSelf(ast, classname, tableNode)
                 if guide.getKeyName(p) == 'self' then
                     luadoc.buildAndBindDoc(
                         ast, value,
-                        t_buildComment('param', ('self %s'):format(classname), p.start - 1))
+                        pl_buildComment('param', ('self %s'):format(classname), p.start - 1))
                     break
                 end
             end
@@ -743,15 +757,19 @@ local function t_injectSelf(ast, classname, tableNode)
     end
 end
 
+---LS 插件回调：在 luadoc 解析前改写 AST，注入自绑定
+---@param uri string
+---@param ast table
+---@return table
 function OnTransformAst(uri, ast)
     if ok_luadoc and ok_guide and type(ast) == 'table' and ast.type == 'main' then
         guide.eachSource(ast, function(node)
             if node.type == 'call' and node.args then
-                local classname = t_getClassName(node)
+                local classname = pl_getClassName(node)
                 if classname then
                     for _, a in ipairs(node.args) do
                         if a.type == 'table' then
-                            t_injectSelf(ast, classname, a)
+                            pl_injectSelf(ast, classname, a)
                         end
                     end
                 end
