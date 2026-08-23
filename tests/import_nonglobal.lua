@@ -29,6 +29,7 @@ class "NonGlobal_mn1" {
     end;
 }
 
-local NonGlobal_mn1 = sc._ENV.NonGlobal_mn1 ---@type NonGlobal_mn1
-local obj = NonGlobal_mn1()
+-- 强制向下转型（从 _ENV 取只能得到 object）
+local MyClass = sc._ENV.NonGlobal_mn1 ---@cast MyClass NonGlobal_mn1
+local obj = MyClass()
 print(obj:probe())

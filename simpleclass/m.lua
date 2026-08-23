@@ -15,7 +15,7 @@ local mm_names = {
 
 ---@class simpleclass
 local M = {
-    _ENV = {};
+    _ENV = {}; ---@type table<string, object>
     _MMS = mm_names;
     _CMT = class_MT;
 }
