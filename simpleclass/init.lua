@@ -4,7 +4,7 @@ local mname, murl -- Standard lua `require` arguments
     , margs = ... -- Reserved for user custom extension
 
 ---@class simpleclass.INIT_OPTIONS
-local options = type(margs) == "table" and margs or {}
+local options = {}
 
 --==================================== INIT OPTIONS ====================================--
 
@@ -13,6 +13,13 @@ options.INTERFACE_INCLUDED = true;
 options.DEFAULT_I_FEATURE  = "general";
 
 --==================================== INIT OPTIONS ====================================--
+
+-- Merge import options
+if type(margs) == "table" then
+    for k, v in pairs(margs) do
+        options[k] = v
+    end
+end
 
 local M   = require "simpleclass.m" ---@class simpleclass
             require "simpleclass.object"
