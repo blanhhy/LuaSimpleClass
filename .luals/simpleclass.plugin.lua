@@ -81,13 +81,22 @@ local function findBraceEnd(text, startPos)
     return nil
 end
 
-local function skipCommentsAndWhitespace(body, i)
+-- 若 collect 提供，则把类体表层出现的单行 `---@field ...` 注释收集为类字段声明（透传至 ---@class 块）
+local function skipCommentsAndWhitespace(body, i, collect)
     local n = #body
     while i <= n do
         local c = body:sub(i, i)
         if c:match('%s') or c == ';' or c == ',' then
             i = i + 1
         elseif c == '-' and body:sub(i + 1, i + 1) == '-' then
+            if collect then
+                local cl = body:sub(i)
+                local ce = cl:find('\n', 1, true) or (#cl + 1)
+                local lineTxt = (cl:sub(1, ce - 1)):gsub('^%s+', '')
+                if lineTxt:match('^%-%-%-@field') then
+                    collect[#collect + 1] = lineTxt
+                end
+            end
             i = skipComment(body, i)
         else
             break
@@ -189,10 +198,11 @@ end
 local function parseMethods(body)
     local methods = {}
     local fields = {}
+    local declareFields = {}
     local n = #body
     local i = 1
     while i <= n do
-        i = skipCommentsAndWhitespace(body, i)
+        i = skipCommentsAndWhitespace(body, i, declareFields)
         if i > n then break end
 
         local name, afterFieldStart
@@ -236,8 +246,11 @@ local function parseMethods(body)
                 end
                 local lineStart = ci + 1
                 local line = body:sub(lineStart, lineEnd)
-                if line:match('^%s*---') then
-                    table.insert(commentLines, 1, (line:gsub('^%s+', '')))
+                local tline = line:gsub('^%s+', '')
+                if tline:match('^%-%-%-@field') then
+                    -- ---@field 已被前进扫描收集为类字段声明，不再挂到方法/字段的 docs 上
+                elseif line:match('^%s*---') then
+                    table.insert(commentLines, 1, tline)
                 else
                     break
                 end
@@ -359,7 +372,7 @@ local function parseMethods(body)
             i = findFieldEnd(body, afterFieldStart)
         end
     end
-    return methods, fields
+    return methods, fields, declareFields
 end
 
 local function getFirstParamName(params)
@@ -686,7 +699,7 @@ function OnSetText(uri, text)
             if not className then
                 pos = nextPos + 5
             else
-                local methods, fields = parseMethods(body)
+                local methods, fields, declareFields = parseMethods(body)
                 local parent = parentName or 'object'
                 local out = {}
                 local classLine = '---@class ' .. className .. ' : ' .. parent
@@ -694,6 +707,10 @@ function OnSetText(uri, text)
                     classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
                 end
                 out[#out + 1] = classLine
+                -- 表表层手写的 ---@field 透传到 ---@class 下的连续注释行，声明未在 __init 赋值的字段
+                for _, df in ipairs(declareFields) do
+                    out[#out + 1] = df
+                end
                 out[#out + 1] = '---@field __class ' .. className
                 out[#out + 1] = '---@field __base ' .. parent
                 out[#out + 1] = '---@operator call:' .. className
@@ -809,6 +826,17 @@ function OnSetText(uri, text)
                     end
                 end
                 out[#out + 1] = '---@diagnostic enable: undefined-field'
+
+                if #declareFields > 0 then
+                    -- 原始类体里的 ---@field（其前无 ---@class）会触发 doc-field-no-class。
+                    -- 在此（表体开始处）禁用，到生成的类注解块前再启用，仅覆盖这一小段。
+                    diffs[#diffs + 1] = {
+                        start  = braceStart + 1,
+                        finish = braceStart,
+                        text   = '---@diagnostic disable: doc-field-no-class\n',
+                    }
+                    out[#out + 1] = '---@diagnostic enable: doc-field-no-class'
+                end
 
                 diffs[#diffs + 1] = {
                     start  = classEnd + 1,
