@@ -1,6 +1,10 @@
 ---@diagnostic disable: lowercase-global
+---@diagnostic disable-next-line: unused-local
+local mname, murl -- Standard lua `require` arguments
+    , margs = ... -- Reserved for user custom extension
+
 ---@class simpleclass.INIT_OPTIONS
-local options = {}
+local options = type(margs) == "table" and margs or {}
 
 --==================================== INIT OPTIONS ====================================--
 
