@@ -209,7 +209,7 @@ local function parseMethods(body)
         do
             local n1, p1 = body:match('^([%w_]+)%s*=%s*()', i)
             local n2, p2 = body:match("^%['([^']+)'%]%s*=%s*()", i)
-            local n3, p3 = body:match('^%"([^"]+)"%]%s*=%s*()', i)
+            local n3, p3 = body:match('^%["([^"]+)"%]%s*=%s*()', i)
             if n1 then
                 name = n1; afterFieldStart = p1
             elseif n2 then
