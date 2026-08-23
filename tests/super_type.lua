@@ -1,7 +1,7 @@
--- super() 父类锚定（注入基类存在性检查）：super(Student, self) 调用的方法若父类无同名方法，
--- 在注入的检查块中触发 undefined-field（line 22 = 注入块 base_method=_.__nonexistent_base）。
+-- super() 锚定基类：方法内注入局部 `function super(_, _) return <父类> end` 遮蔽全局 super，
+-- 使 `super(Child, self):name()` 的接收者为父类。父类无该方法则于原调用处(line 24)报 undefined-field。
 -- 有效调用 super(...):__init 不应报警。
--- expect: 26:undefined-field
+-- expect: 24:undefined-field
 require "simpleclass"
 
 class "Person_qwceuirgqf" {
@@ -23,4 +23,8 @@ class "Student_q2gihi2j43" : extends "Person_qwceuirgqf" {
     bad = function(self)
         super(Student_q2gihi2j43, self):__nonexistent_base()
     end;
+    wrongSig = function(self)
+        super(Student_q2gihi2j43, self):__init("only-name")
+    end;
 }
+-- expect: 27:missing-parameter

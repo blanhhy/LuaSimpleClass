@@ -149,7 +149,7 @@ local function parseClassBlock(text, startPos)
     if not braceStart then return nil end
     local braceEnd = findBraceEnd(text, braceStart)
     if not braceEnd then return nil end
-    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1)
+    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1), braceStart
 end
 
 local function isWordBoundary(body, pos, n)
@@ -345,6 +345,8 @@ local function parseMethods(body)
                 isGetter = isGetter,
                 isSetter = isSetter,
                 isOverride = isOverride,
+                -- body 内"方法签名右括号之后"的位置（相对 body），用于插入 super 遮蔽
+                sigEnd = j + 1,
             }
             i = k
         else
@@ -680,7 +682,7 @@ function OnSetText(uri, text)
                 pos = iEnd + 1
             end
         else
-            local className, parentName, implementsList, classStart, classEnd, body = parseClassBlock(text, nextPos)
+            local className, parentName, implementsList, classStart, classEnd, body, braceStart = parseClassBlock(text, nextPos)
             if not className then
                 pos = nextPos + 5
             else
@@ -808,56 +810,26 @@ function OnSetText(uri, text)
                 end
                 out[#out + 1] = '---@diagnostic enable: undefined-field'
 
-                -- 收集需要在基类上做"存在性检查"的方法名：
-                -- (a) 标注 ---@override 的方法；(b) 方法体内通过 `super(X, self):name()` 调用的方法。
-                -- 用父类类型 `---@class <parent>` 访问这些名字，若基类无同名方法则触发 undefined-field。
-                local overrideMethods = {}
-                for _, m in ipairs(methods) do
-                    if m.isOverride and m.name ~= 'new' then
-                        overrideMethods[#overrideMethods + 1] = m
-                    end
-                end
-                local superCalled = {}
-                for _, m in ipairs(methods) do
-                    if m.body then
-                        for mname in m.body:gmatch('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*([%w_]+)') do
-                            superCalled[mname] = true
-                        end
-                    end
-                end
-                local baseCheckNames = {}
-                local seen = {}
-                for _, m in ipairs(overrideMethods) do
-                    if not seen[m.name] then
-                        seen[m.name] = true
-                        baseCheckNames[#baseCheckNames + 1] = m.name
-                    end
-                end
-                for mname in pairs(superCalled) do
-                    if not seen[mname] then
-                        seen[mname] = true
-                        baseCheckNames[#baseCheckNames + 1] = mname
-                    end
-                end
-                table.sort(baseCheckNames)
-                if #baseCheckNames > 0 and parentName then
-                    out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
-                    out[#out + 1] = 'local function __ls_check__()'
-                    out[#out + 1] = '    ---@class ' .. parentName
-                    out[#out + 1] = '    local _ = {}'
-                    out[#out + 1] = '    local base_method'
-                    for _, nm in ipairs(baseCheckNames) do
-                        out[#out + 1] = '    base_method = _.' .. nm
-                    end
-                    out[#out + 1] = '    return base_method'
-                    out[#out + 1] = 'end'
-                end
-
                 diffs[#diffs + 1] = {
                     start  = classEnd + 1,
                     finish = classEnd,
                     text   = '\n' .. table.concat(out, '\n'),
                 }
+
+                -- 直接在用到 super 的方法内注入局部 `super`（返回基类类型），把 `super(Child, self)` 的
+                -- 接收者锚定为基类。位置取方法签名右括号之后、同行末尾，零宽度插入不改变行号。
+                local baseName = parentName or 'object'
+                for _, m in ipairs(methods) do
+                    if m.sigEnd and m.body and m.body:find('super%s*%(') then
+                        -- body[i] 对应 text[braceStart+i]；右括号在 body[sigEnd-1]，越过即 braceStart+sigEnd
+                        local at = braceStart + m.sigEnd
+                        diffs[#diffs + 1] = {
+                            start  = at,
+                            finish = at - 1,
+                            text   = ' local function super(_, _)return ' .. baseName .. ' end',
+                        }
+                    end
+                end
                 pos = classEnd + 1
             end
         end
