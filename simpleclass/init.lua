@@ -16,8 +16,10 @@ options.DEFAULT_I_FEATURE  = "general";
 
 -- Merge import options
 if type(margs) == "table" then
-    for k, v in pairs(margs) do
-        options[k] = v
+    for k, v in next, margs do
+        if v ~= nil then
+            options[k] = v
+        end
     end
 end
 
