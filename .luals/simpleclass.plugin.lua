@@ -899,7 +899,10 @@ local function pl_getClassName(outerCall)
     local callee = outerCall and outerCall.node
     while callee do
         if callee.type == 'call' then
-            if callee.node and callee.node.type == 'getglobal'
+            -- class 既可以是全局（全局导入），也可能是手动 `local class = ...` 的局部变量（非全局导入）。
+            -- README 约定非全局导入须使函数名与全局导入一致，故这里对 getglobal/getlocal 名 'class' 一并识别。
+            if callee.node
+            and (callee.node.type == 'getglobal' or callee.node.type == 'getlocal')
             and guide.getKeyName(callee.node) == 'class' then
                 local nameNode = callee.args and callee.args[1]
                 if nameNode and nameNode.type == 'string' then
