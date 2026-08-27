@@ -1,4 +1,5 @@
-require "simpleclass"
+---@type simpleclass
+local sc = require "simpleclass"
 
 --#==========================================
 --# 基础使用
@@ -44,7 +45,7 @@ print(s1:isInstance(Person))   --> true
 print(s1:isInstance(object))   --> true
 print(isinstance(s1, "table")) --> true
 
-print(cls_type(s1)) --> Student
+print(sc.type(s1)) --> Student
 
 --#==========================================
 --# 深层继承

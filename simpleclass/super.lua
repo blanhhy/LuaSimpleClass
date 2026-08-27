@@ -20,16 +20,10 @@ local Super = {
 
 setmetatable(Super, {__mode = 'k'})
 
----@class simpleclass.super # A proxy object to call superclass methods
----@field self class|object # The object to call the method on
----@field __class class     # The superclass of the object
----@field [string] function # Methods of the superclass
+
 
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
----@param cls  class
----@param obj? class|object
----@return simpleclass.super
 function M.super(cls, obj)
     if not obj then obj = cls end
     local valid = obj and (Super[obj] or type(obj) == "table" and obj.__base)

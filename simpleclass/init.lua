@@ -43,6 +43,44 @@ M.AUTO_GLOBAL = false
 ---@type simpleclass.I_FEATURE
 M.I_FEATURE = options.DEFAULT_I_FEATURE
 
+---@alias simpleclass.FIELD
+---| "class"
+---| "super"
+---| "interface"
+---| "type"
+---| "object"
+---| "isinstance"
+---| "issubclass"
+
+---Import fields from simpleclass module to environment.  
+---eg:
+---```
+---simpleclass.env_import({
+---    "class",
+---    "super",
+---    ["type"] = "cls_type"
+---}, _ENV)
+---```
+---which means:
+---```python
+---from simpleclass import
+---    class,
+---    super,
+---    type as cls_type
+---```
+---@param fields {[simpleclass.FIELD]?: string, [integer]?: simpleclass.FIELD}
+---@param env? table Default to `_G` if missing.
+function M.env_import(fields, env)
+    env = env or _G
+    for k, v in next, fields do
+        if M[v] then -- eg. { "class" }
+            env[v] = M[v]
+        elseif M[k] then -- eg. { "cls_type" = "type" }
+            env[v] = M[k]
+        end
+    end
+end
+
 ---Include interface module
 if options.INTERFACE_INCLUDED then
     require "simpleclass.interface"
@@ -51,15 +89,14 @@ end
 ---Global import
 if options.GLOBAL_IMPORT then
     M.AUTO_GLOBAL = true
-
-    class = M.class
-    super = M.super
-    interface = M.interface
-    cls_type = M.type
-
-    object = M.object ---@type object
-    isinstance = object.isInstance
-    issubclass = object.isExtends
+    M.env_import {
+        "class",
+        "super",
+        "interface",
+        "object",
+        "isinstance",
+        "issubclass",
+    }
 end
 
 return M

@@ -6,22 +6,25 @@ local M = require "simpleclass.m" ---@class simpleclass
 local type, setmetatable, error
     = type, setmetatable, error
 
----@class simpleclass.creator
----@operator call:class
+---@class simpleclass.creator<T> : _ClassCreator<T>
 local cc = {
     name = "<anonymous>";
     base = require("simpleclass.object");
 }
 
 ---Single inheritance keyword
+---@generic T
 ---@param basename? string
+---@return _ClassCreator<T>
 function cc:extends(basename)
     self.base = M._ENV[basename]
     return self
 end
 
+---Define the class body
+---@generic T
 ---@param clazz table
----@return class
+---@return T
 function cc:def(clazz)
     local base = self.base
 
@@ -69,14 +72,17 @@ M.creator = cc
 ---```lua
 ---local cls = class {}
 ---```
----@param name? string
----@return simpleclass.creator
+---@generic T
+---@param name `T`
+---@return _ClassCreator<T>|_ClassDefiner<T>
 ---@overload fun(body:table):class
 function M.class(name)
     local typ = type(name)
     if typ == "table" then
         return cc:def(name)
     end
+    ---@generic T
+    ---@type _ClassCreator<T>
     return setmetatable({
         name = type(name) == "string" and name ~= '' and
         name or "<anonymous>"

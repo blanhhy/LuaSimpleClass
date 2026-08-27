@@ -2,16 +2,10 @@
 ---仿 Python 的 list 类
 ---@class list
 
-local class = class
-local cls_type = cls_type
-local isinstance = isinstance
-
-if not class then
-    local m = require "simpleclass"
-    class = m.class
-    cls_type = m.type
-    isinstance = m.object.isInstance
-end
+local sc = require "simpleclass" ---@type simpleclass
+local class = sc.class
+local cls_type = sc.type
+local isinstance = sc.isinstance
 
 local isJIT = pcall(require, "jit")
 local is5_5 = _VERSION >= "Lua 5.5"

@@ -1,13 +1,13 @@
 local M      = require "simpleclass.m" ---@class simpleclass
 local cc     = M.creator               ---@class simpleclass.creator
-local object = M._ENV.object
+local object = M.object
 
 local type, setmetatable, error
     = type, setmetatable, error
 
 local Interface
 
----@class interface
+---@class simpleclass.interface : interface
 Interface = {
     _ENV = M._ENV;
     global = _G; ---@class _G
@@ -16,7 +16,6 @@ Interface = {
 
 Interface.__index = Interface
 
----Extend the interface with other interfaces
 ---@param ... interface
 ---@return interface
 function Interface:extends(...)
@@ -37,6 +36,7 @@ end
 
 function Interface:check_impl(clazz)
     if M.I_FEATURE ~= "general" then return true end
+    ---@diagnostic disable-next-line: inject-field
     clazz.__implemented = clazz.__implemented or {}
     if clazz.__implemented[self] then return true end
     for i = 1, #self do
@@ -67,8 +67,6 @@ function Interface:__tostring()
     return ("<interface '%s'>")
     :format(self.__iname)
 end
-
-M = M ---@class simpleclass
 
 ---Define a new interface
 ---@param name? string|table
