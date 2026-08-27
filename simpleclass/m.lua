@@ -15,7 +15,7 @@ local mm_names = {
 
 ---@class simpleclass
 local M = {
-    _ENV = {}; ---@type table<string, object>
+    _ENV = {}; ---@type table<string, class>
     _MMS = mm_names;
     _CMT = class_MT;
 }
@@ -23,11 +23,12 @@ local M = {
 ---Get the type of a value, considering classes as special types  
 ---eg: 
 ---```lua
----cls_type(Eagle()) => Eagle
----cls_type("Hello") => "string"
+---simpleclass.type(Eagle()) => Eagle
+---simpleclass.type("Hello") => "string"
 ---```
----@param val object
----@return class
+---@generic T:object
+---@param val T
+---@return class<T>
 ---@overload fun(val):type
 function M.type(val)
     local typ = type(val)

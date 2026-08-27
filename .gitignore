@@ -1,3 +1,4 @@
 .tmp/
+experiments/
 debug*.lua
 test*.lua

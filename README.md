@@ -166,11 +166,11 @@ obj:foo() --> "foo from    MyClass"
 
 ### 类型检查
 
-`cls_type(obj)`
+`simpleclass.type(obj)`
 
 - 返回对象的类
 - 如果是基本类型，返回 `type(obj)`
-- 这是它在 `_G` 中的名称（因为 `_G.type` 已存在），在模块中名为 `type`
+- 由于`_G.type` 已存在，故不自动注入
 
 `isinstance(obj, cls_or_type)`
 
@@ -187,7 +187,7 @@ obj:foo() --> "foo from    MyClass"
 `cls:isImplements(...interface)`
 
 - 判断类是否实现了指定接口，可以多个
-- 没有对应的全局函数（我认为没有必要）
+- 没有对应的模块级接口（我认为没有必要）
 
 上面几个方法接受或返回的类/接口都是对象本身
 
