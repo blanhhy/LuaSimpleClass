@@ -100,12 +100,12 @@ function _CC:def(tbl) end
 ---```lua
 ---local cls = class {}
 ---```
----@generic T
----@param name `T`
+---@generic T:string
+---@param name? `T`
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function class(name) end
 
----@param body? table
+---@param body table
 ---@return object
 function class(body) end
 
@@ -146,7 +146,7 @@ function Interface:check_impl(clazz) end
 function Interface:extends(...) end
 
 ---Define a new interface
----@param name? string|table
+---@param name? string
 ---@return interface
 function interface(name) end
 
