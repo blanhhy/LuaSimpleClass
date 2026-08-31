@@ -7,17 +7,14 @@
 
 ---@class class<T>                    # A reflection of a class
 ---@field __classname string          # The name of the class
----@field __class T                   # The class type
 ---@field __base class|false          # The base class
 ---@field __init function?            # The constructor
----@operator call:class.instance
+---@operator call:object
 local Class = {}
-
----@class class.instance<T> : class<T>
 
 ---Create a new object of the class
 ---@generic T
----@return class.instance<T>
+---@return T
 function Class:new() end
 
 ---Check if the class extends the base class
