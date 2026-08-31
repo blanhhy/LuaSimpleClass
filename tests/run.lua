@@ -161,6 +161,10 @@ for _, path in ipairs(files) do
     for _, sf in ipairs(listDir(SIMPLE_DIR) or {}) do
         copyFile(SIMPLE_DIR .. sep .. sf, scDir .. sep .. sf)
     end
+    -- 类型声明文件在项目根（simpleclass.d.lua）时一并复制，否则隔离工作区缺类型
+    if readFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua') ~= nil then
+        copyFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua', scDir .. sep .. 'simpleclass.d.lua')
+    end
 
     local diags = runCheck(ws)
 
