@@ -201,7 +201,7 @@ obj:foo() --> "foo from    MyClass"
 }
 ```
 
-复制插件脚本，并且保持 `simpleclass` 文件夹在 LS 支持的模块目录（工作目录或指定第三方库目录）中即可
+复制插件脚本和 `simpleclass.d.lua` 到工作区即可
 
 大致的功能：
 
