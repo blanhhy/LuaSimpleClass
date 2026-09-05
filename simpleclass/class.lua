@@ -72,8 +72,8 @@ M.creator = cc
 ---```lua
 ---local cls = class {}
 ---```
----@generic T
----@param name `T`
+---@generic T:string
+---@param name `T`.class
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 ---@overload fun(body:table):class
 function M.class(name)

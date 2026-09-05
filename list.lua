@@ -27,10 +27,13 @@ local unpack = table.unpack or unpack
 
 class "list" {
     -- 静态属性
+
     ---@static
-    chkidxEnabled = true; -- 索引检查开关, 默认开启
+    -- 索引检查开关, 默认开启
+    chkidxEnabled = true;
 
     -- 静态方法
+
     ---@static
     ---@param lim number
     ---@param length? integer 如果提供了 length, 返回值会被规范为正向索引
@@ -67,17 +70,16 @@ class "list" {
     end;
 
     -- 构造方法
-    -- 由于 jit 和 5.5 情况下有预分配空间的需求, 所以直接重写了 new, 没有用 __init
-    -- 可以从参数列表或已有的数组来创建数组, 也可以创建空数组
-    ---@Override
-    ---@Classmethod
+
+    -- 可以从参数列表或已有的数组来创建数组, 也可以创建空数组  
+    -- （由于 jit 和 5.5 情况下有预分配空间的需求，所以用了 new 而不是 __init）
     ---@param ... any
-    ---@overload fun(self:list, array:any[])
-    new = function(self, ...)
+    ---@overload fun(cls:list.class, array:any[])
+    new = function(cls, ...)
         local nargs = select('#', ...)
 
         if nargs == 0 then
-            return setmetatable({__class = self, length = 0}, self)
+            return setmetatable({__class = cls, length = 0}, cls)
         end
 
         local array = nargs == 1 and type(...) == "table" and (...) or {...}
@@ -85,10 +87,10 @@ class "list" {
 
         if isJIT or is5_5 then
             newArr = table_new(#array, 2)
-            newArr.__class = self
-            setmetatable(newArr, self)
+            newArr.__class = cls
+            setmetatable(newArr, cls)
         else
-            newArr = setmetatable({__class = self}, self)
+            newArr = setmetatable({__class = cls}, cls)
         end
 
         local count = 0
@@ -102,18 +104,17 @@ class "list" {
         return newArr
     end;
 
-    -- 内部构造方法
-    -- 产生一个空容器, 内部使用, 必须立即填充值
-    ---@Classmethod
-    _newContainter = function(self, length)
+    ---@static
+    -- 产生一个空容器，内部使用，必须立即填充值
+    _newContainter = function(cls, length)
         local newArr
 
         if isJIT then
             newArr = table_new(length, 2)
-            newArr.__class = self
-            setmetatable(newArr, self)
+            newArr.__class = cls
+            setmetatable(newArr, cls)
         else
-            newArr = setmetatable({__class = self}, self)
+            newArr = setmetatable({__class = cls}, cls)
         end
 
         newArr.length = length
@@ -508,6 +509,8 @@ class "list" {
 
 -- 让切片语法更简洁
 -- eg: slice = arr(1, 3[, 1])
-list.__call = list.sub
+---@diagnostic disable-next-line: cast-type-mismatch
+local proto = list ---@cast proto list
+list.__call = proto.sub
 
 return list

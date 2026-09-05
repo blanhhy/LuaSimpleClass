@@ -363,13 +363,16 @@ local function parseMethods(body)
             }
             i = k
         else
+            local fieldEnd = findFieldEnd(body, afterFieldStart)
+            local fieldValue = (body:sub(afterFieldStart, fieldEnd - 1)):gsub('^%s+', ''):gsub('%s+$', '')
             fields[#fields + 1] = {
                 name = name,
+                value = fieldValue,
                 docs = commentLines,
                 isGetter = isGetter,
                 isSetter = isSetter,
             }
-            i = findFieldEnd(body, afterFieldStart)
+            i = fieldEnd
         end
     end
     return methods, fields, declareFields
@@ -702,18 +705,21 @@ function OnSetText(uri, text)
                 local methods, fields, declareFields = parseMethods(body)
                 local parent = parentName or 'object'
                 local out = {}
+                -- 类对象：X.class 继承 class，call 运算符返回实例 X
+                out[#out + 1] = '---@class ' .. className .. '.class : class'
+                out[#out + 1] = '---@operator call:' .. className
+                out[#out + 1] = className .. ' = {}'
+                -- 实例：X 继承父类实例 parent
                 local classLine = '---@class ' .. className .. ' : ' .. parent
                 if #implementsList > 0 then
                     classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
                 end
                 out[#out + 1] = classLine
+                out[#out + 1] = '---@field __class ' .. className .. '.class'
                 -- 表表层手写的 ---@field 透传到 ---@class 下的连续注释行，声明未在 __init 赋值的字段
                 for _, df in ipairs(declareFields) do
                     out[#out + 1] = df
                 end
-                out[#out + 1] = '---@field __class ' .. className
-                out[#out + 1] = '---@field __base ' .. parent
-                out[#out + 1] = '---@operator call:' .. className
                 -- 元方法 → @operator 标注（元方法带 @return 才生成；参数全标注则附操作数类型）
                 for _, m in ipairs(methods) do
                     local opName = PL_OP_FROM_META[m.name]
@@ -744,7 +750,7 @@ function OnSetText(uri, text)
                         end
                     end
                 end
-                out[#out + 1] = className .. ' = {}'
+                out[#out + 1] = className .. '.__proto = {}'
 
                 local newMethod = nil
                 local initMethod = nil
@@ -758,24 +764,37 @@ function OnSetText(uri, text)
                     for _, docLine in ipairs(newMethod.docs) do
                         out[#out + 1] = docLine
                     end
-                    out[#out + 1] = '---@diagnostic disable-next-line: unused-local'
-                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self end'
+                    if not pl_methodReturn(newMethod.docs) then
+                        out[#out + 1] = '---@return ' .. className
+                    end
+                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
                 elseif initMethod then
                     local paramStr = stripFirstParam(initMethod.params)
                     for _, docLine in ipairs(initMethod.docs) do
                         out[#out + 1] = docLine
                     end
-                    out[#out + 1] = '---@diagnostic disable-next-line: unused-local'
-                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self end'
+                    if not pl_methodReturn(initMethod.docs) then
+                        out[#out + 1] = '---@return ' .. className
+                    end
+                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
                 else
-                    out[#out + 1] = 'function ' .. className .. ':new()return self end'
+                    out[#out + 1] = '---@return ' .. className
+                    out[#out + 1] = 'function ' .. className .. ':new()return self.__proto end'
                 end
 
                 for _, f in ipairs(fields) do
+                    local isStatic = false
+                    for _, dl in ipairs(f.docs) do
+                        if dl:match('^%-%-%-@static') then isStatic = true; break end
+                    end
                     for _, docLine in ipairs(f.docs) do
                         out[#out + 1] = docLine
                     end
-                    out[#out + 1] = className .. '.' .. f.name .. ' = nil'
+                    if isStatic then
+                        out[#out + 1] = className .. '.' .. f.name .. ' = ' .. (f.value or 'nil')
+                    else
+                        out[#out + 1] = className .. '.__proto.' .. f.name .. ' = ' .. (f.value or 'nil')
+                    end
                 end
 
                 -- 方法体已由 OnTransformAst 自注入在原始代码处完成了字段/类型检查，
@@ -786,7 +805,7 @@ function OnSetText(uri, text)
                 for _, m in ipairs(methods) do
                     if m.isGetter then
                         local attrName = m.name
-                        out[#out + 1] = className .. '.' .. attrName .. ' = ('
+                        out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
                         out[#out + 1] = '    ---@param self ' .. className
                         out[#out + 1] = '    function(' .. m.params .. ')'
                         if m.body and #m.body > 0 then
@@ -798,7 +817,7 @@ function OnSetText(uri, text)
                             end
                         end
                         out[#out + 1] = '    end'
-                        out[#out + 1] = ')(' .. className .. ')'
+                        out[#out + 1] = ')(' .. className .. '.__proto)'
                     end
                 end
 
@@ -806,15 +825,22 @@ function OnSetText(uri, text)
                     if m.name == 'new' then
                     elseif m.isGetter or m.isSetter then
                     else
-                        local firstParam = getFirstParamName(m.params)
+                        local isMeta = m.name:match('^__') ~= nil and m.name ~= '__init'
+                        local isStatic = false
+                        for _, dl in ipairs(m.docs) do
+                            if dl:match('^%-%-%-@static') then isStatic = true; break end
+                        end
                         for _, docLine in ipairs(m.docs) do
                             out[#out + 1] = docLine
                         end
-                        if firstParam == 'self' then
+                        -- 挂载目标：元方法/静态方法挂类对象，其余挂实例
+                        local target = (isMeta or isStatic) and className or (className .. '.__proto')
+                        -- 冒号语法要求首参数为 self；尽量标注冒号，否则点语法保留全部参数
+                        if getFirstParamName(m.params) == 'self' then
                             local cleanParams = stripFirstParam(m.params)
-                            out[#out + 1] = 'function ' .. className .. ':' .. m.name .. '(' .. cleanParams .. ')'
+                            out[#out + 1] = 'function ' .. target .. ':' .. m.name .. '(' .. cleanParams .. ')'
                         else
-                            out[#out + 1] = 'function ' .. className .. '.' .. m.name .. '(' .. m.params .. ')'
+                            out[#out + 1] = 'function ' .. target .. '.' .. m.name .. '(' .. m.params .. ')'
                         end
                         if m.body and #m.body > 0 then
                             local trimmed = trimBody(m.body)
@@ -868,9 +894,9 @@ function OnSetText(uri, text)
                     text   = '\n' .. table.concat(out, '\n'),
                 }
 
-                -- 直接在用到 super 的方法内注入局部 `super`（返回基类类型），把 `super(Child, self)` 的
-                -- 接收者锚定为基类。位置取方法签名右括号之后、同行末尾，零宽度插入不改变行号。
-                local baseName = parentName or 'object'
+                -- 直接在用到 super 的方法内注入局部 `super`（返回基类实例类型），把 `super(Child, self)` 的
+                -- 接收者锚定为基类实例。位置取方法签名右括号之后、同行末尾，零宽度插入不改变行号。
+                local baseExpr = parentName and (parentName .. '.__proto') or 'object'
                 for _, m in ipairs(methods) do
                     if m.sigEnd and m.body and m.body:find('super%s*%(') then
                         -- body[i] 对应 text[braceStart+i]；右括号在 body[sigEnd-1]，越过即 braceStart+sigEnd
@@ -878,7 +904,7 @@ function OnSetText(uri, text)
                         diffs[#diffs + 1] = {
                             start  = at,
                             finish = at - 1,
-                            text   = ' local function super(_, _)return ' .. baseName .. ' end',
+                            text   = ' local function super(_, _)return ' .. baseExpr .. ' end',
                         }
                     end
                 end
@@ -944,7 +970,8 @@ local function pl_getClassName(outerCall)
     return nil
 end
 
----遍历类体 table，给每个方法的 self 参数绑定 `@param self <类名>`
+---遍历类体 table，给每个方法的接收者参数绑定类型：
+---  首参数 self → `@param self <类名>`（实例）；首参数 cls → `@param cls <类名>.class`（类对象）。
 ---@param ast table  AST 根
 ---@param classname string
 ---@param tableNode table 类体 table 节点
@@ -958,10 +985,16 @@ local function pl_injectSelf(ast, classname, tableNode)
         if value and value.type == 'function' and value.args then
             for j = 1, #value.args do
                 local p = value.args[j]
-                if guide.getKeyName(p) == 'self' then
+                local key = guide.getKeyName(p)
+                if key == 'self' then
                     luadoc.buildAndBindDoc(
                         ast, value,
                         pl_buildComment('param', ('self %s'):format(classname), p.start - 1))
+                    break
+                elseif key == 'cls' then
+                    luadoc.buildAndBindDoc(
+                        ast, value,
+                        pl_buildComment('param', ('cls %s.class'):format(classname), p.start - 1))
                     break
                 end
             end

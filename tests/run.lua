@@ -128,7 +128,13 @@ local function runCheck(workspaceDir)
         local ln, code = raw:match('%.lua:(%d+):%d+ %[.-%] .- %(([%w%-]+)%)$')
         if ln then diags[#diags + 1] = { line = tonumber(ln), code = code } end
     end
-    return diags
+    -- LuaLS 可能对同一位置同一 code 输出多行，去重后计数才稳定
+    local seen, uniq = {}, {}
+    for _, d in ipairs(diags) do
+        local k = d.line .. ':' .. d.code
+        if not seen[k] then seen[k] = true; uniq[#uniq + 1] = d end
+    end
+    return uniq
 end
 
 -- ---------- 主流程 ----------
