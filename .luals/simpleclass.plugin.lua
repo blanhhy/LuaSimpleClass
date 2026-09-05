@@ -3,6 +3,9 @@
 ---@field finish integer
 ---@field text   string
 
+-- 记录各文件内每个类的 implements(...) 块在原始代码中的位置，供接口约束诊断定位到原始源码。
+local __sc_implpos = {}
+
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
 -- 跳过一段短字符串（含 \ 转义）。i 指向开引号 " 或 '，返回闭引号后的位置
@@ -134,11 +137,17 @@ local function parseClassBlock(text, startPos)
     end
     pos = skipCommentsAndWhitespace(text, pos) or pos
     local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
+    local impKwStart, impFin
     if impStart then
+        -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
+        local k = impStart + 1
+        while text:sub(k, k):match('%s') do k = k + 1 end
+        impKwStart = k
         pos = impEnd + 1
         while pos <= n do
             local c = text:sub(pos, pos)
             if c == ')' then
+                impFin = pos
                 break
             elseif c:match('[%w_]') then
                 local iend = text:find('[%s,)]', pos)
@@ -158,7 +167,7 @@ local function parseClassBlock(text, startPos)
     if not braceStart then return nil end
     local braceEnd = findBraceEnd(text, braceStart)
     if not braceEnd then return nil end
-    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1), braceStart
+    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1), braceStart, impKwStart, impFin
 end
 
 local function isWordBoundary(body, pos, n)
@@ -653,6 +662,7 @@ function OnSetText(uri, text)
 
     local pos = 1
     local n = #text
+    __sc_implpos[uri] = {}
     while pos <= n do
         local nextClass = findClassKeyword(text, pos)
         local nextInterface = findInterfaceKeyword(text, pos)
@@ -698,7 +708,7 @@ function OnSetText(uri, text)
                 pos = iEnd + 1
             end
         else
-            local className, parentName, implementsList, classStart, classEnd, body, braceStart = parseClassBlock(text, nextPos)
+            local className, parentName, implementsList, classStart, classEnd, body, braceStart, impKwStart, impFin = parseClassBlock(text, nextPos)
             if not className then
                 pos = nextPos + 5
             else
@@ -933,6 +943,9 @@ function OnSetText(uri, text)
                         }
                     end
                 end
+                if #implementsList > 0 and impKwStart and impFin then
+                    __sc_implpos[uri][className] = { start = impKwStart, finish = impFin }
+                end
                 pos = classEnd + 1
             end
         end
@@ -1121,9 +1134,24 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                                 if #missing == 0 then
                                     break
                                 end
+                                -- posRange 记录原始源码中 implements(...) 的字节偏移；
+                                -- 诊断 start/finish 须为 diff 后文本的 packed 位置（row*10000+col），
+                                -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
+                                local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
+                                local start, finish = set.start, set.finish
+                                if posRange and state.diffInfo then
+                                    -- packPosition 的列重测是含尾字节的（encoder.len(a,b) 计 [a,b]），
+                                    -- 故起点须传 targetByte-1 才能落在 targetByte 对应字符上。
+                                    local okd, dsRaw = pcall(diagfiles.diffedOffset, state, posRange.start - 1)
+                                    local okf, dfRaw = pcall(diagfiles.diffedOffset, state, posRange.finish)
+                                    if okd and okf and dsRaw and dfRaw then
+                                        start  = diaggideX.offsetToPosition(state, dsRaw)
+                                        finish = diaggideX.offsetToPosition(state, dfRaw)
+                                    end
+                                end
                                 callback {
-                                    start   = set.start,
-                                    finish  = set.finish,
+                                    start   = start,
+                                    finish  = finish,
                                     message = ('%s implements interfaces but does not implement method: %s')
                                         :format(selfName, table.concat(missing, ', ')),
                                 }
