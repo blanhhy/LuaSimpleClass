@@ -7,17 +7,14 @@
 
 ---@class class<T>                    # A reflection of a class
 ---@field __classname string          # The name of the class
----@field __class T                   # The class type
 ---@field __base class|false          # The base class
 ---@field __init function?            # The constructor
----@operator call:class.instance
+---@operator call:object
 local Class = {}
-
----@class class.instance<T> : class<T>
 
 ---Create a new object of the class
 ---@generic T
----@return class.instance<T>
+---@return T
 function Class:new() end
 
 ---Check if the class extends the base class
@@ -100,12 +97,12 @@ function _CC:def(tbl) end
 ---```lua
 ---local cls = class {}
 ---```
----@generic T
----@param name `T`
+---@generic T:string
+---@param name? `T`
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function class(name) end
 
----@param body? table
+---@param body table
 ---@return object
 function class(body) end
 
@@ -146,7 +143,7 @@ function Interface:check_impl(clazz) end
 function Interface:extends(...) end
 
 ---Define a new interface
----@param name? string|table
+---@param name? string
 ---@return interface
 function interface(name) end
 
