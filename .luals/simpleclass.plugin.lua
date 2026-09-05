@@ -838,6 +838,30 @@ function OnSetText(uri, text)
                     out[#out + 1] = '---@diagnostic enable: doc-field-no-class'
                 end
 
+                -- @override 检查：标注 ---@override 的方法（new 除外）须在基类上确有同名方法。
+                -- 用父类类型访问这些名字，基类无同名方法则触发 undefined-field。
+                local overrideNames = {}
+                local seenOv = {}
+                for _, m in ipairs(methods) do
+                    if m.isOverride and m.name ~= 'new' and not seenOv[m.name] then
+                        seenOv[m.name] = true
+                        overrideNames[#overrideNames + 1] = m.name
+                    end
+                end
+                table.sort(overrideNames)
+                if #overrideNames > 0 and parentName then
+                    out[#out + 1] = '---@diagnostic disable-next-line: unused-function, unused-local, redefined-local'
+                    out[#out + 1] = 'local function __ls_override_check__()'
+                    out[#out + 1] = '    ---@class ' .. parentName
+                    out[#out + 1] = '    local _ = {}'
+                    out[#out + 1] = '    local override_method'
+                    for _, nm in ipairs(overrideNames) do
+                        out[#out + 1] = '    override_method = _.' .. nm
+                    end
+                    out[#out + 1] = '    return override_method'
+                    out[#out + 1] = 'end'
+                end
+
                 diffs[#diffs + 1] = {
                     start  = classEnd + 1,
                     finish = classEnd,
