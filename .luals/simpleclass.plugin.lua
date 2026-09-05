@@ -602,12 +602,12 @@ local function parseInterfaceBlock(text, startPos)
 end
 
 -- 类体元方法键 → LuaLS 支持的 @operator 操作符名（仅算术 / .. / len / unm / call 支持）
--- eq/lt/le/tostring 无对应操作符；__call 与构造器 call 冲突故跳过
+-- eq/lt/le/tostring 无对应操作符。
 local PL_OP_FROM_META = {
     __add = 'add', __sub = 'sub', __mul = 'mul', __div = 'div', __mod = 'mod',
     __pow = 'pow', __idiv = 'idiv', __band = 'band', __bor = 'bor', __bxor = 'bxor',
     __shl = 'shl', __shr = 'shr', __concat = 'concat', __unm = 'unm',
-    __bnot = 'bnot', __len = 'len',
+    __bnot = 'bnot', __len = 'len', __call = 'call',
 }
 
 -- 从参数列表字符串提取参数名（含 self）
