@@ -59,23 +59,7 @@ cc.__call  = cc.def
 
 M.creator = cc
 
----Define a new class  
----eg:
----```lua
----class "MyClass" : extends "MyBaseClass" {
----    __init = function(self)
----        super(self):__init()
----    end
----}
----```
----or anonymous:
----```lua
----local cls = class {}
----```
----@generic T:string
----@param name `T`.class
----@return _ClassCreator<T>|_ClassDefiner<T>
----@overload fun(body:table):class
+
 function M.class(name)
     local typ = type(name)
     if typ == "table" then

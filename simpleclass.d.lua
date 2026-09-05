@@ -1,23 +1,14 @@
----@meta simpleclass
+---@meta
 ---Types declare for simpleclass module
 
 
 
 
-
----@class class<T>                    # A reflection of a class
----@field __classname string          # The name of the class
----@field __base class|false          # The base class
----@field __init function?            # The constructor
----@operator call:object
+---A reflection of a class
+---@class class
 local Class = {}
 
----Create a new object of the class
----@generic T
----@return T
-function Class:new() end
-
----Check if the class extends the base class
+---Check if the class extends the base class (class method)
 ---@param base class
 ---@return boolean
 function Class:isExtends(base) end
@@ -104,12 +95,12 @@ function _CC:def(tbl) end
 ---local cls = class {}
 ---```
 ---@generic T:string
----@param name? `T`
+---@param name? `T`.class
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function class(name) end
 
 ---@param body table
----@return object
+---@return class
 function class(body) end
 
 
@@ -149,11 +140,14 @@ function Interface:check_impl(clazz) end
 function Interface:extends(...) end
 
 ---Define a new interface
----@param name? string
+---@param name string
 ---@return interface
 function interface(name) end
 
-
+---Define a new interface
+---@param body? table
+---@return interface
+function interface(body) end
 
 
 
