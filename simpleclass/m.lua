@@ -26,10 +26,8 @@ local M = {
 ---simpleclass.type(Eagle()) => Eagle
 ---simpleclass.type("Hello") => "string"
 ---```
----@generic T:object
----@param val T
----@return class<T>
----@overload fun(val):type
+---@param val any
+---@return class|type
 function M.type(val)
     local typ = type(val)
     if typ == "table" and val.__class then

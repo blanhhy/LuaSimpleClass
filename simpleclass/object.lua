@@ -3,7 +3,8 @@ local M = require "simpleclass.m" ---@class simpleclass
 local type, setmetatable
     = type, setmetatable
 
----@class simpleclass.object : object
+---@class simpleclass.object : object.class
+---@field __init any
 local object = {
     __classname = "object";
     __tostring = function(self) return ("<%s object>"):format(self.__class) end;
@@ -72,8 +73,9 @@ end
 setmetatable(object, M._CMT)
 M._ENV.object = object
 
-M.object = object ---@type object
-M.isinstance = M.object.isInstance
+M.object = object ---@type object.class
+local proto = object ---@cast proto object
+M.isinstance = proto.isInstance
 M.issubclass = M.object.isExtends
 
 return object

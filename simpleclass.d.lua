@@ -28,13 +28,7 @@ function Class:isExtends(base) end
 ---@return integer? arg_index if not ok
 function Class:isImplements(interface) end
 
----Check if the object is an instance of the class or interface  
----(also compatible with lua type)
----@param cls class|interface|type
----@return boolean
-function Class:isInstance(cls) end
-
----Convert the class to a string
+---Convert the object to a string
 ---@return string
 function Class:toString() end
 
@@ -42,21 +36,33 @@ function Class:toString() end
 
 
 
----Base class of all classes
----@class object : class
----@field __class object
----@field __base false
+---The base class of all classes
+---@class object.class : class
+---@operator call: object
 object = {__classname = "object"}
 
----Instantiate
 ---@return object
 function object:new() end
 
----Get the class of the object
----@return object
-function object:getClass() end
+---@class object
+---@field __class object.class
+object.__proto = {}
 
-object.is = rawequal
+---Get the class of the object
+---@return class
+function object.__proto:getClass() end
+
+---Check if the object is an instance of the class or interface  
+---(also compatible with lua type)
+---@param cls class|interface|type
+---@return boolean
+function object.__proto:isInstance(cls) end
+
+---Convert the object to a string
+---@return string
+function object.__proto:toString() end
+
+object.__proto.is = rawequal
 
 
 
@@ -112,13 +118,13 @@ function class(body) end
 
 ---@class super<T>
 ---@field self T
----@field __class T
+---@field __class class
 ---@field [string] unknown
 
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
 ---@generic T:object
----@param cls T
+---@param cls class
 ---@param obj? T
 ---@return super<T>
 function super(cls, obj) end
@@ -151,5 +157,5 @@ function interface(name) end
 
 
 
-isinstance = Class.isInstance
+isinstance = object.__proto.isInstance
 issubclass = Class.isExtends
