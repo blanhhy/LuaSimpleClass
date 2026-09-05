@@ -77,7 +77,11 @@ class "Bird_wrong" : implements(CanEat, CanFly) {
 }
 end, print)
 
--- Output: class Bird_wrong implements <interface 'CanFly'> but dose not implement method 'fly'.
+-- Output: class Bird_wrong implements <interface 'CanFly'> but does not implement method 'fly'.
+
+-- 如果在用 LS 插件的话，还能看到工作区的报错：
+-- Bird_wrong implements interfaces but does not implement method: CanFly.fly
+-- （对演示文件而言还挺烦人的）
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {

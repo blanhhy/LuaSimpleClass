@@ -209,8 +209,7 @@ obj:foo() --> "foo from    MyClass"
 - 定义方法时，自动绑定 self 和 super 类型
 - 自动包含用户定义的类成员（含 Getter 对应属性）
 - 自动生成 `new` 方法的签名注解
-- 自动分析继承链与接口，保证多态性
-- 提供 `@override`，用于检查基类上是否有同名方法
+- 接口约束自动检查与 `@override` 检查
 - 类体内支持显式 `@field` 声明类成员
 - 识别元方法上的 `@operator` `@return` 注解
 

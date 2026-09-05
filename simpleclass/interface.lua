@@ -117,7 +117,7 @@ function cc:onDef_impl_check(clazz)
         local iface = self.ifaces[i]
         local ok, mname = iface:check_impl(clazz)
         if not ok then return false,
-        ("class %s implements %s but dose not implement method '%s'.")
+        ("class %s implements %s but does not implement method '%s'.")
         :format(self.name, iface, mname, iface)
     end end
     return true

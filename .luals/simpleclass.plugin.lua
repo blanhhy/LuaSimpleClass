@@ -752,6 +752,31 @@ function OnSetText(uri, text)
                 end
                 out[#out + 1] = className .. '.__proto = {}'
 
+                -- 若实现了接口，额外生成 "未继承接口" 的 X.__own 类型，
+                -- 仅列出本类自身声明的实例方法，供接口约束（missing-implements）检查。
+                -- X.__own 的 extends 只含父类、不含接口，故 vm.getFields 展开时
+                -- 不会把接口方法当作继承可达，从而能判定"该类缺哪些接口方法"。
+                if #implementsList > 0 then
+                    local ownMembers = {}
+                    for _, m in ipairs(methods) do
+                        if m.name ~= 'new' and m.name ~= '__init' then
+                            local isMeta = m.name:match('^__') ~= nil and m.name ~= '__init'
+                            local isStatic = false
+                            for _, dl in ipairs(m.docs) do
+                                if dl:match('^%-%-%-@static') then isStatic = true; break end
+                            end
+                            if not isMeta and not isStatic and not m.isGetter and not m.isSetter then
+                                ownMembers[#ownMembers + 1] = m.name
+                            end
+                        end
+                    end
+                    -- 空类体也要生成（空类型），否则"一个方法都没实现"的场景会被诊断器跳过而漏报
+                    out[#out + 1] = '---@class ' .. className .. '.__own : ' .. parent
+                    for _, mn in ipairs(ownMembers) do
+                        out[#out + 1] = '---@field ' .. mn .. ' function'
+                    end
+                end
+
                 local newMethod = nil
                 local initMethod = nil
                 for _, m in ipairs(methods) do
@@ -1022,4 +1047,91 @@ function OnTransformAst(uri, ast)
         end)
     end
     return ast
+end
+
+-- ==================================== 接口约束诊断 ====================================
+-- 插件生成 X.__own 类（extends 只含父类、不含接口）后，注册一个自定义诊断器，
+-- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
+-- 机制：core.diagnostics.<name> 由 LS 按名动态 require，此处通过 package.loaded 预置；
+-- 名字登记进 define.DiagnosticDefaultSeverity 以进入诊断枚举清单。
+local ok_diagfiles, diagfiles  = pcall(require, 'files')
+local ok_diagdefine, diagdefine = pcall(require, 'proto.define')
+local ok_diagvm, diagvm        = pcall(require, 'vm')
+local ok_diagguide, diaggideX  = pcall(require, 'parser.guide')
+
+if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
+    diagdefine.DiagnosticDefaultSeverity['missing-implements']         = 'Warning'
+    diagdefine.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
+
+    package.loaded['core.diagnostics.missing-implements'] = function (uri, callback)
+        local state = diagfiles.getState(uri)
+        if not state then return end
+
+        -- 与内置诊断器一致：枚举 vm 已编译的全局类型，而非遍历 state.ast 的 doc 注释节点。
+        -- 插件 diff 注入的 ---@class 在编译阶段进入 allGlobals，因此从这里能读到类型。
+        -- 注意 getSets(uri) 语义是"该 scope 可见"而非"定义于此文件"（type 类全局工作区可见），
+        -- 须用 guide.getUri(set) 过滤出真正定义在本文件的类，否则诊断会误报到其他文件。
+        local seen = {}
+        for _, gv in ipairs(diagvm.getGlobals('type')) do
+            for _, set in ipairs(gv:getSets(uri)) do
+                if set.type == 'doc.class'
+                and set.extends and #set.extends >= 2
+                and set.class and set.class[1]
+                and diaggideX.getUri(set) == uri then
+                    local selfName = set.class[1]
+                    if not seen[selfName] then
+                        seen[selfName] = true
+
+                        -- 仅检查插件生成的类：需存在 X.__own 类型
+                        local ownG = diagvm.getGlobal('type', selfName .. '.__own')
+                        if ownG then
+                            local ownDef
+                            for _, s in ipairs(ownG:getSets(uri)) do
+                                if s.type == 'doc.class' then ownDef = s; break end
+                            end
+                            if ownDef then
+                                -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
+                                local clsFields = {}
+                                for _, fld in ipairs(diagvm.getFields(ownDef)) do
+                                    local k = diagvm.getKeyName(fld)
+                                    if k and type(k) == 'string' then clsFields[k] = true end
+                                end
+
+                                -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
+                                local missing = {}
+                                for idx = 2, #set.extends do
+                                    local ifname = set.extends[idx][1]
+                                    if ifname then
+                                        local ig = diagvm.getGlobal('type', ifname)
+                                        if ig then
+                                            for _, s2 in ipairs(ig:getSets(uri)) do
+                                                if s2.type == 'doc.class' and s2.fields then
+                                                    for _, fld in ipairs(s2.fields) do
+                                                        local k = diagvm.getKeyName(fld)
+                                                        if k and type(k) == 'string' and not clsFields[k] then
+                                                            missing[#missing + 1] = ('%s.%s'):format(ifname, k)
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+
+                                if #missing == 0 then
+                                    break
+                                end
+                                callback {
+                                    start   = set.start,
+                                    finish  = set.finish,
+                                    message = ('%s implements interfaces but does not implement method: %s')
+                                        :format(selfName, table.concat(missing, ', ')),
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
