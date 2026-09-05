@@ -13,7 +13,7 @@ local mm_names = {
     "__tostring", "__index", "__newindex",
 }
 
----@class simpleclass
+---@class M : simpleclass
 local M = {
     _ENV = {}; ---@type table<string, class>
     _MMS = mm_names;

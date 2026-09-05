@@ -1,5 +1,5 @@
-local M      = require "simpleclass.m" ---@class simpleclass
-local cc     = M.creator               ---@class simpleclass.creator
+local M      = require "simpleclass.m" ---@class M
+local cc     = M.creator               ---@class M.creator
 local object = M.object
 
 local type, setmetatable, error
@@ -7,7 +7,7 @@ local type, setmetatable, error
 
 local Interface
 
----@class simpleclass.interface : interface
+---@class M.interface : interface
 Interface = {
     _ENV = M._ENV;
     global = _G; ---@class _G
@@ -107,6 +107,9 @@ function cc:implements(...)
     return self
 end
 
+---@param clazz class
+---@return boolean ok
+---@return string? err error message
 function cc:onDef_impl_check(clazz)
     if M.I_FEATURE ~= "general" then return true end
     if not self.ifaces then return true end

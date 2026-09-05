@@ -1,8 +1,7 @@
 ---@diagnostic disable: deprecated
 ---仿 Python 的 list 类
----@class list
 
-local sc = require "simpleclass" ---@type simpleclass
+local sc = require "simpleclass"
 local class = sc.class
 local cls_type = sc.type
 local isinstance = sc.isinstance

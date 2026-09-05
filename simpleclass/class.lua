@@ -1,12 +1,12 @@
 -- 一种比较intersting的轻量class实现
 
 local G = _G                      ---@class _G
-local M = require "simpleclass.m" ---@class simpleclass
+local M = require "simpleclass.m" ---@class M
 
 local type, setmetatable, error
     = type, setmetatable, error
 
----@class simpleclass.creator<T> : _ClassCreator<T>
+---@class M.creator<T> : _ClassCreator<T>
 local cc = {
     name = "<anonymous>";
     base = require("simpleclass.object");

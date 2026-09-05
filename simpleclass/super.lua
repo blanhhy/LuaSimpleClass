@@ -1,4 +1,4 @@
-local M = require "simpleclass.m" ---@class simpleclass
+local M = require "simpleclass.m" ---@class M
 
 local type, setmetatable, error
     = type, setmetatable, error
@@ -20,10 +20,12 @@ local Super = {
 
 setmetatable(Super, {__mode = 'k'})
 
-
-
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
+---@generic cls:class, obj:object
+---@param cls cls
+---@param obj? obj
+---@return super<cls, obj>
 function M.super(cls, obj)
     if not obj then obj = cls end
     local valid = obj and (Super[obj] or type(obj) == "table" and obj.__base)

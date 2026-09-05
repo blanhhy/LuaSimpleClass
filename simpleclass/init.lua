@@ -3,7 +3,7 @@
 local mname, murl -- Standard lua `require` arguments
     , margs = ... -- Reserved for user custom extension
 
----@class simpleclass.INIT_OPTIONS
+---@class M.INIT_OPTIONS
 local options = {}
 
 --==================================== INIT OPTIONS ====================================--
@@ -23,7 +23,7 @@ if type(margs) == "table" then
     end
 end
 
-local M   = require "simpleclass.m" ---@class simpleclass
+local M   = require "simpleclass.m" ---@class M
             require "simpleclass.object"
             require "simpleclass.class"
             require "simpleclass.super"
@@ -33,24 +33,10 @@ local M   = require "simpleclass.m" ---@class simpleclass
 ---@type boolean
 M.AUTO_GLOBAL = false
 
----@alias simpleclass.I_FEATURE
----| "general"  Full interface feature.
----| "nocheck"  Skip interface checking. 
----| "lexical"  Only interface syntax. (for LS analysis)
-
 ---Interface feature to use, meaningless if interface module not included.  
 ---**Warning**: switch in "general" & "nocheck" is safe, BUT "lexical" skipping definition is irreversible.
 ---@type simpleclass.I_FEATURE
 M.I_FEATURE = options.DEFAULT_I_FEATURE
-
----@alias simpleclass.FIELD
----| "class"
----| "super"
----| "interface"
----| "type"
----| "object"
----| "isinstance"
----| "issubclass"
 
 ---Import fields from simpleclass module to environment.  
 ---eg:

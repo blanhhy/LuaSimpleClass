@@ -1,9 +1,9 @@
-local M = require "simpleclass.m" ---@class simpleclass
+local M = require "simpleclass.m" ---@class M
 
 local type, setmetatable
     = type, setmetatable
 
----@class simpleclass.object : object.class
+---@class M.object : object.class
 ---@field __init any
 local object = {
     __classname = "object";
@@ -33,12 +33,14 @@ function object:__newindex(key, value)
 end
 
 function object:new(...)
-    local obj = setmetatable({__class = self}, self)
+    local obj = setmetatable({__class = self}, self) ---@type object
     local init = self.__init
     if type(init) == "function" then init(obj,...) end
     return obj
 end
 
+---Check if the class extends the base class (class method)
+---@param base class
 ---@return boolean
 function object:isExtends(base)
     while type(self) == "table" do
@@ -48,6 +50,9 @@ function object:isExtends(base)
     return false
 end
 
+---Check if the object is an instance of the class or interface  
+---(also compatible with lua type)
+---@param cls class|interface|type
 function object:isInstance(cls)
     local typ = type(self)
 
@@ -73,9 +78,8 @@ end
 setmetatable(object, M._CMT)
 M._ENV.object = object
 
-M.object = object ---@type object.class
-local proto = object ---@cast proto object
-M.isinstance = proto.isInstance
-M.issubclass = M.object.isExtends
+M.object = object
+M.isinstance = object.isInstance
+M.issubclass = object.isExtends
 
 return object
