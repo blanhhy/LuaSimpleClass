@@ -5,6 +5,7 @@
 
 -- 记录各文件内每个类的 implements(...) 块在原始代码中的位置，供接口约束诊断定位到原始源码。
 local __sc_implpos = {}
+local __sc_overridepos = {}
 
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
@@ -215,16 +216,20 @@ local function parseMethods(body)
         if i > n then break end
 
         local name, afterFieldStart
+        local nameStart, nameFinish
         do
             local n1, p1 = body:match('^([%w_]+)%s*=%s*()', i)
             local n2, p2 = body:match("^%['([^']+)'%]%s*=%s*()", i)
             local n3, p3 = body:match('^%["([^"]+)"%]%s*=%s*()', i)
             if n1 then
                 name = n1; afterFieldStart = p1
+                nameStart = i; nameFinish = i + #n1 - 1
             elseif n2 then
                 name = n2; afterFieldStart = p2
+                nameStart = i + 2; nameFinish = nameStart + #n2 - 1
             elseif n3 then
                 name = n3; afterFieldStart = p3
+                nameStart = i + 2; nameFinish = nameStart + #n3 - 1
             end
         end
         if not name then
@@ -367,6 +372,8 @@ local function parseMethods(body)
                 isGetter = isGetter,
                 isSetter = isSetter,
                 isOverride = isOverride,
+                sourceStart = nameStart,
+                sourceFinish = nameFinish,
                 -- body 内"方法签名右括号之后"的位置（相对 body），用于插入 super 遮蔽
                 sigEnd = j + 1,
             }
@@ -406,8 +413,10 @@ end
 local function trimBody(body)
     local lines = {}
     for line in body:gmatch('([^\n]*)\n?') do
-        if not line:match('^%s*$') then
-            lines[#lines + 1] = line
+        -- 方法体会被重新拼接到 diff 文本中，不能把原始行尾空白带入生成代码。
+        local cleanLine = line:gsub('%s+$', '')
+        if not cleanLine:match('^%s*$') then
+            lines[#lines + 1] = cleanLine
         end
     end
     if #lines == 0 then return '' end
@@ -663,6 +672,7 @@ function OnSetText(uri, text)
     local pos = 1
     local n = #text
     __sc_implpos[uri] = {}
+    __sc_overridepos[uri] = {}
     while pos <= n do
         local nextClass = findClassKeyword(text, pos)
         local nextInterface = findInterfaceKeyword(text, pos)
@@ -715,6 +725,27 @@ function OnSetText(uri, text)
                 local methods, fields, declareFields = parseMethods(body)
                 local parent = parentName or 'object'
                 local out = {}
+
+                if parentName then
+                    local overrideMethods = {}
+                    local seenOverride = {}
+                    for _, m in ipairs(methods) do
+                        if m.isOverride and m.name ~= 'new' and not seenOverride[m.name] then
+                            seenOverride[m.name] = true
+                            overrideMethods[#overrideMethods + 1] = {
+                                name = m.name,
+                                start = braceStart + m.sourceStart,
+                                finish = braceStart + m.sourceFinish,
+                            }
+                        end
+                    end
+                    if #overrideMethods > 0 then
+                        __sc_overridepos[uri][className] = {
+                            parent = parentName,
+                            methods = overrideMethods,
+                        }
+                    end
+                end
                 -- 类对象：X.class 继承 class，call 运算符返回实例 X
                 out[#out + 1] = '---@class ' .. className .. '.class : class'
                 out[#out + 1] = '---@operator call:' .. className
@@ -899,8 +930,10 @@ function OnSetText(uri, text)
                     out[#out + 1] = '---@diagnostic enable: doc-field-no-class'
                 end
 
-                -- @override 检查：标注 ---@override 的方法（new 除外）须在基类上确有同名方法。
-                -- 用父类类型访问这些名字，基类无同名方法则触发 undefined-field。
+                -- 旧的 @override 检查实现：通过访问伪造的父类字段间接触发
+                -- undefined-field。现在由下方的 invalid-override 诊断器直接检查，
+                -- 保留这段注释作为旧实现的对照，避免与新诊断重复报警。
+                --[[
                 local overrideNames = {}
                 local seenOv = {}
                 for _, m in ipairs(methods) do
@@ -922,6 +955,7 @@ function OnSetText(uri, text)
                     out[#out + 1] = '    return override_method'
                     out[#out + 1] = 'end'
                 end
+                ]]--
 
                 diffs[#diffs + 1] = {
                     start  = classEnd + 1,
@@ -1062,9 +1096,7 @@ function OnTransformAst(uri, ast)
     return ast
 end
 
--- ==================================== 接口约束诊断 ====================================
--- 插件生成 X.__own 类（extends 只含父类、不含接口）后，注册一个自定义诊断器，
--- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
+-- ==================================== 自定义诊断器 ====================================
 -- 机制：core.diagnostics.<name> 由 LS 按名动态 require，此处通过 package.loaded 预置；
 -- 名字登记进 define.DiagnosticDefaultSeverity 以进入诊断枚举清单。
 local ok_diagfiles, diagfiles  = pcall(require, 'files')
@@ -1075,7 +1107,30 @@ local ok_diagguide, diaggideX  = pcall(require, 'parser.guide')
 if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
     diagdefine.DiagnosticDefaultSeverity['missing-implements']         = 'Warning'
     diagdefine.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
+    diagdefine.DiagnosticDefaultSeverity['invalid-override']             = 'Warning'
+    diagdefine.DiagnosticDefaultNeededFileStatus['invalid-override']     = 'Any'
 
+    -- 把原始源码字节偏移转换为诊断器需要的 diff 后 packed 位置。
+    local function diagRangeFromOriginal(state, startOffset, finishOffset)
+        if state.diffInfo then
+            -- diffedPackPosition 的列重测包含目标字节，起点需后退一个字节；
+            -- finish 保持在目标字符上，使范围包含方法名最后一个字符。
+            local okStart, diffedStart = pcall(
+                diagfiles.diffedOffset, state, startOffset - 1)
+            local okFinish, diffedFinish = pcall(
+                diagfiles.diffedOffset, state, finishOffset)
+            if okStart and okFinish and diffedStart and diffedFinish then
+                return diaggideX.offsetToPosition(state, diffedStart),
+                    diaggideX.offsetToPosition(state, diffedFinish)
+            end
+        else
+            return diaggideX.offsetToPosition(state, startOffset),
+                diaggideX.offsetToPosition(state, finishOffset)
+        end
+    end
+
+    -- 由 OnSetText 生成 X.__own 类（extends 只含父类、不含接口），
+    -- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
     package.loaded['core.diagnostics.missing-implements'] = function (uri, callback)
         local state = diagfiles.getState(uri)
         if not state then return end
@@ -1157,6 +1212,46 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                                 }
                             end
                         end
+                    end
+                end
+            end
+        end
+    end
+
+    package.loaded['core.diagnostics.invalid-override'] = function (uri, callback)
+        local state = diagfiles.getState(uri)
+        if not state then return end
+
+        local classes = __sc_overridepos[uri]
+        if not classes then return end
+
+        for className, info in pairs(classes) do
+            local parentGlobal = diagvm.getGlobal('type', info.parent)
+            local parentFields = {}
+            if parentGlobal then
+                for _, parentSet in ipairs(parentGlobal:getSets(uri)) do
+                    if parentSet.type == 'doc.class' then
+                        for _, field in ipairs(diagvm.getFields(parentSet)) do
+                            local name = diagvm.getKeyName(field)
+                            if name and type(name) == 'string' then
+                                parentFields[name] = true
+                            end
+                        end
+                    end
+                end
+            end
+
+            for _, method in ipairs(info.methods) do
+                if not parentFields[method.name] then
+                    local start, finish = diagRangeFromOriginal(
+                        state, method.start, method.finish)
+                    if start and finish then
+                        callback {
+                            start = start,
+                            finish = finish,
+                            message = ("%s marks '%s' with @override, but %s has no such method")
+                                :format(className, method.name, info.parent),
+                        }
                     end
                 end
             end
