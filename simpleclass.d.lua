@@ -4,7 +4,9 @@
 ---@class simpleclass
 local sc = {}
 
----@class class
+---@class class<o>
+---@field __proto o
+
 ---@class object
 ---@class object.class : class
 ---@operator call: object
@@ -22,8 +24,13 @@ local sc = {}
 
 
 ---A reflection of a class
----@class class
+---@class class<o>
 local c
+
+---Create a instance
+---@generic o
+---@return o
+function c:new() end
 
 ---Check if the class extends the base class
 ---@param base class
@@ -124,12 +131,14 @@ function i:extends(...) end
 ---simpleclass.type(Eagle()) => Eagle
 ---simpleclass.type("Hello") => "string"
 ---```
----@param obj object
----@return class
+---@generic o:object
+---@param obj o
+---@return class<o> cls
 function sc.type(obj) end
 
+---Equivalent to `type` function
 ---@param v any
----@return type
+---@return type type
 function sc.type(v) end
 
 ---Define a new class  

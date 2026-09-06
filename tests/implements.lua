@@ -2,14 +2,14 @@
 -- expect: 8:missing-implements
 require "simpleclass"
 
-interface "CanEat" {"eat"}
-interface "CanFly" {"fly"}
+interface "CanEat_uebxyu21" {"eat"}
+interface "CanFly_uebxyu21" {"fly"}
 
-class "Bird_wrong" : implements(CanEat, CanFly) {
+class "Bird_wrong_uebxyu21" : implements(CanEat_uebxyu21, CanFly_uebxyu21) {
     eat = function(self) return self end;
 }
 
-class "Bird" : implements(CanEat, CanFly) {
+class "Bird_uebxyu21" : implements(CanEat_uebxyu21, CanFly_uebxyu21) {
     eat = function(self) return self end;
     fly = function(self) return self end;
 }

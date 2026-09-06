@@ -19,7 +19,7 @@ end
 local _patcher_ok, patcher = pcall(require, 'llspatcher')
 
 if _patcher_ok then
-    -- Optional VM overload dispatch. It only affects explicitly registered functions
+    -- Optional VM overload dispatch with generic-aware candidate selection.
     patcher.apply "overload_dispatch"
 end
 
