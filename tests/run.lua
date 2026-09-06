@@ -1,9 +1,9 @@
 -- 预期诊断回归 runner
 --
--- 对 tests/ 下每个 *.lua（跳过 run.lua）：
---   1) 复制该文件 + simpleclass 模块 到隔离的临时工作区
---      （临时目录无 .gitignore 且配置 useGitIgnore=false，故一定被分析）
---   2) 写 .luarc.json（插件绝对路径），跑 lua-language-server --check
+-- 对 tests/ 下全部 *.lua（跳过 run.lua）：
+--   1) 一次性复制到隔离的临时工作区，并复制唯一的 simpleclass.d.lua
+--      （运行时 simpleclass 模块不需要复制，d.lua 提供完整模块语义）
+--   2) 写 .luarc.json（插件绝对路径），只跑一次 lua-language-server --check
 --   3) 解析诊断 (行:列 [级别] 消息 (code))，与测试顶部 `-- expect:` 声明比对
 --   4) 全过返回 0，否则返回 1
 --
@@ -27,7 +27,6 @@ end
 local CWD = getcwd():gsub('[/\\]+$', '')
 local PROJECT_DIR = CWD
 local TEST_DIR    = CWD .. sep .. 'tests'
-local SIMPLE_DIR  = CWD .. sep .. 'simpleclass'
 local PLUGIN_PATH = CWD .. sep .. '.luals' .. sep .. 'simpleclass.plugin.lua'
 
 -- ---------- 工具 ----------
@@ -126,23 +125,30 @@ local function runCheck(workspaceDir)
     -- 诊断可能跨多行（如 param-type-mismatch 附带 - detail 行），
     -- (code) 与 :line:col 不在同一行。逐行扫描：先记下最近一次 :line:col，
     -- 当某行以 (code) 结尾时，把该 code 归属到该 line。
-    local pendingLine = nil
+    local pendingFile, pendingLine = nil, nil
     for raw in clean:gmatch('[^\n]*') do
-        -- <tmp>/xxx.lua:31:32 [Warning] ... 定位行
-        local ln = raw:match('%.lua:(%d+):%d+')
-        if ln then pendingLine = tonumber(ln) end
-        if pendingLine then
+        -- <tmp>/xxx.lua:31:32 [Warning] ... 定位文件和行
+        local file, ln = raw:match('([^/\\]+%.lua):(%d+):%d+')
+        if file then
+            pendingFile = file
+            pendingLine = tonumber(ln)
+        end
+        if pendingFile and pendingLine then
             local code = raw:match('%(([%w%-]+)%)$')
             if code then
-                diags[#diags + 1] = { line = pendingLine, code = code }
-                pendingLine = nil
+                diags[#diags + 1] = {
+                    file = pendingFile,
+                    line = pendingLine,
+                    code = code,
+                }
+                pendingFile, pendingLine = nil, nil
             end
         end
     end
     -- LuaLS 可能对同一位置同一 code 输出多行，去重后计数才稳定
     local seen, uniq = {}, {}
     for _, d in ipairs(diags) do
-        local k = d.line .. ':' .. d.code
+        local k = d.file .. ':' .. d.line .. ':' .. d.code
         if not seen[k] then seen[k] = true; uniq[#uniq + 1] = d end
     end
     return uniq
@@ -158,36 +164,40 @@ end
 table.sort(files)
 if #files == 0 then io.stderr:write('no test files in ' .. TEST_DIR .. '\n'); return 1 end
 
-local pass, fail = 0, 0
+-- 一次性建立 workspace：LuaLS 目录诊断才能解析测试文件之间的类型关系。
+local tmpRoot = (os.getenv('TEMP') or os.getenv('TMP') or '/tmp'):gsub('[/\\]+$', '')
+local ws = tmpRoot .. sep .. 'lsreg_' .. tostring(os.time()) .. '_all'
+os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
+os.execute(isWin and ('if not exist "%s" mkdir "%s"'):format(ws, ws) or ('mkdir -p "%s"'):format(ws))
+
+local expectedByFile = {}
 for _, path in ipairs(files) do
     local testFile = path:match('([^/\\]+%.lua)$')
-    local text = readFile(path)
-    local expects = parseExpects(text)
-
-    -- 隔离临时工作区
-    local tmpRoot = (os.getenv('TEMP') or os.getenv('TMP') or '/tmp'):gsub('[/\\]+$', '')
-    local ws = tmpRoot .. sep .. 'lsreg_' .. tostring(os.time()) .. '_' .. pass .. '_' .. testFile:gsub('%.lua$', '')
-    os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
-    os.execute(isWin and ('if not exist "%s" mkdir "%s"'):format(ws, ws) or ('mkdir -p "%s"'):format(ws))
-
-    -- 复制测试文件
+    expectedByFile[testFile] = parseExpects(readFile(path))
     copyFile(path, ws .. sep .. testFile)
-    -- 复制 simpleclass 模块
-    local scDir = ws .. sep .. 'simpleclass'
-    os.execute(isWin and ('if not exist "%s" mkdir "%s"'):format(scDir, scDir) or ('mkdir -p "%s"'):format(scDir))
-    for _, sf in ipairs(listDir(SIMPLE_DIR) or {}) do
-        copyFile(SIMPLE_DIR .. sep .. sf, scDir .. sep .. sf)
-    end
-    -- 类型声明文件在项目根（simpleclass.d.lua）时一并复制，否则隔离工作区缺类型
-    if readFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua') ~= nil then
-        copyFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua', scDir .. sep .. 'simpleclass.d.lua')
-    end
+end
 
-    local diags = runCheck(ws)
+-- simpleclass.d.lua 已经提供完整模块语义，不复制 simpleclass/ 运行时目录。
+copyFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua', ws .. sep .. 'simpleclass.d.lua')
 
+local diags = runCheck(ws)
+if not diags then
+    os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
+    return 1
+end
+
+local actualByFile = {}
+for _, d in ipairs(diags) do
+    local list = actualByFile[d.file]
+    if not list then list = {}; actualByFile[d.file] = list end
+    list[#list + 1] = d
+end
+
+local pass, fail = 0, 0
+local function checkFile(testFile, expects, actual)
     local expectSet, actualSet = {}, {}
     for _, e in ipairs(expects) do expectSet[e.line .. ':' .. e.code] = true end
-    for _, d in ipairs(diags or {}) do actualSet[d.line .. ':' .. d.code] = true end
+    for _, d in ipairs(actual) do actualSet[d.line .. ':' .. d.code] = true end
 
     local missing, extra = {}, {}
     for _, e in ipairs(expects) do
@@ -200,16 +210,27 @@ for _, path in ipairs(files) do
 
     if #missing == 0 and #extra == 0 then
         pass = pass + 1
-        print(('PASS  %-28s (%d diag)'):format(testFile, #(diags or {})))
+        print(('PASS  %-28s (%d diag)'):format(testFile, #actual))
     else
         fail = fail + 1
-        print(('FAIL  %-28s (expected %d, got %d)'):format(testFile, #expects, #(diags or {})))
+        print(('FAIL  %-28s (expected %d, got %d)'):format(testFile, #expects, #actual))
         if #missing > 0 then print('  missing(expected but absent):\n    ' .. table.concat(missing, '\n    ')) end
         if #extra > 0 then print('  extra(reported but unexpected):\n    ' .. table.concat(extra, '\n    ')) end
     end
-
-    os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
 end
+
+for _, path in ipairs(files) do
+    local testFile = path:match('([^/\\]+%.lua)$')
+    checkFile(testFile, expectedByFile[testFile], actualByFile[testFile] or {})
+end
+
+for testFile, actual in pairs(actualByFile) do
+    if not expectedByFile[testFile] then
+        checkFile(testFile, {}, actual)
+    end
+end
+
+os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
 
 print(('---- %d passed, %d failed'):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
