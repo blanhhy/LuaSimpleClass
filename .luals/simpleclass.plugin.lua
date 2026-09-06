@@ -7,6 +7,22 @@
 local __sc_implpos = {}
 local __sc_overridepos = {}
 
+-- Make sibling plugin modules resolvable when runtime.plugin is a relative path.
+local __pl_source = debug.getinfo(1, 'S').source
+local __pl_dir = __pl_source:match('^@?(.*)[/\\][^/\\]+$')
+if __pl_dir then
+    package.path = package.path .. ';'
+        .. __pl_dir .. '/?.lua;'
+        .. __pl_dir .. '/?/init.lua'
+end
+
+local _patcher_ok, patcher = pcall(require, 'llspatcher')
+
+if _patcher_ok then
+    -- Optional VM overload dispatch. It only affects explicitly registered functions
+    patcher.apply "overload_dispatch"
+end
+
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
 -- 跳过一段短字符串（含 \ 转义）。i 指向开引号 " 或 '，返回闭引号后的位置

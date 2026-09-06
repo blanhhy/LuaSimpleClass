@@ -124,8 +124,12 @@ function i:extends(...) end
 ---simpleclass.type(Eagle()) => Eagle
 ---simpleclass.type("Hello") => "string"
 ---```
+---@param obj object
+---@return class
+function sc.type(obj) end
+
 ---@param v any
----@return class|type
+---@return type
 function sc.type(v) end
 
 ---Define a new class  
