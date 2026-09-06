@@ -11,11 +11,12 @@
 -- 不写任何 expect 表示该文件应为 0 诊断。
 
 local SRC   = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or 'tests/'
-local isWin = package.config:sub(1, 1) == '\\'
-local sep   = isWin and '\\' or '/'
+local sep   = package.config:sub(1, 1)
+local isWin = sep == '\\'
 
 -- 用绝对路径（相对路径写进临时 .luarc.json 时，LuaLS 相对临时目录解析会找不到）
 local function trim(s) return (s or ''):gsub('^%s+', ''):gsub('%s+$', '') end
+local function ujoin(...) return table.concat({...}, sep) end
 
 local function getcwd()
     local f = io.popen(isWin and 'cd' or 'pwd')
@@ -26,12 +27,12 @@ end
 
 local CWD = getcwd():gsub('[/\\]+$', '')
 local PROJECT_DIR = CWD
-local TEST_DIR    = CWD .. sep .. 'tests'
-local PLUGIN_PATH = CWD .. sep .. '.luals' .. sep .. 'simpleclass.plugin.lua'
+local TEST_DIR    = ujoin(CWD, 'tests')
+local PLUGIN_PATH = ujoin(CWD, '.luals', 'simpleclass.plugin.lua')
 
 -- ---------- 工具 ----------
 local function which(exe)
-    local cmd = isWin and ('where "%s" 2>nul'):format(exe)
+    local cmd = isWin and ('where.exe "%s" 2>nul'):format(exe)
         or ('command -v "%s" 2>/dev/null'):format(exe)
     local f = io.popen(cmd)
     if not f then return nil end
@@ -96,7 +97,7 @@ end
 
 -- ---------- 运行 luals 并解析实际诊断 ----------
 local function runCheck(workspaceDir)
-    local cfgPath = workspaceDir .. sep .. '.luarc.json'
+    local cfgPath = ujoin(workspaceDir, '.luarc.json')
     writeFile(cfgPath, json({
         ['runtime.plugin']  = PLUGIN_PATH,
         workspace           = { useGitIgnore = false },
@@ -164,9 +165,9 @@ end
 table.sort(files)
 if #files == 0 then io.stderr:write('no test files in ' .. TEST_DIR .. '\n'); return 1 end
 
--- 一次性建立 workspace：LuaLS 目录诊断才能解析测试文件之间的类型关系。
-local tmpRoot = (os.getenv('TEMP') or os.getenv('TMP') or '/tmp'):gsub('[/\\]+$', '')
-local ws = tmpRoot .. sep .. 'lsreg_' .. tostring(os.time()) .. '_all'
+-- 建立临时工作区
+local ws = os.tmpname()
+os.remove(ws)
 os.execute(isWin and ('rmdir /s /q "%s" 2>nul'):format(ws) or ('rm -rf "%s"'):format(ws))
 os.execute(isWin and ('if not exist "%s" mkdir "%s"'):format(ws, ws) or ('mkdir -p "%s"'):format(ws))
 
@@ -177,8 +178,11 @@ for _, path in ipairs(files) do
     copyFile(path, ws .. sep .. testFile)
 end
 
--- simpleclass.d.lua 已经提供完整模块语义，不复制 simpleclass/ 运行时目录。
-copyFile(PROJECT_DIR .. sep .. 'simpleclass.d.lua', ws .. sep .. 'simpleclass.d.lua')
+-- 复制 simpleclass.d.lua 提供类型与模块定义
+copyFile(
+	ujoin(PROJECT_DIR, 'simpleclass.d.lua'),
+	ujoin(ws, 'simpleclass.d.lua')
+)
 
 local diags = runCheck(ws)
 if not diags then
