@@ -1472,7 +1472,7 @@ local ok_diagvm, diagvm        = pcall(require, 'vm')
 local ok_diagguide, diaggideX  = pcall(require, 'parser.guide')
 
 if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
-    diagdefine.DiagnosticDefaultSeverity['missing-implements']         = 'Warning'
+    diagdefine.DiagnosticDefaultSeverity['missing-implements']         = 'Error' -- 接口有运行时检查，给 Error 级别更合适
     diagdefine.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
     diagdefine.DiagnosticDefaultSeverity['invalid-override']             = 'Warning'
     diagdefine.DiagnosticDefaultNeededFileStatus['invalid-override']     = 'Any'
