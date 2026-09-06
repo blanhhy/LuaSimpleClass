@@ -1,3 +1,15 @@
+-- imports
+local ok_vm,     vm     = pcall(require, 'vm')
+local ok_files,  files  = pcall(require, 'files')
+local ok_guide,  guide  = pcall(require, 'parser.guide')
+local ok_luadoc, luadoc = pcall(require, 'parser.luadoc')
+local ok_define, define = pcall(require, 'proto.define')
+
+-- 需要应用的补丁
+local ENABLE_PATCHES = {
+    'overload_dispatch';
+}
+
 ---@class diff
 ---@field start  integer
 ---@field finish integer
@@ -7,24 +19,6 @@
 local __sc_implpos = {}
 local __sc_overridepos = {}
 local __sc_classmeta = {}
-
--- Make sibling plugin modules resolvable when runtime.plugin is a relative path.
-local __pl_source = debug.getinfo(1, 'S').source
-local __pl_dir = __pl_source:match('^@?(.*)[/\\][^/\\]+$')
-if __pl_dir then
-    package.path = package.path .. ';'
-        .. __pl_dir .. '/?.lua;'
-        .. __pl_dir .. '/?/init.lua'
-end
-
-local _patcher_ok, patcher = pcall(require, 'llspatcher')
-
-if _patcher_ok then
-    -- Optional VM overload dispatch with generic-aware candidate selection.
-    patcher.apply "overload_dispatch"
-end
-
-local _meta_vm_ok, _meta_vm = pcall(require, 'vm')
 
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
@@ -1316,9 +1310,6 @@ end
 -- markVirtual 标记保证不污染高亮。
 -- 注：parser.luadoc / parser.guide 是 LuaLS 内部模块，用 pcall + ok_ 兜底，缺省时静默降级。
 
-local ok_luadoc, luadoc = pcall(require, 'parser.luadoc')
-local ok_guide,  guide  = pcall(require, 'parser.guide')
-
 ---构造一个虚拟的短注释节点
 ---@param t string   注释标签，如 "param"
 ---@param value string 注释内容
@@ -1425,15 +1416,15 @@ function OnTransformAst(uri, ast)
                 local classname = pl_getClassName(node)
                 if classname then
                     local classmeta = __sc_classmeta[uri] and __sc_classmeta[uri][classname]
-                    if classmeta and classmeta.parent and _meta_vm_ok then
-                        local parent = _meta_vm.getGlobal('type', classmeta.parent)
+                    if classmeta and classmeta.parent and ok_vm then
+                        local parent = vm.getGlobal('type', classmeta.parent)
                         if parent then
                             for _, set in ipairs(parent:getSets(uri)) do
                                 if set.type == 'doc.class' then
-                                    for _, field in ipairs(_meta_vm.getFields(set)) do
-                                        local name = _meta_vm.getKeyName(field)
+                                    for _, field in ipairs(vm.getFields(set)) do
+                                        local name = vm.getKeyName(field)
                                         if name and not classmeta.fieldTypes[name] then
-                                            local okInfer, infer = pcall(_meta_vm.getInfer, field)
+                                            local okInfer, infer = pcall(vm.getInfer, field)
                                             if okInfer and infer then
                                                 local okView, typ = pcall(infer.view, infer, uri)
                                                 if okView and typ and typ ~= 'unknown' then
@@ -1466,16 +1457,11 @@ end
 -- ==================================== 自定义诊断器 ====================================
 -- 机制：core.diagnostics.<name> 由 LS 按名动态 require，此处通过 package.loaded 预置；
 -- 名字登记进 define.DiagnosticDefaultSeverity 以进入诊断枚举清单。
-local ok_diagfiles, diagfiles  = pcall(require, 'files')
-local ok_diagdefine, diagdefine = pcall(require, 'proto.define')
-local ok_diagvm, diagvm        = pcall(require, 'vm')
-local ok_diagguide, diaggideX  = pcall(require, 'parser.guide')
-
-if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
-    diagdefine.DiagnosticDefaultSeverity['missing-implements']         = 'Error' -- 接口有运行时检查，给 Error 级别更合适
-    diagdefine.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
-    diagdefine.DiagnosticDefaultSeverity['invalid-override']             = 'Warning'
-    diagdefine.DiagnosticDefaultNeededFileStatus['invalid-override']     = 'Any'
+if ok_files and ok_define and ok_vm and ok_guide then
+    define.DiagnosticDefaultSeverity['missing-implements']         = 'Error' -- 接口有运行时检查，给 Error 级别更合适
+    define.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
+    define.DiagnosticDefaultSeverity['invalid-override']             = 'Warning'
+    define.DiagnosticDefaultNeededFileStatus['invalid-override']     = 'Any'
 
     -- 把原始源码字节偏移转换为诊断器需要的 diff 后 packed 位置。
     local function diagRangeFromOriginal(state, startOffset, finishOffset)
@@ -1483,23 +1469,23 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
             -- diffedPackPosition 的列重测包含目标字节，起点需后退一个字节；
             -- finish 保持在目标字符上，使范围包含方法名最后一个字符。
             local okStart, diffedStart = pcall(
-                diagfiles.diffedOffset, state, startOffset - 1)
+                    files.diffedOffset, state, startOffset - 1)
             local okFinish, diffedFinish = pcall(
-                diagfiles.diffedOffset, state, finishOffset)
+                    files.diffedOffset, state, finishOffset)
             if okStart and okFinish and diffedStart and diffedFinish then
-                return diaggideX.offsetToPosition(state, diffedStart),
-                    diaggideX.offsetToPosition(state, diffedFinish)
+                return guide.offsetToPosition(state, diffedStart),
+                    guide.offsetToPosition(state, diffedFinish)
             end
         else
-            return diaggideX.offsetToPosition(state, startOffset),
-                diaggideX.offsetToPosition(state, finishOffset)
+            return guide.offsetToPosition(state, startOffset),
+                guide.offsetToPosition(state, finishOffset)
         end
     end
 
     -- 由 OnSetText 生成 X.__own 类（extends 只含父类、不含接口），
     -- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
     package.loaded['core.diagnostics.missing-implements'] = function (uri, callback)
-        local state = diagfiles.getState(uri)
+        local state = files.getState(uri)
         if not state then return end
 
         -- 与内置诊断器一致：枚举 vm 已编译的全局类型，而非遍历 state.ast 的 doc 注释节点。
@@ -1507,18 +1493,18 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
         -- 注意 getSets(uri) 语义是"该 scope 可见"而非"定义于此文件"（type 类全局工作区可见），
         -- 须用 guide.getUri(set) 过滤出真正定义在本文件的类，否则诊断会误报到其他文件。
         local seen = {}
-        for _, gv in ipairs(diagvm.getGlobals('type')) do
+        for _, gv in ipairs(vm.getGlobals('type')) do
             for _, set in ipairs(gv:getSets(uri)) do
                 if set.type == 'doc.class'
                 and set.extends and #set.extends >= 2
                 and set.class and set.class[1]
-                and diaggideX.getUri(set) == uri then
+                and guide.getUri(set) == uri then
                     local selfName = set.class[1]
                     if not seen[selfName] then
                         seen[selfName] = true
 
                         -- 仅检查插件生成的类：需存在 X.__own 类型
-                        local ownG = diagvm.getGlobal('type', selfName .. '.__own')
+                        local ownG = vm.getGlobal('type', selfName .. '.__own')
                         if ownG then
                             local ownDef
                             for _, s in ipairs(ownG:getSets(uri)) do
@@ -1527,8 +1513,8 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                             if ownDef then
                                 -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
                                 local clsFields = {}
-                                for _, fld in ipairs(diagvm.getFields(ownDef)) do
-                                    local k = diagvm.getKeyName(fld)
+                                for _, fld in ipairs(vm.getFields(ownDef)) do
+                                    local k = vm.getKeyName(fld)
                                     if k and type(k) == 'string' then clsFields[k] = true end
                                 end
 
@@ -1537,12 +1523,12 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                                 for idx = 2, #set.extends do
                                     local ifname = set.extends[idx][1]
                                     if ifname then
-                                        local ig = diagvm.getGlobal('type', ifname)
+                                        local ig = vm.getGlobal('type', ifname)
                                         if ig then
                                             for _, s2 in ipairs(ig:getSets(uri)) do
                                                 if s2.type == 'doc.class' and s2.fields then
                                                     for _, fld in ipairs(s2.fields) do
-                                                        local k = diagvm.getKeyName(fld)
+                                                        local k = vm.getKeyName(fld)
                                                         if k and type(k) == 'string' and not clsFields[k] then
                                                             missing[#missing + 1] = ('%s.%s'):format(ifname, k)
                                                         end
@@ -1564,11 +1550,11 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                                 if posRange and state.diffInfo then
                                     -- packPosition 的列重测是含尾字节的（encoder.len(a,b) 计 [a,b]），
                                     -- 故起点须传 targetByte-1 才能落在 targetByte 对应字符上。
-                                    local okd, dsRaw = pcall(diagfiles.diffedOffset, state, posRange.start - 1)
-                                    local okf, dfRaw = pcall(diagfiles.diffedOffset, state, posRange.finish)
+                                    local okd, dsRaw = pcall(files.diffedOffset, state, posRange.start - 1)
+                                    local okf, dfRaw = pcall(files.diffedOffset, state, posRange.finish)
                                     if okd and okf and dsRaw and dfRaw then
-                                        start  = diaggideX.offsetToPosition(state, dsRaw)
-                                        finish = diaggideX.offsetToPosition(state, dfRaw)
+                                        start  = guide.offsetToPosition(state, dsRaw)
+                                        finish = guide.offsetToPosition(state, dfRaw)
                                     end
                                 end
                                 callback {
@@ -1586,20 +1572,20 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
     end
 
     package.loaded['core.diagnostics.invalid-override'] = function (uri, callback)
-        local state = diagfiles.getState(uri)
+        local state = files.getState(uri)
         if not state then return end
 
         local classes = __sc_overridepos[uri]
         if not classes then return end
 
         for className, info in pairs(classes) do
-            local parentGlobal = diagvm.getGlobal('type', info.parent)
+            local parentGlobal = vm.getGlobal('type', info.parent)
             local parentFields = {}
             if parentGlobal then
                 for _, parentSet in ipairs(parentGlobal:getSets(uri)) do
                     if parentSet.type == 'doc.class' then
-                        for _, field in ipairs(diagvm.getFields(parentSet)) do
-                            local name = diagvm.getKeyName(field)
+                        for _, field in ipairs(vm.getFields(parentSet)) do
+                            local name = vm.getKeyName(field)
                             if name and type(name) == 'string' then
                                 parentFields[name] = true
                             end
@@ -1623,5 +1609,84 @@ if ok_diagfiles and ok_diagdefine and ok_diagvm and ok_diagguide then
                 end
             end
         end
+    end
+end
+
+
+
+-- ==================================== VM 补丁 ====================================
+-- Optional patcher for LuaLS.
+-- This relies on LuaLS VM internals and is intentionally opt-in per function.
+
+local _pl_src = debug and debug.getinfo(1, 'S').source
+local _pl_dir = _pl_src and _pl_src:match('^@?(.*)[/\\][^/\\]+$')
+local _pt_dir = _pl_dir and _pl_dir .. '/patches/'
+local apply_patch = nil
+
+if _pt_dir and ok_vm and ok_guide then
+    local M = {} ---@class LLSPatch
+    M.vm = vm
+    M.guide = guide
+
+    ---Declare the type requirement for a patch.
+    ---@param vt_list [any, type, any, type, any, type]
+    function M.t_require(vt_list)
+        if not vt_list or #vt_list == 0 then
+            return true
+        end
+        for i = 1, #vt_list, 2 do
+            local v = vt_list[i]
+            local t = vt_list[i+1]
+            if type(v) ~= t then
+                return false
+            end
+        end
+        return true
+    end
+
+    ---Apply a patch. This is a no-op if the patch is already applied.  
+    -- Patch must exist in `patches` directory.
+    ---@param name string
+    ---@return boolean ok
+    ---@return string? err if failed.
+    function apply_patch(name)
+        if type(name) ~= 'string' or name == '' then
+            return false
+            , ("Invalid patch name '%s'")
+            : format(name)
+        end
+
+        local state = vm.__simpleclass_patcher_state
+        if not state then
+            state = {}
+            vm.__simpleclass_patcher_state = state
+        end
+
+        if state[name] then
+            return true
+        end
+
+        local patch, err1 = loadfile(_pt_dir .. name .. '.lua', "bt", _ENV)
+        if not patch then
+            state[name] = false
+            return false
+            , ("Failed to load patch '%s': %s")
+            : format(name, err1)
+        end
+
+        state[name] = {}
+        local do_ok, pt_ok, err2 = pcall(patch, M, state[name])
+
+        if not do_ok or not pt_ok then
+            state[name] = false
+            return false
+            , ("Failed to apply patch '%s': %s")
+            : format(name, pt_ok or err2)
+        end
+        return true
+    end
+
+    for _, name in ipairs(ENABLE_PATCHES) do
+        apply_patch(name)
     end
 end
