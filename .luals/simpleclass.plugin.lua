@@ -3,9 +3,10 @@
 ---@field finish integer
 ---@field text   string
 
--- 记录各文件内每个类的 implements(...) 块在原始代码中的位置，供接口约束诊断定位到原始源码。
+-- 插件级状态，跨阶段、跨文件记录工作区信息
 local __sc_implpos = {}
 local __sc_overridepos = {}
+local __sc_classmeta = {}
 
 -- Make sibling plugin modules resolvable when runtime.plugin is a relative path.
 local __pl_source = debug.getinfo(1, 'S').source
@@ -22,6 +23,8 @@ if _patcher_ok then
     -- Optional VM overload dispatch with generic-aware candidate selection.
     patcher.apply "overload_dispatch"
 end
+
+local _meta_vm_ok, _meta_vm = pcall(require, 'vm')
 
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
@@ -677,6 +680,262 @@ local function pl_operatorOperand(docs, params)
     return typeOf[names[2]]
 end
 
+-- 从类体字段声明和 getter 返回值建立属性类型索引。
+local function pl_fieldTypes(declareFields, methods)
+    local types = {}
+    for _, line in ipairs(declareFields or {}) do
+        local name, typ = line:match('^%-%-%-@field%s+([%w_]+)%s+(.+)$')
+        if name and typ then
+            types[name] = typ:gsub('%s+$', '')
+        end
+    end
+    for _, method in ipairs(methods or {}) do
+        if method.isGetter and not types[method.name] then
+            local ret = pl_methodReturn(method.docs)
+            if ret then
+                types[method.name] = ret
+            else
+                local backing = method.body:match('return%s+self%s*%.%s*([%w_]+)')
+                if backing and types[backing] then
+                    types[method.name] = types[backing]
+                end
+            end
+        elseif method.isSetter and not types[method.name] then
+            local backing = method.body:match('self%s*%.%s*([%w_]+)%s*=%s*[%w_]+%f[%W]')
+            if backing and types[backing] then
+                types[method.name] = types[backing]
+            end
+        end
+    end
+    return types
+end
+
+local function pl_hasParamDoc(docs, name)
+    for _, line in ipairs(docs or {}) do
+        if line:match('^%-%-%-@param%s+' .. name .. '%f[%s]') then
+            return true
+        end
+    end
+    return false
+end
+
+-- 只从单一、直接的字段赋值推导参数，避免把复杂表达式误认为参数类型来源。
+local function pl_methodParamTypes(method, fieldTypes)
+    local params = pl_paramNames(method.params)
+    if #params < 2 then return {} end
+    local inferred = method.inferred or {}
+
+    local function add(name, typ)
+        if not name or not typ or name == params[1] or pl_hasParamDoc(method.docs, name) then
+            return
+        end
+        if inferred[name] and inferred[name] ~= typ then
+            inferred[name] = false
+        else
+            inferred[name] = typ
+        end
+    end
+
+    if method.isSetter then
+        -- set.<property> 的属性名已经在 parseMethods 中去掉了 set. 前缀。
+        if #params == 2 then
+            local typ = fieldTypes[method.name]
+            if not typ then
+                local backing = method.body:match('self%s*%.%s*([%w_]+)%s*=%s*' .. params[2] .. '%f[%W]')
+                typ = backing and fieldTypes[backing]
+            end
+            add(params[2], typ)
+        end
+    else
+        for field, param in method.body:gmatch('self%s*%.%s*([%w_]+)%s*=%s*([%w_]+)') do
+            add(param, fieldTypes[field])
+        end
+    end
+
+    for name, typ in pairs(inferred) do
+        if not typ then inferred[name] = nil end
+    end
+    return inferred
+end
+
+-- 把顶层逗号分隔的参数列表切成字符串表，忽略括号/字符串/长注释/长字符串内的逗号。
+-- 起始位置位于 `(` 之后，结束位置在匹配的 `)` 之前。
+local function pl_splitCallArgs(body, open, close)
+    local args = {}
+    local depth = 0
+    local inS, inD, inSq, inLstr, inBstr = false, false, false, false, false
+    local i = open
+    local start = open
+    while i <= close do
+        local c = body:sub(i, i)
+        if inLstr then
+            if c == ']' and body:sub(i, i + 1) == ']]' then inLstr = false i = i + 1 end
+        elseif inBstr then
+            if c == ']' and body:sub(i, i + 1) == ']]' then inBstr = false i = i + 1 end
+        elseif inS then
+            if c == '\\' then i = i + 1
+            elseif c == "'" then inS = false end
+        elseif inD then
+            if c == '\\' then i = i + 1
+            elseif c == '"' then inD = false end
+        elseif inSq then
+            if c == ')' then inSq = false end
+        elseif c == "'" then inS = true
+        elseif c == '"' then inD = true
+        elseif c == '[' and body:sub(i + 1, i + 1) == '[' then inLstr = true i = i + 1
+        elseif c == ']' and body:sub(i + 1, i + 1) == ']' then inBstr = true i = i + 1
+        elseif c == '(' then depth = depth + 1
+        elseif c == ')' then
+            if depth == 0 then
+                if i > start then args[#args + 1] = body:sub(start, i - 1) end
+                return args
+            end
+            depth = depth - 1
+        elseif c == ',' and depth == 0 then
+            args[#args + 1] = body:sub(start, i - 1)
+            start = i + 1
+        end
+        i = i + 1
+    end
+    if i > start then args[#args + 1] = body:sub(start, close) end
+    return args
+end
+
+-- 在 body 中找出对名字 `name` 的调用，并把实参列表表返回，每条以 `parentParamName` 形式追加。
+local function pl_collectSuperCalls(body, name)
+    local calls = {}
+    local len = #name
+    local i = 1
+    while i <= #body do
+        -- super(Cls, self):name(args)
+        local _, finish = body:find('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*' .. name .. '%s*%(', i)
+        if finish then
+            local depth = 0
+            local j = finish
+            while j <= #body do
+                local c = body:sub(j, j)
+                if c == '(' then depth = depth + 1
+                elseif c == ')' then
+                    depth = depth - 1
+                    if depth == 0 then break end
+                end
+                j = j + 1
+            end
+            if j <= #body then
+                calls[#calls + 1] = pl_splitCallArgs(body, finish + 1, j - 1)
+            end
+            i = j + 1
+        else
+            -- Parent.name(self, args...)  或  Parent:name(args)
+            _, finish = body:find('[%w_]+%s*%:%s*' .. name .. '%s*%(', i)
+            if not finish then
+                _, finish = body:find('[%w_]+%s*%.%s*' .. name .. '%s*%(%s*self%s*,', i)
+            end
+            if finish then
+                local depth = 0
+                local j = finish
+                while j <= #body do
+                    local c = body:sub(j, j)
+                    if c == '(' then depth = depth + 1
+                    elseif c == ')' then
+                        depth = depth - 1
+                        if depth == 0 then break end
+                    end
+                    j = j + 1
+                end
+                if j <= #body then
+                    local args = pl_splitCallArgs(body, finish + 1, j - 1)
+                    -- 对 Parent.name(self, ...) 形式：跳过首个 self 实参
+                    local isDotCall = body:sub(finish - 1, finish - 1) == '.'
+                    if isDotCall and args[1] and args[1]:match('^%s*self%s*$') then
+                        table.remove(args, 1)
+                    end
+                    calls[#calls + 1] = args
+                end
+                i = j + 1
+            else
+                i = i + 1
+            end
+        end
+    end
+    return calls
+end
+
+-- 若子类方法 body 调用了父类同名方法并按位置转发参数，则继承父类参数已知类型。
+local function pl_superParamTypes(method, classmeta, allmeta)
+    if not classmeta or not classmeta.parent then return {} end
+    local params = pl_paramNames(method.params)
+    if #params < 2 then return {} end
+    local myInferred = method.inferred or {}
+    local extra = {}
+
+    local function need(name) return params[1] ~= name and not myInferred[name] and not pl_hasParamDoc(method.docs, name) end
+
+    local function add(name, typ)
+        if not name or not typ or not need(name) then return end
+        extra[name] = typ
+    end
+
+    local calls = pl_collectSuperCalls(method.body or '', method.name)
+    if #calls == 0 then return extra end
+
+    local visit, curClass = 0, classmeta
+    while curClass and curClass.parent do
+        visit = visit + 1
+        if visit > 16 then break end
+        local parentMeta = allmeta and allmeta[curClass.parent]
+        local parentMethod = parentMeta and parentMeta.methods[method.name]
+        local parentParamTypes = {}
+        if parentMethod then
+            for i, pname in ipairs(pl_paramNames(parentMethod.params)) do
+                local typ = parentMethod.inferred and parentMethod.inferred[pname]
+                if not typ then
+                    for _, line in ipairs(parentMethod.docs or {}) do
+                        local docName, docType = line:match('^%-%-%-@param%s+([%w_]+)%s+(.+)$')
+                        if docName == pname and docType then typ = docType:gsub('%s+$', '') end
+                    end
+                end
+                if typ and i >= 2 then
+                    parentParamTypes[i - 1] = typ
+                end
+            end
+        end
+
+        for _, argList in ipairs(calls) do
+            for pi, pname in pairs(parentParamTypes) do
+                local argText = argList[pi]
+                if argText then
+                    local argName = argText:match('^%s*([%w_]+)%s*$')
+                    if argName then
+                        add(argName, pname)
+                    end
+                end
+            end
+        end
+
+        curClass = parentMeta
+    end
+
+    return extra
+end
+
+local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
+    local inferred = pl_methodParamTypes(method, fieldTypes)
+    method.inferred = inferred
+    if classmeta and allmeta then
+        for name, typ in pairs(pl_superParamTypes(method, classmeta, allmeta)) do
+            inferred[name] = typ
+        end
+    end
+    local docs = {}
+    for _, name in ipairs(pl_paramNames(method.params)) do
+        if inferred[name] then
+            docs[#docs + 1] = ('---@param %s %s'):format(name, inferred[name])
+        end
+    end
+    return docs
+end
+
 function OnSetText(uri, text)
     local hasClass = findClassKeyword(text, 1)
     local hasInterface = findInterfaceKeyword(text, 1)
@@ -689,6 +948,7 @@ function OnSetText(uri, text)
     local n = #text
     __sc_implpos[uri] = {}
     __sc_overridepos[uri] = {}
+    __sc_classmeta[uri] = {}
     while pos <= n do
         local nextClass = findClassKeyword(text, pos)
         local nextInterface = findInterfaceKeyword(text, pos)
@@ -739,6 +999,16 @@ function OnSetText(uri, text)
                 pos = nextPos + 5
             else
                 local methods, fields, declareFields = parseMethods(body)
+                local methodMeta = {}
+                for _, method in ipairs(methods) do
+                    methodMeta[method.name] = method
+                end
+                __sc_classmeta[uri][className] = {
+                    methods = methodMeta,
+                    fieldTypes = pl_fieldTypes(declareFields, methods),
+                    parent = parentName,
+                }
+                local classmeta = __sc_classmeta[uri][className]
                 local parent = parentName or 'object'
                 local out = {}
 
@@ -846,6 +1116,9 @@ function OnSetText(uri, text)
                     for _, docLine in ipairs(newMethod.docs) do
                         out[#out + 1] = docLine
                     end
+                    for _, docLine in ipairs(pl_inferredParamDocs(newMethod, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
+                        out[#out + 1] = docLine
+                    end
                     if not pl_methodReturn(newMethod.docs) then
                         out[#out + 1] = '---@return ' .. className
                     end
@@ -853,6 +1126,9 @@ function OnSetText(uri, text)
                 elseif initMethod then
                     local paramStr = stripFirstParam(initMethod.params)
                     for _, docLine in ipairs(initMethod.docs) do
+                        out[#out + 1] = docLine
+                    end
+                    for _, docLine in ipairs(pl_inferredParamDocs(initMethod, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
                         out[#out + 1] = docLine
                     end
                     if not pl_methodReturn(initMethod.docs) then
@@ -915,10 +1191,19 @@ function OnSetText(uri, text)
                         for _, docLine in ipairs(m.docs) do
                             out[#out + 1] = docLine
                         end
+                        for _, docLine in ipairs(pl_inferredParamDocs(m, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
+                            out[#out + 1] = docLine
+                        end
                         -- 挂载目标：元方法/静态方法挂类对象，其余挂实例
                         local target = (isMeta or isStatic) and className or (className .. '.__proto')
-                        -- 冒号语法要求首参数为 self；尽量标注冒号，否则点语法保留全部参数
-                        if getFirstParamName(m.params) == 'self' then
+                        -- 元方法挂在类对象上，但 Lua 语义中的首参仍是实例；
+                        -- 用点语法避免 LuaLS 把冒号接收者推成 X.class。
+                        if isMeta and getFirstParamName(m.params) == 'self' then
+                            if not pl_hasParamDoc(m.docs, 'self') then
+                                out[#out + 1] = '---@param self ' .. className
+                            end
+                            out[#out + 1] = 'function ' .. target .. '.' .. m.name .. '(' .. m.params .. ')'
+                        elseif getFirstParamName(m.params) == 'self' then
                             local cleanParams = stripFirstParam(m.params)
                             out[#out + 1] = 'function ' .. target .. ':' .. m.name .. '(' .. cleanParams .. ')'
                         else
@@ -1001,6 +1286,22 @@ function OnSetText(uri, text)
         end
     end
 
+    local allmeta = __sc_classmeta[uri]
+    local classCount = 0
+    for _ in pairs(allmeta) do classCount = classCount + 1 end
+    for _ = 1, classCount do
+        for _, classmeta in pairs(allmeta) do
+            local parent = classmeta.parent and allmeta[classmeta.parent]
+            if parent then
+                for name, typ in pairs(parent.fieldTypes) do
+                    if not classmeta.fieldTypes[name] then
+                        classmeta.fieldTypes[name] = typ
+                    end
+                end
+            end
+        end
+    end
+
     if #diffs == 0 then return nil end
     return diffs
 end
@@ -1059,11 +1360,13 @@ local function pl_getClassName(outerCall)
 end
 
 ---遍历类体 table，给每个方法的接收者参数绑定类型：
----  首参数 self → `@param self <类名>`（实例）；首参数 cls → `@param cls <类名>.class`（类对象）。
+---  首参数 self → `@param self <类名>`（实例）
+---  首参数 cls → `@param cls <类名>.class`（类对象）
+---  赋值给已知字段的参数 → `@param <参数名> <字段类型>`
 ---@param ast table  AST 根
 ---@param classname string
 ---@param tableNode table 类体 table 节点
-local function pl_injectSelf(ast, classname, tableNode)
+local function pl_injectParams(ast, classname, tableNode, classmeta)
     if not tableNode or tableNode.type ~= 'table' then
         return
     end
@@ -1071,6 +1374,11 @@ local function pl_injectSelf(ast, classname, tableNode)
         local field = tableNode[i]
         local value = field and field.value
         if value and value.type == 'function' and value.args then
+            local methodName = guide.getKeyName(field)
+            if methodName then
+                methodName = methodName:gsub('^get%.', ''):gsub('^set%.', '')
+            end
+            local method = classmeta and methodName and classmeta.methods[methodName]
             for j = 1, #value.args do
                 local p = value.args[j]
                 local key = guide.getKeyName(p)
@@ -1084,6 +1392,19 @@ local function pl_injectSelf(ast, classname, tableNode)
                         ast, value,
                         pl_buildComment('param', ('cls %s.class'):format(classname), p.start - 1))
                     break
+                end
+            end
+            if method and classmeta.fieldTypes then
+                local inferred = pl_methodParamTypes(method, classmeta.fieldTypes)
+                for j = 1, #value.args do
+                    local p = value.args[j]
+                    local key = guide.getKeyName(p)
+                    local typ = key and inferred[key]
+                    if typ then
+                        luadoc.buildAndBindDoc(
+                            ast, value,
+                            pl_buildComment('param', ('%s %s'):format(key, typ), p.start - 1))
+                    end
                 end
             end
         end
@@ -1100,9 +1421,36 @@ function OnTransformAst(uri, ast)
             if node.type == 'call' and node.args then
                 local classname = pl_getClassName(node)
                 if classname then
+                    local classmeta = __sc_classmeta[uri] and __sc_classmeta[uri][classname]
+                    if classmeta and classmeta.parent and _meta_vm_ok then
+                        local parent = _meta_vm.getGlobal('type', classmeta.parent)
+                        if parent then
+                            for _, set in ipairs(parent:getSets(uri)) do
+                                if set.type == 'doc.class' then
+                                    for _, field in ipairs(_meta_vm.getFields(set)) do
+                                        local name = _meta_vm.getKeyName(field)
+                                        if name and not classmeta.fieldTypes[name] then
+                                            local okInfer, infer = pcall(_meta_vm.getInfer, field)
+                                            if okInfer and infer then
+                                                local okView, typ = pcall(infer.view, infer, uri)
+                                                if okView and typ and typ ~= 'unknown' then
+                                                    classmeta.fieldTypes[name] = typ
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
                     for _, a in ipairs(node.args) do
                         if a.type == 'table' then
-                            pl_injectSelf(ast, classname, a)
+                            pl_injectParams(
+                                ast,
+                                classname,
+                                a,
+                                classmeta
+                            )
                         end
                     end
                 end

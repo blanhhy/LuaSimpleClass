@@ -1,5 +1,5 @@
 -- @operator 自动生成：元方法带 @return 才生成操作符标注。
--- __add 返回 Vec → `v + v` 结果为 Vec，故 (v+v).noSuchField 触发 undefined-field（line 14）。
+-- __add 返回 Vec → `v + v` 结果为 Vec，故 (v+v).noSuchField 触发 undefined-field（line 15）。
 -- 反之 __mul 无 @return → 不生成 operator，(n*n) 保持 unknown，(n*n).alsoNoSuch 不应报警。
 -- expect: 15:undefined-field
 require "simpleclass"

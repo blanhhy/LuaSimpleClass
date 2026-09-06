@@ -16,8 +16,6 @@ class "Person" {
 }
 
 class "Student" : extends "Person" {
-    ---@param name string
-    ---@param age integer
     ---@param grade string
     __init = function(self, name, age, grade)
         super(Student, self):__init(name, age)
@@ -50,9 +48,6 @@ print(sc.type(s1)) --> Student
 --# 深层继承
 --#==========================================
 class "CollageStudent" : extends "Student" {
-    ---@param name string
-    ---@param age integer
-    ---@param grade string
     __init = function(self, name, age, grade)
         super(CollageStudent, self):__init(name, age, grade)
     end;

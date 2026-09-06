@@ -20,7 +20,7 @@ end
 local sc = require "simpleclass" -- 局部导入
 local class = sc.class           -- 手动 local class
 
-class "NonGlobal_mn1" {
+local MyClass = class "NonGlobal_mn1" {
     __init = function(self)
         self.field = "x"
     end;
@@ -29,7 +29,5 @@ class "NonGlobal_mn1" {
     end;
 }
 
--- 强制向下转型（从 _ENV 取只能得到 object）
-local MyClass = sc._ENV.NonGlobal_mn1 ---@cast MyClass NonGlobal_mn1
 local obj = MyClass()
-print(obj:probe())
+print(assert(obj:probe() == nil))

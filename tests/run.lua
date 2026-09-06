@@ -123,10 +123,21 @@ local function runCheck(workspaceDir)
     local diags = {}
     -- 剥掉 LuaLS 输出的 ANSI 颜色码（如 \x1b[34m \x1b[0m）与 \r，否则正则锚点对不上
     local clean = (out or ''):gsub('\27%[[;%-%d]+m', ''):gsub('\r', '')
+    -- 诊断可能跨多行（如 param-type-mismatch 附带 - detail 行），
+    -- (code) 与 :line:col 不在同一行。逐行扫描：先记下最近一次 :line:col，
+    -- 当某行以 (code) 结尾时，把该 code 归属到该 line。
+    local pendingLine = nil
     for raw in clean:gmatch('[^\n]*') do
-        -- <tmp>/xxx.lua:31:32 [Warning] ... (undefined-field)
-        local ln, code = raw:match('%.lua:(%d+):%d+ %[.-%] .- %(([%w%-]+)%)$')
-        if ln then diags[#diags + 1] = { line = tonumber(ln), code = code } end
+        -- <tmp>/xxx.lua:31:32 [Warning] ... 定位行
+        local ln = raw:match('%.lua:(%d+):%d+')
+        if ln then pendingLine = tonumber(ln) end
+        if pendingLine then
+            local code = raw:match('%(([%w%-]+)%)$')
+            if code then
+                diags[#diags + 1] = { line = pendingLine, code = code }
+                pendingLine = nil
+            end
+        end
     end
     -- LuaLS 可能对同一位置同一 code 输出多行，去重后计数才稳定
     local seen, uniq = {}, {}
