@@ -1,4 +1,4 @@
--- 报告 lua-language-server 的检查结果
+-- 获取 lua-language-server 在实际工作区的检查结果
 
 local function trim(s)
     if s == nil then
@@ -24,7 +24,7 @@ end
 local function which(exe)
     local command
     if package.config:sub(1, 1) == "\\" then
-        command = "where " .. quote_arg(exe) .. " 2>nul"
+        command = "where.exe " .. quote_arg(exe) .. " 2>nul"
     else
         command = "command -v " .. quote_arg(exe) .. " 2>/dev/null"
     end
@@ -451,9 +451,9 @@ local function generate_temp_config(project_settings, user_settings, workspace_s
     if not has_config then return nil end
 
     local is_win = package.config:sub(1, 1) == "\\"
-    local temp_dir = os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-    local temp_path = temp_dir .. (is_win and "\\luals_check_" or "/luals_check_") .. tostring(os.time())
-
+    local temp_path = os.tmpname()
+    os.remove(temp_path)
+    
     if is_win then
         os.execute('if not exist "' .. temp_path .. '" mkdir "' .. temp_path .. '"')
     else

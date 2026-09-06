@@ -974,13 +974,13 @@ function OnSetText(uri, text)
                 out[#out + 1] = iname .. ' = {__iname="' .. iname .. '"} ---@class I.' .. iname .. ' : interface'
                 -- 第二部分：虚拟类型，给类多态用，不继承 interface
                 local classLine = '---@class ' .. iname
-                if #extendsList > 0 then
+                if extendsList and #extendsList > 0 then
                     classLine = classLine .. ' : ' .. table.concat(extendsList, ', ')
                 else
                     classLine = classLine .. ' : object'
                 end
                 out[#out + 1] = classLine
-                for _, f in ipairs(fields) do
+                for _, f in ipairs(fields or {}) do
                     out[#out + 1] = '---@field ' .. f .. ' function'
                 end
                 diffs[#diffs + 1] = {
@@ -1035,7 +1035,7 @@ function OnSetText(uri, text)
                 out[#out + 1] = className .. ' = {}'
                 -- 实例：X 继承父类实例 parent
                 local classLine = '---@class ' .. className .. ' : ' .. parent
-                if #implementsList > 0 then
+                if implementsList and #implementsList > 0 then
                     classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
                 end
                 out[#out + 1] = classLine
