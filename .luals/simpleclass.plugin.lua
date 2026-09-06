@@ -169,6 +169,8 @@ local function parseClassBlock(text, startPos)
             if c == ')' then
                 impFin = pos
                 break
+            elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
+                pos = skipComment(text, pos)
             elseif c:match('[%w_]') then
                 local iend = text:find('[%s,)]', pos)
                 if iend then
@@ -222,6 +224,33 @@ local function findFieldEnd(body, start)
         end
     end
     return n + 1
+end
+
+-- Find the closing parenthesis of a call while ignoring strings and comments.
+local function findMatchingParen(text, open)
+    local depth = 1
+    local i = open + 1
+    while i <= #text do
+        local c = text:sub(i, i)
+        if c == '"' or c == "'" then
+            i = skipShortString(text, i)
+        elseif c == '[' then
+            local e = skipLongBracket(text, i)
+            i = e or (i + 1)
+        elseif c == '-' and text:sub(i + 1, i + 1) == '-' then
+            i = skipComment(text, i)
+        elseif c == '(' then
+            depth = depth + 1
+            i = i + 1
+        elseif c == ')' then
+            depth = depth - 1
+            if depth == 0 then return i end
+            i = i + 1
+        else
+            i = i + 1
+        end
+    end
+    return nil
 end
 
 local function parseMethods(body)
@@ -442,132 +471,91 @@ local function trimBody(body)
     return table.concat(lines, '\n')
 end
 
-local function findClassKeyword(text, from)
+local function findDslKeyword(text, from, keyword)
     local n = #text
-    local pos = from
-    while pos <= n do
-        local cstart = text:find('class', pos, true)
-        if not cstart then return nil end
-        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_.]') then
-            local isInStringOrComment = false
-            local scanPos = pos
-            while scanPos < cstart do
-                local sc = text:sub(scanPos, scanPos)
-                if sc == '"' or sc == "'" then
-                    local q = sc
-                    scanPos = scanPos + 1
-                    while scanPos <= n and text:sub(scanPos, scanPos) ~= q do
-                        if text:sub(scanPos, scanPos) == '\n' then
-                            break
-                        end
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                    scanPos = scanPos + 1
-                elseif sc == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
-                    while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                elseif sc == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
-                    scanPos = scanPos + 2
-                    while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                    scanPos = scanPos + 2
-                else
-                    scanPos = scanPos + 1
-                end
+    local i = from
+    while i <= n do
+        local c = text:sub(i, i)
+        if c == '"' or c == "'" then
+            i = skipShortString(text, i)
+        elseif c == '[' then
+            local e = skipLongBracket(text, i)
+            i = e or (i + 1)
+        elseif c == '-' and text:sub(i + 1, i + 1) == '-' then
+            i = skipComment(text, i)
+        elseif text:sub(i, i + #keyword - 1) == keyword then
+            local before = i > 1 and text:sub(i - 1, i - 1) or '\n'
+            local afterStart = i + #keyword
+            local restStart = afterStart
+            while restStart <= n and text:sub(restStart, restStart):match('%s') do
+                restStart = restStart + 1
             end
-            if not isInStringOrComment then
-                local afterStart = cstart + 5
-                local restStart = afterStart
-                while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                    restStart = restStart + 1
-                end
-                if restStart <= n and text:sub(restStart, restStart) == '"' then
-                    return cstart
-                end
+            if not before:match('[%w_.]')
+                and restStart <= n
+                and text:sub(restStart, restStart) == '"' then
+                return i
             end
+            i = i + #keyword
+        else
+            i = i + 1
         end
-        pos = cstart + 1
     end
     return nil
 end
 
+local function findClassKeyword(text, from)
+    return findDslKeyword(text, from, 'class')
+end
+
 local function findInterfaceKeyword(text, from)
-    local n = #text
-    local pos = from
-    while pos <= n do
-        local cstart = text:find('interface', pos, true)
-        if not cstart then return nil end
-        local before = cstart > 1 and text:sub(cstart - 1, cstart - 1) or '\n'
-        if not before:match('[%w_.]') then
-            local isInStringOrComment = false
-            local scanPos = pos
-            while scanPos < cstart do
-                local sc = text:sub(scanPos, scanPos)
-                if sc == '"' or sc == "'" then
-                    local q = sc
-                    scanPos = scanPos + 1
-                    while scanPos <= n and text:sub(scanPos, scanPos) ~= q do
-                        if text:sub(scanPos, scanPos) == '\n' then
-                            break
-                        end
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                    scanPos = scanPos + 1
-                elseif sc == '-' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '-' then
-                    while scanPos <= n and text:sub(scanPos, scanPos) ~= '\n' do
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                elseif sc == '[' and scanPos < n and text:sub(scanPos + 1, scanPos + 1) == '[' then
-                    scanPos = scanPos + 2
-                    while scanPos <= n and text:sub(scanPos, scanPos + 1) ~= ']]' do
-                        scanPos = scanPos + 1
-                    end
-                    if scanPos >= cstart then
-                        isInStringOrComment = true
-                        break
-                    end
-                    scanPos = scanPos + 2
-                else
-                    scanPos = scanPos + 1
-                end
+    return findDslKeyword(text, from, 'interface')
+end
+
+-- Interface bodies are a flat list of string members. Only collect literals at
+-- the body root; strings inside comments, long strings, or nested expressions
+-- are data and must not become interface requirements.
+local function collectInterfaceFields(body)
+    local fields = {}
+    local round, curly, square = 0, 0, 0
+    local i = 1
+    while i <= #body do
+        local c = body:sub(i, i)
+        if c == '"' or c == "'" then
+            local e = skipShortString(body, i)
+            if round == 0 and curly == 0 and square == 0 and e > i + 1 then
+                fields[#fields + 1] = body:sub(i + 1, e - 2)
             end
-            if not isInStringOrComment then
-                local afterStart = cstart + 9
-                local restStart = afterStart
-                while restStart <= n and text:sub(restStart, restStart):match('%s') do
-                    restStart = restStart + 1
-                end
-                if restStart <= n and text:sub(restStart, restStart) == '"' then
-                    return cstart
-                end
+            i = e
+        elseif c == '[' then
+            local e = skipLongBracket(body, i)
+            if e then
+                i = e
+            else
+                square = square + 1
+                i = i + 1
             end
+        elseif c == '-' and body:sub(i + 1, i + 1) == '-' then
+            i = skipComment(body, i)
+        elseif c == '(' then
+            round = round + 1
+            i = i + 1
+        elseif c == ')' then
+            if round > 0 then round = round - 1 end
+            i = i + 1
+        elseif c == '{' then
+            curly = curly + 1
+            i = i + 1
+        elseif c == '}' then
+            if curly > 0 then curly = curly - 1 end
+            i = i + 1
+        elseif c == ']' then
+            if square > 0 then square = square - 1 end
+            i = i + 1
+        else
+            i = i + 1
         end
-        pos = cstart + 1
     end
-    return nil
+    return fields
 end
 
 local function parseInterfaceBlock(text, startPos)
@@ -597,6 +585,8 @@ local function parseInterfaceBlock(text, startPos)
             local c = text:sub(pos, pos)
             if c == ')' then
                 break
+            elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
+                pos = skipComment(text, pos)
             elseif c:match('[%w_]') then
                 local eend = text:find('[%s,)]', pos)
                 if eend then
@@ -619,9 +609,7 @@ local function parseInterfaceBlock(text, startPos)
             local braceEnd = findBraceEnd(text, pos)
             if not braceEnd then return nil end
             local body = text:sub(pos + 1, braceEnd - 1)
-            for field in body:gmatch('"([^"]+)"') do
-                fields[#fields + 1] = field
-            end
+            fields = collectInterfaceFields(body)
             return iname, extendsList, fields, startPos, braceEnd
         elseif c == '\n' or c == ';' then
             return iname, extendsList, fields, startPos, pos - 1
@@ -762,97 +750,112 @@ end
 -- 起始位置位于 `(` 之后，结束位置在匹配的 `)` 之前。
 local function pl_splitCallArgs(body, open, close)
     local args = {}
-    local depth = 0
-    local inS, inD, inSq, inLstr, inBstr = false, false, false, false, false
+    local round, curly, square = 0, 0, 0
     local i = open
     local start = open
     while i <= close do
         local c = body:sub(i, i)
-        if inLstr then
-            if c == ']' and body:sub(i, i + 1) == ']]' then inLstr = false i = i + 1 end
-        elseif inBstr then
-            if c == ']' and body:sub(i, i + 1) == ']]' then inBstr = false i = i + 1 end
-        elseif inS then
-            if c == '\\' then i = i + 1
-            elseif c == "'" then inS = false end
-        elseif inD then
-            if c == '\\' then i = i + 1
-            elseif c == '"' then inD = false end
-        elseif inSq then
-            if c == ')' then inSq = false end
-        elseif c == "'" then inS = true
-        elseif c == '"' then inD = true
-        elseif c == '[' and body:sub(i + 1, i + 1) == '[' then inLstr = true i = i + 1
-        elseif c == ']' and body:sub(i + 1, i + 1) == ']' then inBstr = true i = i + 1
-        elseif c == '(' then depth = depth + 1
-        elseif c == ')' then
-            if depth == 0 then
-                if i > start then args[#args + 1] = body:sub(start, i - 1) end
-                return args
+        if c == '"' or c == "'" then
+            i = skipShortString(body, i)
+        elseif c == '[' then
+            local e = skipLongBracket(body, i)
+            if e then
+                i = e
+            else
+                square = square + 1
+                i = i + 1
             end
-            depth = depth - 1
-        elseif c == ',' and depth == 0 then
+        elseif c == '-' and body:sub(i + 1, i + 1) == '-' then
+            i = skipComment(body, i)
+        elseif c == '(' then
+            round = round + 1
+            i = i + 1
+        elseif c == ')' then
+            if round > 0 then round = round - 1 end
+            i = i + 1
+        elseif c == '{' then
+            curly = curly + 1
+            i = i + 1
+        elseif c == '}' then
+            if curly > 0 then curly = curly - 1 end
+            i = i + 1
+        elseif c == ']' then
+            if square > 0 then square = square - 1 end
+            i = i + 1
+        elseif c == ',' and round == 0 and curly == 0 and square == 0 then
             args[#args + 1] = body:sub(start, i - 1)
             start = i + 1
+            i = i + 1
+        else
+            i = i + 1
         end
-        i = i + 1
     end
     if i > start then args[#args + 1] = body:sub(start, close) end
     return args
 end
 
+local function pl_isCodePosition(text, target)
+    local i = 1
+    while i < target do
+        local c = text:sub(i, i)
+        if c == '"' or c == "'" then
+            local e = skipShortString(text, i)
+            if e > target then return false end
+            i = e
+        elseif c == '[' then
+            local e = skipLongBracket(text, i)
+            if e then
+                if e > target then return false end
+                i = e
+            else
+                i = i + 1
+            end
+        elseif c == '-' and text:sub(i + 1, i + 1) == '-' then
+            local e = skipComment(text, i)
+            if e > target then return false end
+            i = e
+        else
+            i = i + 1
+        end
+    end
+    return true
+end
+
 -- 在 body 中找出对名字 `name` 的调用，并把实参列表表返回，每条以 `parentParamName` 形式追加。
 local function pl_collectSuperCalls(body, name)
     local calls = {}
-    local len = #name
     local i = 1
     while i <= #body do
         -- super(Cls, self):name(args)
-        local _, finish = body:find('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*' .. name .. '%s*%(', i)
-        if finish then
-            local depth = 0
-            local j = finish
-            while j <= #body do
-                local c = body:sub(j, j)
-                if c == '(' then depth = depth + 1
-                elseif c == ')' then
-                    depth = depth - 1
-                    if depth == 0 then break end
-                end
-                j = j + 1
+        local found, finish = body:find('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*' .. name .. '%s*%(', i)
+        if found and pl_isCodePosition(body, found) then
+            local close = findMatchingParen(body, finish)
+            if close then
+                calls[#calls + 1] = pl_splitCallArgs(body, finish + 1, close - 1)
+                i = close + 1
+            else
+                i = finish + 1
             end
-            if j <= #body then
-                calls[#calls + 1] = pl_splitCallArgs(body, finish + 1, j - 1)
-            end
-            i = j + 1
         else
             -- Parent.name(self, args...)  或  Parent:name(args)
-            _, finish = body:find('[%w_]+%s*%:%s*' .. name .. '%s*%(', i)
-            if not finish then
-                _, finish = body:find('[%w_]+%s*%.%s*' .. name .. '%s*%(%s*self%s*,', i)
+            found, finish = body:find('[%w_]+%s*%:%s*' .. name .. '%s*%(', i)
+            if not found then
+                found, finish = body:find('[%w_]+%s*%.%s*' .. name .. '%s*%(%s*self%s*,', i)
             end
-            if finish then
-                local depth = 0
-                local j = finish
-                while j <= #body do
-                    local c = body:sub(j, j)
-                    if c == '(' then depth = depth + 1
-                    elseif c == ')' then
-                        depth = depth - 1
-                        if depth == 0 then break end
-                    end
-                    j = j + 1
-                end
-                if j <= #body then
-                    local args = pl_splitCallArgs(body, finish + 1, j - 1)
+            if found and pl_isCodePosition(body, found) then
+                local close = findMatchingParen(body, finish)
+                if close then
+                    local args = pl_splitCallArgs(body, finish + 1, close - 1)
                     -- 对 Parent.name(self, ...) 形式：跳过首个 self 实参
                     local isDotCall = body:sub(finish - 1, finish - 1) == '.'
                     if isDotCall and args[1] and args[1]:match('^%s*self%s*$') then
                         table.remove(args, 1)
                     end
                     calls[#calls + 1] = args
+                    i = close + 1
+                else
+                    i = finish + 1
                 end
-                i = j + 1
             else
                 i = i + 1
             end
