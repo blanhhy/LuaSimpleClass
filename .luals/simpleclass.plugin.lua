@@ -694,7 +694,12 @@ end
 
 local function pl_hasParamDoc(docs, name)
     for _, line in ipairs(docs or {}) do
-        if line:match('^%-%-%-@param%s+' .. name .. '%f[%s]') then
+        local docName = line:match('^%-%-%-@param%s+([%w_]+)%s')
+        if docName == name then
+            return true
+        end
+        docName = line:match('^%-%-%-@param%s+([%w_]+)%?%s')
+        if docName == name then
             return true
         end
     end
@@ -931,7 +936,7 @@ local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
     local inferred = pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
     local docs = {}
     for _, name in ipairs(pl_paramNames(method.params)) do
-        if inferred[name] then
+        if inferred[name] and not pl_hasParamDoc(method.docs, name) then
             docs[#docs + 1] = ('---@param %s %s'):format(name, inferred[name])
         end
     end
