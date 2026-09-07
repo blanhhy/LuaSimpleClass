@@ -121,7 +121,7 @@ print(eagle:isInstance(BirdLike))   --> true
 --# Getter / Setter
 --#==========================================
 class "Account" {
-    ---@param balance? number
+    ---@field private _balance number
     __init = function(self, balance)
         self._balance = balance or 0
     end;

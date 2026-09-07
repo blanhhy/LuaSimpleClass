@@ -921,6 +921,33 @@ local function pl_superParamTypes(method, classmeta, allmeta)
     return extra
 end
 
+local function pl_isStaticMethod(docs)
+    for _, line in ipairs(docs or {}) do
+        if line:match('^%-%-%-@static') then
+            return true
+        end
+    end
+    return false
+end
+
+local function pl_receiverType(method, classname)
+    if not method or not classname then return nil end
+    local first = getFirstParamName(method.params)
+    if method.name == 'new' and first then
+        return classname .. '.class'
+    end
+    if pl_isStaticMethod(method.docs) then
+        if first == 'cls' then
+            return classname .. '.class'
+        end
+        return nil
+    end
+    if first then
+        return classname
+    end
+    return nil
+end
+
 local function pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
     local inferred = pl_methodParamTypes(method, fieldTypes)
     method.inferred = inferred
@@ -1164,23 +1191,21 @@ function OnSetText(uri, text)
                     end
                 end
 
-                -- 方法体已由 OnTransformAst 自注入在原始代码处完成了字段/类型检查，
-                -- 重发的副本仅用于登记方法签名与返回类型，其 body 诊断会与原始重复，
-                -- 故在此作用域内关闭 body 级诊断，避免重复报警（enable 在重发区末尾恢复）。
-                out[#out + 1] = '---@diagnostic disable: undefined-field'
-
                 for _, m in ipairs(methods) do
                     if m.isGetter then
                         local attrName = m.name
                         out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
                         out[#out + 1] = '    ---@param self ' .. className
                         out[#out + 1] = '    function(' .. m.params .. ')'
+                        out[#out + 1] = '        self = self ---@class ' .. className
                         if m.body and #m.body > 0 then
                             local trimmed = trimBody(m.body)
                             if #trimmed > 0 then
+                                out[#out + 1] = '        ---@diagnostic disable'
                                 for line in trimmed:gmatch('([^\n]+)') do
                                     out[#out + 1] = '    ' .. line
                                 end
+                                out[#out + 1] = '        ---@diagnostic enable'
                             end
                         end
                         out[#out + 1] = '    end'
@@ -1197,6 +1222,7 @@ function OnSetText(uri, text)
                         for _, dl in ipairs(m.docs) do
                             if dl:match('^%-%-%-@static') then isStatic = true; break end
                         end
+                        local receiverType = pl_receiverType(m, className)
                         for _, docLine in ipairs(m.docs) do
                             out[#out + 1] = docLine
                         end
@@ -1205,30 +1231,35 @@ function OnSetText(uri, text)
                         end
                         -- 挂载目标：元方法/静态方法挂类对象，其余挂实例
                         local target = (isMeta or isStatic) and className or (className .. '.__proto')
-                        -- 元方法挂在类对象上，但 Lua 语义中的首参仍是实例；
-                        -- 用点语法避免 LuaLS 把冒号接收者推成 X.class。
-                        if isMeta and getFirstParamName(m.params) == 'self' then
-                            if not pl_hasParamDoc(m.docs, 'self') then
-                                out[#out + 1] = '---@param self ' .. className
-                            end
-                            out[#out + 1] = 'function ' .. target .. '.' .. m.name .. '(' .. m.params .. ')'
-                        elseif getFirstParamName(m.params) == 'self' then
+                        local receiverName = getFirstParamName(m.params)
+                        local usesColon = receiverType == className
+                            and receiverName == 'self'
+                            and not isStatic
+                            and not isMeta
+                        if receiverType and receiverName and not usesColon
+                        and not pl_hasParamDoc(m.docs, receiverName) then
+                            out[#out + 1] = '---@param ' .. receiverName .. ' ' .. receiverType
+                        end
+                        if usesColon then
                             local cleanParams = stripFirstParam(m.params)
                             out[#out + 1] = 'function ' .. target .. ':' .. m.name .. '(' .. cleanParams .. ')'
                         else
                             out[#out + 1] = 'function ' .. target .. '.' .. m.name .. '(' .. m.params .. ')'
                         end
+                        if receiverType and receiverName then
+                            out[#out + 1] = '    ' .. receiverName .. ' = ' .. receiverName .. ' ---@class ' .. receiverType
+                        end
                         if m.body and #m.body > 0 then
                             local trimmed = trimBody(m.body)
                             if #trimmed > 0 then
+                                out[#out + 1] = '    ---@diagnostic disable'
                                 out[#out + 1] = trimmed
+                                out[#out + 1] = '    ---@diagnostic enable'
                             end
                         end
                         out[#out + 1] = 'end'
                     end
                 end
-                out[#out + 1] = '---@diagnostic enable: undefined-field'
-
                 if #declareFields > 0 then
                     -- 原始类体里的 ---@field（其前无 ---@class）会触发 doc-field-no-class。
                     -- 在此（表体开始处）禁用，到生成的类注解块前再启用，仅覆盖这一小段。
@@ -1337,6 +1368,26 @@ local function pl_buildComment(t, value, pos)
     }
 end
 
+-- LuaLS treats `---@param self Class` as a type reference only.  Bind a
+-- virtual class doc to the receiver as well, so visibility checks can see
+-- that the original DSL method body executes in Class's context.
+local function pl_bindClassToParam(ast, param, classname)
+    if not param or not classname then
+        return
+    end
+    local doc = luadoc.buildAndBindDoc(
+        ast,
+        param,
+        pl_buildComment('class', classname, param.start - 1)
+    )
+    if not doc then
+        return
+    end
+    param.bindDocs = param.bindDocs or {}
+    param.bindDocs[#param.bindDocs + 1] = doc
+    doc.bindSource = param
+end
+
 ---沿 callee 链向上解析 class 调用，取回类名（即 `class "Name"` 中的 Name）
 ---@param outerCall table 外层 call 节点
 ---@return string?
@@ -1366,8 +1417,8 @@ local function pl_getClassName(outerCall)
 end
 
 ---遍历类体 table，给每个方法的接收者参数绑定类型：
----  首参数 self → `@param self <类名>`（实例）
----  首参数 cls → `@param cls <类名>.class`（类对象）
+---  实例方法首参数 → `<类名>`；只有名字为 self 时重发副本使用冒号语法
+---  静态方法首参数 cls → `<类名>.class`
 ---  赋值给已知字段的参数 → `@param <参数名> <字段类型>`
 ---@param ast table  AST 根
 ---@param classname string
@@ -1385,19 +1436,18 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
                 methodName = methodName:gsub('^get%.', ''):gsub('^set%.', '')
             end
             local method = classmeta and methodName and classmeta.methods[methodName]
-            for j = 1, #value.args do
-                local p = value.args[j]
-                local key = guide.getKeyName(p)
-                if key == 'self' then
-                    luadoc.buildAndBindDoc(
-                        ast, value,
-                        pl_buildComment('param', ('self %s'):format(classname), p.start - 1))
-                    break
-                elseif key == 'cls' then
-                    luadoc.buildAndBindDoc(
-                        ast, value,
-                        pl_buildComment('param', ('cls %s.class'):format(classname), p.start - 1))
-                    break
+            local receiverType = pl_receiverType(method, classname)
+            if receiverType then
+                local receiverName = getFirstParamName(method.params)
+                for j = 1, #value.args do
+                    local p = value.args[j]
+                    if guide.getKeyName(p) == receiverName then
+                        luadoc.buildAndBindDoc(
+                            ast, value,
+                            pl_buildComment('param', ('%s %s'):format(receiverName, receiverType), p.start - 1))
+                        pl_bindClassToParam(ast, p, receiverType)
+                        break
+                    end
                 end
             end
             if method and classmeta.fieldTypes then
