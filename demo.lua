@@ -65,18 +65,16 @@ interface "CanFly" {"fly"}
 
 -- 错误的定义
 xpcall(function()
-class "Bird_wrong" : implements(CanEat, CanFly) {
-    eat = function()
-        print("Bird eats bugs")
-    end;
-}
+    -- 如果在用配套 LS 插件的话，静态就会报错。这里错误示范，临时禁用诊断
+    ---@diagnostic disable-next-line: unknown-diag-code
+    ---@diagnostic disable-next-line: missing-implements
+    class "Bird_wrong" : implements(CanEat, CanFly) {
+        eat = function()
+            print("I can eat but not fly.")
+        end;
+    }
+    -- Output: class Bird_wrong implements <interface 'CanFly'> but does not implement method 'fly'.
 end, print)
-
--- Output: class Bird_wrong implements <interface 'CanFly'> but does not implement method 'fly'.
-
--- 如果在用 LS 插件的话，还能看到工作区的报错：
--- Bird_wrong implements interfaces but does not implement method: CanFly.fly
--- （对演示文件而言还挺烦人的）
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {

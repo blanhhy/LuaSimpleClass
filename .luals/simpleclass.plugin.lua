@@ -1,9 +1,15 @@
--- imports
-local ok_vm,     vm     = pcall(require, 'vm')
-local ok_files,  files  = pcall(require, 'files')
-local ok_guide,  guide  = pcall(require, 'parser.guide')
-local ok_luadoc, luadoc = pcall(require, 'parser.luadoc')
-local ok_define, define = pcall(require, 'proto.define')
+local function prequire(m)
+    local ok, ret = pcall(require, m)
+    ok = ok and ret ~= nil
+    return ok, ret
+end
+
+local ok_vm,     vm     = prequire 'vm'
+local ok_files,  files  = prequire 'files'
+local ok_guide,  guide  = prequire 'parser.guide'
+local ok_luadoc, luadoc = prequire 'parser.luadoc'
+local ok_define, define = prequire 'proto.define'
+local ok_diag,   diag   = prequire 'proto.diagnostic'
 
 -- 需要应用的补丁
 local ENABLE_PATCHES = {
@@ -1543,118 +1549,131 @@ function OnTransformAst(uri, ast)
 end
 
 -- ==================================== 自定义诊断器 ====================================
--- 机制：core.diagnostics.<name> 由 LS 按名动态 require，此处通过 package.loaded 预置；
--- 名字登记进 define.DiagnosticDefaultSeverity 以进入诊断枚举清单。
-if ok_files and ok_define and ok_vm and ok_guide then
-    define.DiagnosticDefaultSeverity['missing-implements']         = 'Error' -- 接口有运行时检查，给 Error 级别更合适
-    define.DiagnosticDefaultNeededFileStatus['missing-implements'] = 'Any'
-    define.DiagnosticDefaultSeverity['invalid-override']             = 'Warning'
-    define.DiagnosticDefaultNeededFileStatus['invalid-override']     = 'Any'
+-- 机制：core.diagnostics.<name> 由 LS 按名动态 require，此处通过 package.loaded 预置
+
+---@alias diagnostic.severity 'Hint' | 'Information' | 'Warning' | 'Error'      诊断级别
+---@alias diagnostic.fstatus  'Any' | 'Opened' | 'None'                         文件状态要求
+---@alias diagnostic.callback fun(diag: diagnostic)                             诊断回调
+---@alias diagnostic.handler  fun(uri: string, callback: diagnostic.callback)   诊断器实现
+---@class diagnostic
+---@field start integer
+---@field finish integer
+---@field message string
+
+if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
+    -- 注册自定义的 LuaLS 诊断器
+    ---@param name     string
+    ---@param severity diagnostic.severity
+    ---@param status   diagnostic.fstatus
+    ---@param handler? diagnostic.handler
+    local function registerDiagnostic(name, severity, status, handler)
+        diag.register { name } {
+            group    = 'simpleclass',
+            severity = severity,
+            status   = status,
+        }
+        -- getDiagAndErrNameMap() 可能在插件加载前已经建立。
+        diag._diagAndErrNames = nil
+        define.DiagnosticDefaultSeverity[name] = severity
+        define.DiagnosticDefaultNeededFileStatus[name] = status
+        package.loaded['core.diagnostics.' .. name] = handler or nil
+    end
 
     -- 把原始源码字节偏移转换为诊断器需要的 diff 后 packed 位置。
+    ---@param startOffset  integer 原始源码字节偏移
+    ---@param finishOffset integer 原始源码字节偏移
     local function diagRangeFromOriginal(state, startOffset, finishOffset)
         if state.diffInfo then
             -- diffedPackPosition 的列重测包含目标字节，起点需后退一个字节；
             -- finish 保持在目标字符上，使范围包含方法名最后一个字符。
-            local okStart, diffedStart = pcall(
-                    files.diffedOffset, state, startOffset - 1)
-            local okFinish, diffedFinish = pcall(
-                    files.diffedOffset, state, finishOffset)
+            local okStart,  diffedStart  = pcall(files.diffedOffset, state, startOffset - 1)
+            local okFinish, diffedFinish = pcall(files.diffedOffset, state, finishOffset)
             if okStart and okFinish and diffedStart and diffedFinish then
-                return guide.offsetToPosition(state, diffedStart),
-                    guide.offsetToPosition(state, diffedFinish)
+                return guide.offsetToPosition(state, diffedStart)
+                    ,  guide.offsetToPosition(state, diffedFinish)
             end
         else
-            return guide.offsetToPosition(state, startOffset),
-                guide.offsetToPosition(state, finishOffset)
+            return guide.offsetToPosition(state, startOffset)
+                ,  guide.offsetToPosition(state, finishOffset)
         end
     end
 
     -- 由 OnSetText 生成 X.__own 类（extends 只含父类、不含接口），
     -- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
-    package.loaded['core.diagnostics.missing-implements'] = function (uri, callback)
+    registerDiagnostic('missing-implements', 'Error', 'Any', function (uri, callback)
         local state = files.getState(uri)
         if not state then return end
 
         -- 与内置诊断器一致：枚举 vm 已编译的全局类型，而非遍历 state.ast 的 doc 注释节点。
-        -- 插件 diff 注入的 ---@class 在编译阶段进入 allGlobals，因此从这里能读到类型。
-        -- 注意 getSets(uri) 语义是"该 scope 可见"而非"定义于此文件"（type 类全局工作区可见），
-        -- 须用 guide.getUri(set) 过滤出真正定义在本文件的类，否则诊断会误报到其他文件。
         local seen = {}
         for _, gv in ipairs(vm.getGlobals('type')) do
             for _, set in ipairs(gv:getSets(uri)) do
-                if set.type == 'doc.class'
-                and set.extends and #set.extends >= 2
-                and set.class and set.class[1]
-                and guide.getUri(set) == uri then
+                if      set.type == 'doc.class'
+                    and set.extends and #set.extends >= 2
+                    and set.class   and set.class[1]
+                    and guide.getUri(set) == uri
+                then
                     local selfName = set.class[1]
                     if not seen[selfName] then
                         seen[selfName] = true
 
                         -- 仅检查插件生成的类：需存在 X.__own 类型
                         local ownG = vm.getGlobal('type', selfName .. '.__own')
-                        if ownG then
-                            local ownDef = pl_docClassSets(ownG, uri)[1]
-                            if ownDef then
-                                -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
-                                local clsFields = pl_vmFieldNames(ownDef)
+                        local ownDef = ownG and pl_docClassSets(ownG, uri)[1]
+                        if ownDef then
+                            -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
+                            local clsFields = pl_vmFieldNames(ownDef)
 
-                                -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
-                                local missing = {}
-                                for idx = 2, #set.extends do
-                                    local ifname = set.extends[idx][1]
-                                    if ifname then
-                                        local ig = vm.getGlobal('type', ifname)
-                                        if ig then
-                                            for _, s2 in ipairs(ig:getSets(uri)) do
-                                                if s2.type == 'doc.class' and s2.fields then
-                                                    for _, fld in ipairs(s2.fields) do
-                                                        local k = vm.getKeyName(fld)
-                                                        if k and type(k) == 'string' and not clsFields[k] then
-                                                            missing[#missing + 1] = ('%s.%s'):format(ifname, k)
-                                                        end
-                                                    end
+                            -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
+                            local missing = {}
+                            for idx = 2, #set.extends do
+                                local ifname = set.extends[idx][1]
+                                local ig = ifname and vm.getGlobal('type', ifname)
+                                if ig then
+                                    for _, s2 in ipairs(ig:getSets(uri)) do
+                                        if s2.type == 'doc.class' and s2.fields then
+                                            for _, fld in ipairs(s2.fields) do
+                                                local k = vm.getKeyName(fld)
+                                                if k and type(k) == 'string' and not clsFields[k] then
+                                                    missing[#missing + 1] = ('%s.%s'):format(ifname, k)
                                                 end
                                             end
                                         end
                                     end
                                 end
-
-                                if #missing == 0 then
-                                    break
-                                end
-                                -- posRange 记录原始源码中 implements(...) 的字节偏移；
-                                -- 诊断 start/finish 须为 diff 后文本的 packed 位置（row*10000+col），
-                                -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
-                                local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
-                                local start, finish = set.start, set.finish
-                                if posRange then
-                                    local rangeStart, rangeFinish = diagRangeFromOriginal(
-                                        state, posRange.start, posRange.finish)
-                                    if rangeStart and rangeFinish then
-                                        start, finish = rangeStart, rangeFinish
-                                    end
-                                end
-                                callback {
-                                    start   = start,
-                                    finish  = finish,
-                                    message = ('%s implements interfaces but does not implement method: %s')
-                                        :format(selfName, table.concat(missing, ', ')),
-                                }
                             end
+
+                            if #missing == 0 then break end
+
+                            -- posRange 记录原始源码中 implements(...) 的字节偏移；
+                            -- 诊断 start/finish 须为 diff 后文本的 packed 位置（row*10000+col），
+                            -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
+                            local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
+                            local start, finish = set.start, set.finish
+                            if posRange then
+                                local rangeStart, rangeFinish = diagRangeFromOriginal(
+                                    state, posRange.start, posRange.finish)
+                                if rangeStart and rangeFinish then
+                                    start, finish = rangeStart, rangeFinish
+                                end
+                            end
+                            callback {
+                                start   = start,
+                                finish  = finish,
+                                message = ('%s implements interfaces but does not implement method: %s')
+                                    :format(selfName, table.concat(missing, ', ')),
+                            }
                         end
                     end
                 end
             end
         end
-    end
+    end)
 
-    package.loaded['core.diagnostics.invalid-override'] = function (uri, callback)
+    registerDiagnostic('invalid-override', 'Warning', 'Any', function (uri, callback)
         local state = files.getState(uri)
-        if not state then return end
-
         local classes = __sc_overridepos[uri]
-        if not classes then return end
+        if not state or not classes then return end
 
         for className, info in pairs(classes) do
             local parentGlobal = vm.getGlobal('type', info.parent)
@@ -1682,7 +1701,7 @@ if ok_files and ok_define and ok_vm and ok_guide then
                 end
             end
         end
-    end
+    end)
 end
 
 
