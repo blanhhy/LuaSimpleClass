@@ -1,9 +1,8 @@
 # Lua Simple Class
 
-[Luaclass](https://github.com/blanhhy/luaclass) 的轻量版，没有那么多功能，但能显著改善 Lua 的 OOP 体验
+可能是第一个有着现代语法，但不干扰——反而增强静态检查工具的 Lua 类库
 
-> Note:
-> `simpleclass` 的类型结构比 `luaclass` 更简单，因此有更好的 LS 类型推导支持
+作为 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版提供，极大简化了运行时行为，但保留核心 OOP 能力，能显著改善 Lua 的 OOP 体验
 
 ## 安装 & 导入
 
@@ -14,6 +13,12 @@ require "simpleclass"
 ```
 
 默认全局导入，这会将所有模块接口注册到 `_G`，如果你不希望这样，可以禁用 [全局导入](#全局导入)
+
+> Guide:  
+> 使用支持参数的第三方导入器是个不错的选择，但你也可以直接：
+> ```lua
+> local sc = require "simpleclass.with" {AUTO_GLOBAL = false}
+> ```
 
 ## 快速开始
 
@@ -32,7 +37,7 @@ local obj = MyClass()
 obj:foo() --> "foo from    MyClass"
 ```
 
-详细指导参考下方 [特性说明](#特性) 或 [演示脚本](demo.lua)
+详细指导参考下方 [特性](#特性) 或 [演示脚本](demo.lua)
 
 ## 特性
 
@@ -40,14 +45,22 @@ obj:foo() --> "foo from    MyClass"
 
 类是 simpleclass 的核心，类是生成对象的蓝图，使多个对象共享相同的方法，同时在构造函数中规定对象应有的属性
 
-- 定义命名类：语法为 `class "<name>" {<body>}`
+定义命名类：语法为 `class "<name>" {<body>}`
 
 > 命名类创建后位于 `simpleclass._ENV` 环境中，同名的类会覆盖之前的定义；如果开启了 [自动全局类](#自动全局类)，还会为类注册全局变量
 
-- 静态方法: 没有 `self` 参数的函数，用 `.` 调用
-- 对象方法: 第一个参数为 `self` 的方法，用 `:` 调用
-- 构造函数：方法签名为 `__init(self, ...) --> nil`
-- 实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
+类的成员：
+
+- 静态字段：直接在类体中定义，属于类本身，所有对象共享
+- 实例字段：在构造函数中定义，每个对象都有自己的实例字段，类无法访问它们
+- Getter & Setter 属性：本质是一对实例方法，但向外暴露一个逻辑上的字段
+- 实例方法：预期首参为实例的方法，习惯将首参命名为 `self`，用 `:` 调用
+- 类方法：预期首参为类的方法，习惯将首参命名为 `cls` 或 `self`，用 `:` 调用
+- 静态方法：挂载在类对象上的普通函数，不依赖于实例或类，用 `.` 调用
+- 构造函数：名为 `__init` 的方法，是特殊的实例方法，在对象创建时调用
+- 元方法：Lua 原生的元方法，定义在类对象上，影响实例对象的行为
+
+实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
 
 > 示例：命名类
 >
@@ -66,7 +79,34 @@ obj:foo() --> "foo from    MyClass"
 > obj:print() --> "hello world"
 > ```
 
-- 匿名类：无名的类，不会注册到任何环境
+Getter & Setter 属性：
+
+- Getter：函数名为 `get.<attr>`，使得 `obj.attr` 可读取
+- Setter：函数名为 `set.<attr>`，使得 `obj.attr` 可赋值
+
+> 示例：定义 Getter & Setter
+>
+> ```lua
+> class "Counter" {
+>     __init = function(self, init)
+>         self._count = init or 0
+>     end;
+>     ['get.count'] = function(self)
+>         return self._count
+>     end;
+>     ['set.count'] = function(self, new)
+>         self._count = new
+>     end;
+> }
+>
+> local obj = Counter(10)
+> print(obj.count) --> 10
+> obj.count = 20
+> print(obj.count) --> 20
+> ```
+> 注：并不需要同时实现，可以只读或只写
+
+匿名类：临时使用的类，无需命名，也不注册环境
 
 > 示例：匿名类
 >
@@ -81,7 +121,7 @@ obj:foo() --> "foo from    MyClass"
 > obj:foo() --> "foo from anonymous class"
 > ```
 >
-> 注：定义有名类时如果传入空参数，空字符串，非字符串参数，一律会被解释为匿名类；如 `class () {}` 也能创建匿名类，这和 `class {}` 方式的不同之处在于，它可以像命名类一样用 `extends` `implements`
+> 注：定义有名类时如果传入空参数，空字符串，非字符串参数，一律会被解释为匿名类；如 `class () {}` 也能创建匿名类，甚至可以使用 `extends` `implements`
 
 ### 类的继承
 
@@ -208,44 +248,36 @@ obj:foo() --> "foo from    MyClass"
 如果要应用补丁，需要也复制对应的补丁文件，并保持目录结构一致
 
 ```
-[ROOT]
+[DIR]
 ├── simpleclass.plugin.lua # 核心插件
 └── patches/               # 补丁脚本目录
 ```
 
-静态类型系统
+自动类型声明：
 
-以 `Myclass` 为例，定义后，产生类对象类型 `Myclass.class` 和对象类型 `Myclass`。
+- 识别 DSL 语法自动生成静态类型注解，无需手动标注类型
+- `@static` 成为有效注解，用于声明在类而非实例上的成员
+- 使用双类型分担语义加自定义诊断模拟 LuaLS 不存在的接口类型
 
-`Myclass.class`：
+辅助类型推导：
 
-- 表示运行时的类对象 `Myclass` 本身
-- 是底层反射类型 `class<?>` 的子类
-- `class "Myclass" {}` 表达式的返回值是此类型；静态方法若使用 `cls` 作为首参，会自动绑定为此类型
-- 包含类体中定义的静态方法、静态属性（须由 `@static` 标注），以及 `new` 方法，元方法
-- 未定义显式 `new` 时，`new` 的签名由 `__init` 推断，返回 `Myclass`
-- 被直接调用时，返回 `Myclass`（无签名校验）
-
-`Myclass`：
-
-- 表示所有 `Myclass` 的实例对象
-- 是 `object` 的子类型，承载完整继承链与接口继承树
-- 实例方法若使用 `self` 作为首参，会自动绑定为此类型；元方法首参自动绑定为此类型
-- 包含类体中所有的实例方法和未标 `@static` 的属性，`__init` 中定义的属性，Getter/Setter 属性，以及显式 `@field` 的属性
-- 如果元方法签名完整或显式标注 `@operator`，该类型会自动得到相应的 `@operator` 注解
-
-辅助类型推导与诊断
-
-- 如果实例方法参数将被赋值给字段，字段类型已声明而形参类型未知，插件自动标注为字段的类型
+- 智能识别方法上下文，对类别已知的方法，自动绑定首参为类或对象的类型
+- 如果实例方法参数将被赋值给字段，字段类型已声明而形参类型未知，自动标注为字段的类型
 - 实例方法中使用 `super` 调用时，插件自动替换为父类对象，从而得到父类方法的参数提示
-- `@override` 作用于实例方法，可以使 LS 检查父类上是否实际有该方法，提供 Warning 诊断
-- 定义类时如果实现了接口，LS 会自动检查类是否实现了接口要求的方法，提供 Error 诊断
-- 【补丁】增强 `@override` 参数类型分派，具体类型、子类型优先，阻止范围重叠的联合类型
+
+静态类型检查：
+
+- `@override` 作成为有效注解，用于检查父类上是否实际有该方法，提供 Warning 诊断
+- 定义类时如果实现了接口，LS 自动检查类是否实现了接口要求的方法，提供 Error 诊断
+- 【补丁】增强 `@overload` 签名分派，具体类型、子类型优先，阻止范围包含的联合类型
 
 更多功能等待发现
 
-> Warnning:
+> Warnning:  
 > 静态推导依赖于 LuaSimpleClass DSL，如果非全局导入，则需要在每个文件中手动 `local` 所用到的模块接口，使得函数名与全局导入时匹配
+> ```lua
+> local class, super = sc.class, sc.super -- etc.
+> ```
 
 ## 配置项
 
