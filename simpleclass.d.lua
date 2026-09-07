@@ -11,8 +11,9 @@ local sc = {}
 ---@class object.class : class
 ---@operator call: object
 
----@class interface
+---@class interface<I>
 ---@field __iname string?
+---@operator call: I
 
 ---@class super<cls, obj>
 ---@field self obj
@@ -23,7 +24,6 @@ local sc = {}
 -----------------------------------------------------------------------------------------------------
 
 
----A reflection of a class
 ---@class class<o>
 local c
 
@@ -66,8 +66,7 @@ o.__proto = {}
 function o.__proto:getClass() end
 
 ---Check if the object is an instance of the class or interface  
----(also compatible with lua type)
----@param cls class|interface|type
+---@param cls class|interface|"table"
 ---@return boolean
 function o.__proto:isInstance(cls) end
 
@@ -164,8 +163,9 @@ function sc.class(name) end
 function sc.class(body) end
 
 ---Define a new interface
----@param name string
----@return interface
+---@generic I:string
+---@param name I.`I`
+---@return interface<I>
 function sc.interface(name) end
 
 ---@param body? table
@@ -180,7 +180,19 @@ function sc.interface(body) end
 ---@return super<cls, obj>
 function sc.super(cls, obj) end
 
-sc.isinstance = o.__proto.isInstance
+---Check if the object is an instance of the class or interface
+---(also compatible with lua type)
+---@param obj object
+---@param cls class|interface|type
+---@return boolean
+function sc.isinstance(obj, cls) end
+
+---Check if `type(v) == T`
+---@param v any
+---@param T type
+---@return boolean
+function sc.isinstance(v, T) end
+
 sc.issubclass = c.isExtends
 sc.object = o
 
