@@ -916,7 +916,7 @@ local function pl_superParamTypes(method, classmeta, allmeta)
     return extra
 end
 
-local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
+local function pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
     local inferred = pl_methodParamTypes(method, fieldTypes)
     method.inferred = inferred
     if classmeta and allmeta then
@@ -924,6 +924,11 @@ local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
             inferred[name] = typ
         end
     end
+    return inferred
+end
+
+local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
+    local inferred = pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
     local docs = {}
     for _, name in ipairs(pl_paramNames(method.params)) do
         if inferred[name] then
@@ -934,6 +939,11 @@ local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
 end
 
 function OnSetText(uri, text)
+    -- A file may lose its last DSL declaration during reload. Clear the
+    -- per-file caches before the early return so old diagnostics cannot leak.
+    __sc_implpos[uri] = {}
+    __sc_overridepos[uri] = {}
+    __sc_classmeta[uri] = {}
     local hasClass = findClassKeyword(text, 1)
     local hasInterface = findInterfaceKeyword(text, 1)
     if not hasClass and not hasInterface then
@@ -943,9 +953,6 @@ function OnSetText(uri, text)
 
     local pos = 1
     local n = #text
-    __sc_implpos[uri] = {}
-    __sc_overridepos[uri] = {}
-    __sc_classmeta[uri] = {}
     while pos <= n do
         local nextClass = findClassKeyword(text, pos)
         local nextInterface = findInterfaceKeyword(text, pos)
@@ -1360,7 +1367,7 @@ end
 ---@param ast table  AST 根
 ---@param classname string
 ---@param tableNode table 类体 table 节点
-local function pl_injectParams(ast, classname, tableNode, classmeta)
+local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
     if not tableNode or tableNode.type ~= 'table' then
         return
     end
@@ -1389,7 +1396,12 @@ local function pl_injectParams(ast, classname, tableNode, classmeta)
                 end
             end
             if method and classmeta.fieldTypes then
-                local inferred = pl_methodParamTypes(method, classmeta.fieldTypes)
+                local inferred = pl_inferredParamTypes(
+                    method,
+                    classmeta.fieldTypes,
+                    classmeta,
+                    __sc_classmeta[uri]
+                )
                 for j = 1, #value.args do
                     local p = value.args[j]
                     local key = guide.getKeyName(p)
@@ -1403,6 +1415,28 @@ local function pl_injectParams(ast, classname, tableNode, classmeta)
             end
         end
     end
+end
+
+local function pl_docClassSets(global, uri)
+    local sets = {}
+    if not global then return sets end
+    for _, set in ipairs(global:getSets(uri)) do
+        if set.type == 'doc.class' then
+            sets[#sets + 1] = set
+        end
+    end
+    return sets
+end
+
+local function pl_vmFieldNames(set)
+    local names = {}
+    for _, field in ipairs(vm.getFields(set)) do
+        local name = vm.getKeyName(field)
+        if name and type(name) == 'string' then
+            names[name] = true
+        end
+    end
+    return names
 end
 
 ---LS 插件回调：在 luadoc 解析前改写 AST，注入自绑定
@@ -1419,17 +1453,15 @@ function OnTransformAst(uri, ast)
                     if classmeta and classmeta.parent and ok_vm then
                         local parent = vm.getGlobal('type', classmeta.parent)
                         if parent then
-                            for _, set in ipairs(parent:getSets(uri)) do
-                                if set.type == 'doc.class' then
-                                    for _, field in ipairs(vm.getFields(set)) do
-                                        local name = vm.getKeyName(field)
-                                        if name and not classmeta.fieldTypes[name] then
-                                            local okInfer, infer = pcall(vm.getInfer, field)
-                                            if okInfer and infer then
-                                                local okView, typ = pcall(infer.view, infer, uri)
-                                                if okView and typ and typ ~= 'unknown' then
-                                                    classmeta.fieldTypes[name] = typ
-                                                end
+                            for _, set in ipairs(pl_docClassSets(parent, uri)) do
+                                for _, field in ipairs(vm.getFields(set)) do
+                                    local name = vm.getKeyName(field)
+                                    if name and not classmeta.fieldTypes[name] then
+                                        local okInfer, infer = pcall(vm.getInfer, field)
+                                        if okInfer and infer then
+                                            local okView, typ = pcall(infer.view, infer, uri)
+                                            if okView and typ and typ ~= 'unknown' then
+                                                classmeta.fieldTypes[name] = typ
                                             end
                                         end
                                     end
@@ -1441,6 +1473,7 @@ function OnTransformAst(uri, ast)
                         if a.type == 'table' then
                             pl_injectParams(
                                 ast,
+                                uri,
                                 classname,
                                 a,
                                 classmeta
@@ -1506,17 +1539,10 @@ if ok_files and ok_define and ok_vm and ok_guide then
                         -- 仅检查插件生成的类：需存在 X.__own 类型
                         local ownG = vm.getGlobal('type', selfName .. '.__own')
                         if ownG then
-                            local ownDef
-                            for _, s in ipairs(ownG:getSets(uri)) do
-                                if s.type == 'doc.class' then ownDef = s; break end
-                            end
+                            local ownDef = pl_docClassSets(ownG, uri)[1]
                             if ownDef then
                                 -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
-                                local clsFields = {}
-                                for _, fld in ipairs(vm.getFields(ownDef)) do
-                                    local k = vm.getKeyName(fld)
-                                    if k and type(k) == 'string' then clsFields[k] = true end
-                                end
+                                local clsFields = pl_vmFieldNames(ownDef)
 
                                 -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
                                 local missing = {}
@@ -1547,14 +1573,11 @@ if ok_files and ok_define and ok_vm and ok_guide then
                                 -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
                                 local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
                                 local start, finish = set.start, set.finish
-                                if posRange and state.diffInfo then
-                                    -- packPosition 的列重测是含尾字节的（encoder.len(a,b) 计 [a,b]），
-                                    -- 故起点须传 targetByte-1 才能落在 targetByte 对应字符上。
-                                    local okd, dsRaw = pcall(files.diffedOffset, state, posRange.start - 1)
-                                    local okf, dfRaw = pcall(files.diffedOffset, state, posRange.finish)
-                                    if okd and okf and dsRaw and dfRaw then
-                                        start  = guide.offsetToPosition(state, dsRaw)
-                                        finish = guide.offsetToPosition(state, dfRaw)
+                                if posRange then
+                                    local rangeStart, rangeFinish = diagRangeFromOriginal(
+                                        state, posRange.start, posRange.finish)
+                                    if rangeStart and rangeFinish then
+                                        start, finish = rangeStart, rangeFinish
                                     end
                                 end
                                 callback {
@@ -1582,14 +1605,9 @@ if ok_files and ok_define and ok_vm and ok_guide then
             local parentGlobal = vm.getGlobal('type', info.parent)
             local parentFields = {}
             if parentGlobal then
-                for _, parentSet in ipairs(parentGlobal:getSets(uri)) do
-                    if parentSet.type == 'doc.class' then
-                        for _, field in ipairs(vm.getFields(parentSet)) do
-                            local name = vm.getKeyName(field)
-                            if name and type(name) == 'string' then
-                                parentFields[name] = true
-                            end
-                        end
+                for _, parentSet in ipairs(pl_docClassSets(parentGlobal, uri)) do
+                    for name in pairs(pl_vmFieldNames(parentSet)) do
+                        parentFields[name] = true
                     end
                 end
             end
