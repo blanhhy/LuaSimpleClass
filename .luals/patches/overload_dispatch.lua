@@ -59,24 +59,6 @@ local function getEffectiveParameter(func, param)
     return node, false
 end
 
-local function isBroadParameter(func)
-    local param = func.args and func.args[1]
-    if not param then
-        return false
-    end
-    local node, genericBroad = getEffectiveParameter(func, param)
-    return genericBroad or isBroadNode(node)
-end
-
-local function isGenericFunction(func)
-    for _, doc in ipairs(func.bindDocs or {}) do
-        if doc.type == 'doc.generic' then
-            return true
-        end
-    end
-    return false
-end
-
 local function isUnresolvedGenericNode(node)
     for item in node:eachObject() do
         if item.type == 'doc.generic.name'
@@ -89,15 +71,13 @@ local function isUnresolvedGenericNode(node)
 end
 
 local function isFunctionMatched(uri, func, args)
-    local params = func.args or {}
     for i, arg in ipairs(args or {}) do
-        local param = params[i]
-        if not param then
+        local parameter = func.args and func.args[i]
+        if not parameter then
             return false
         end
-        local paramNode, genericBroad = getEffectiveParameter(func, param)
-        if not genericBroad
-            and not vm.canCastType(uri, paramNode, vm.compileNode(arg))
+        local paramNode, genericBroad = getEffectiveParameter(func, parameter)
+        if not genericBroad and not vm.canCastType(uri, paramNode, vm.compileNode(arg))
         then
             return false
         end
@@ -105,39 +85,103 @@ local function isFunctionMatched(uri, func, args)
     return true
 end
 
-local function isMoreSpecific(uri, first, second)
-    local firstArgs = first.args or {}
-    local secondArgs = second.args or {}
-    if #firstArgs ~= #secondArgs then
+local function getParameterInfo(func, index)
+    local parameter = func.args and func.args[index]
+    if not parameter then
+        return nil
+    end
+
+    local node, genericBroad = getEffectiveParameter(func, parameter)
+    local literals, literalCount = vm.getLiterals(node)
+    return {
+        node = node,
+        broad = genericBroad or isBroadNode(node),
+        literals = literals,
+        literalCount = literalCount,
+    }
+end
+
+local function getArgumentInfo(arg)
+    local node = vm.compileNode(arg)
+    local literals, literalCount = vm.getLiterals(node)
+    return {
+        node = node,
+        broad = isBroadNode(node),
+        literals = literals,
+        literalCount = literalCount,
+    }
+end
+
+local function hasLiteralMatch(arg, parameter)
+    if not arg.literals or not parameter.literals then
         return false
     end
-
-    -- A useful generic is more specific than any/unknown, but a concrete
-    -- non-generic declaration is preferred over a generic declaration.
-    local firstGeneric = isGenericFunction(first)
-    local secondGeneric = isGenericFunction(second)
-    if firstGeneric ~= secondGeneric then
-        if firstGeneric then
-            return isBroadParameter(second)
-        end
-        return not isBroadParameter(first)
-    end
-
-    local strict = false
-    for i = 1, #firstArgs do
-        local firstNode = vm.compileNode(firstArgs[i])
-        local secondNode = vm.compileNode(secondArgs[i])
-        if isBroadNode(firstNode) or isBroadNode(secondNode) then
-            return false
-        end
-        if vm.isSubType(uri, firstNode, secondNode) ~= true then
-            return false
-        end
-        if vm.isSubType(uri, secondNode, firstNode) ~= true then
-            strict = true
+    for literal in pairs(arg.literals) do
+        if parameter.literals[literal] then
+            return true
         end
     end
-    return strict
+    return false
+end
+
+-- Compare two parameter types for one actual argument.
+-- Returns 1 when first is more precise, -1 when second is more precise,
+-- and 0 when the relationship is unknown or equivalent.
+local function compareParameter(uri, arg, first, second)
+    if first.broad ~= second.broad then
+        return first.broad and -1 or 1
+    end
+    if first.broad then
+        return 0
+    end
+
+    local firstLiteral = hasLiteralMatch(arg, first)
+    local secondLiteral = hasLiteralMatch(arg, second)
+    if firstLiteral ~= secondLiteral then
+        return firstLiteral and 1 or -1
+    end
+    if firstLiteral and secondLiteral
+        and first.literalCount ~= second.literalCount
+    then
+        return first.literalCount < second.literalCount and 1 or -1
+    end
+
+    local firstExact = vm.isSubType(uri, arg.node, first.node) == true
+        and vm.isSubType(uri, first.node, arg.node) == true
+    local secondExact = vm.isSubType(uri, arg.node, second.node) == true
+        and vm.isSubType(uri, second.node, arg.node) == true
+    if firstExact ~= secondExact then
+        return firstExact and 1 or -1
+    end
+
+    local firstToSecond = vm.isSubType(uri, first.node, second.node)
+    local secondToFirst = vm.isSubType(uri, second.node, first.node)
+    if firstToSecond == true and secondToFirst ~= true then
+        return 1
+    end
+    if secondToFirst == true and firstToSecond ~= true then
+        return -1
+    end
+    return 0
+end
+
+local function isMoreSpecific(uri, first, second, args)
+    local better = false
+    for i, arg in ipairs(args) do
+        local firstParameter = getParameterInfo(first, i)
+        local secondParameter = getParameterInfo(second, i)
+        if not firstParameter or not secondParameter then
+            return false
+        end
+
+        local relation = compareParameter(uri, arg, firstParameter, secondParameter)
+        if relation < 0 then
+            return false
+        elseif relation > 0 then
+            better = true
+        end
+    end
+    return better
 end
 
 vm.getExactMatchedFunctions = function(func, args)
@@ -155,51 +199,29 @@ vm.getExactMatchedFunctions = function(func, args)
         end
     end
 
-    -- Prefer every matched non-broad candidate, including a useful generic
-    -- candidate, over an any/unknown fallback.
-    local matchedConcrete = {}
-    local matchedFallback = {}
-    for _, candidate in ipairs(matches) do
-        if isFunctionMatched(uri, candidate, args) then
-            if isBroadParameter(candidate) then
-                matchedFallback[#matchedFallback + 1] = candidate
-            else
-                matchedConcrete[#matchedConcrete + 1] = candidate
-            end
-        end
-    end
-    if #matchedConcrete > 0 then
-        matches = matchedConcrete
-    elseif #matchedFallback > 0 then
-        return matchedFallback
-    end
-    if #matches < 2 then
-        return matches
-    end
-
-    -- Static uncertainty must remain a union; do not guess when the argument is broad.
-    for _, arg in ipairs(args or {}) do
-        if isBroadNode(vm.compileNode(arg)) then
+    local argumentInfo = {}
+    for i, arg in ipairs(args or {}) do
+        argumentInfo[i] = getArgumentInfo(arg)
+        -- A broad actual value cannot select one overload safely.
+        if argumentInfo[i].broad then
             return matches
         end
     end
 
-    -- any/unknown is a fallback only when a concrete candidate also matches.
-    local concrete = {}
+    local matched = {}
     for _, candidate in ipairs(matches) do
-        if not isBroadParameter(candidate) then
-            concrete[#concrete + 1] = candidate
+        if isFunctionMatched(uri, candidate, args) then
+            matched[#matched + 1] = candidate
         end
     end
-    if #concrete == 0 then
-        return matches
+    if #matched < 2 then
+        return #matched > 0 and matched or matches
     end
 
-    -- Keep only candidates that are not strictly dominated by a more specific one.
     local dominated = {}
-    for i, candidate in ipairs(concrete) do
-        for j, other in ipairs(concrete) do
-            if i ~= j and isMoreSpecific(uri, other, candidate) then
+    for i, candidate in ipairs(matched) do
+        for j, other in ipairs(matched) do
+            if i ~= j and isMoreSpecific(uri, other, candidate, argumentInfo) then
                 dominated[i] = true
                 break
             end
@@ -207,12 +229,12 @@ vm.getExactMatchedFunctions = function(func, args)
     end
 
     local selected = {}
-    for i, candidate in ipairs(concrete) do
+    for i, candidate in ipairs(matched) do
         if not dominated[i] then
             selected[#selected + 1] = candidate
         end
     end
-    return #selected > 0 and selected or concrete
+    return #selected > 0 and selected or matched
 end
 
 return true

@@ -23,3 +23,48 @@ take_class(classResult)
 take_class(anonymousClass)
 take_type("string")
 take_type(typeResult)
+
+---@class OverloadValueBase_7c8a
+---@class OverloadValueChild_7c8a : OverloadValueBase_7c8a
+local overloadValue = {} ---@type OverloadValueChild_7c8a
+
+---@param value OverloadValueBase_7c8a
+---@return "base"
+---@overload fun(value: OverloadValueChild_7c8a): "child"
+---@diagnostic disable-next-line: missing-return
+local function chooseSubtype(value) end
+
+---@param value "child"
+local function takeChild(value) end
+takeChild(chooseSubtype(overloadValue))
+
+---@param value string
+---@return "string"
+---@overload fun(value: "special"): "literal"
+---@diagnostic disable-next-line: missing-return
+local function chooseLiteral(value) end
+
+---@param value "literal"
+local function takeLiteral(value) end
+takeLiteral(chooseLiteral("special"))
+
+---@alias OverloadScalar_7c8a string|number
+---@param value OverloadScalar_7c8a
+---@return "scalar"
+---@overload fun(value: string): "string"
+---@diagnostic disable-next-line: missing-return
+local function chooseUnion(value) end
+
+---@param value "string"
+local function takeString(value) end
+takeString(chooseUnion("text"))
+
+---@param value any
+---@return "fallback"
+---@overload fun(value: integer): "integer"
+---@diagnostic disable-next-line: missing-return
+local function chooseFallback(value) end
+
+---@param value "integer"
+local function takeInteger(value) end
+takeInteger(chooseFallback(1))
