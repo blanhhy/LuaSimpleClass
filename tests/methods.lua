@@ -25,7 +25,7 @@ class "TestMethods_cfrhc5f4" {
 
     ---@static
     method_class_self = function(self)
-        print("hello world")
+        print(self.str_static, self.noSuchField)
     end;
 
     ---@static
@@ -53,7 +53,8 @@ class "TestMethods_cfrhc5f4" {
 ---TestMethods_cfrhc5f4 还能使用 .. 来得到 string
 
 -- ===== 成员挂载位置验证 =====
-local tm = TestMethods_cfrhc5f4("hello")
+
+local tm = TestMethods_cfrhc5f4:new("hello")
 
 -- 正向：实例持有实例成员
 print(tm.str1)
@@ -68,24 +69,26 @@ TestMethods_cfrhc5f4.method_static()
 TestMethods_cfrhc5f4:method_class_self()
 TestMethods_cfrhc5f4:method_class_cls()
 print(TestMethods_cfrhc5f4.myprint)
+print(TestMethods_cfrhc5f4.__concat)
 
--- 正向：.. 返回 string（__concat → @operator concat）
-print(tm .. tm)
+-- 负向：实例不应持有类成员
+print(tm.str_static)
+print(tm.method_static)
+print(tm.myprint)
+print(tm.__concat)
 
 -- 负向：类对象不应持有实例成员
 print(TestMethods_cfrhc5f4.str1)
 print(TestMethods_cfrhc5f4.method_foo)
 print(TestMethods_cfrhc5f4.mytoString)
 
--- 负向：实例不应持有类成员
-print(tm.str_static)
-print(tm.method_static)
-print(tm.myprint)
-
 -- 负向：.. 返回的是 string（非 unknown）
 print((tm .. tm).noSuchField)
 
 -- 负向诊断预期（成员挂载位置验证）
+-- method_class_self 的 self 应绑定为类对象类型
+-- expect: 28:undefined-field
+-- expect: 75:undefined-field
 -- expect: 76:undefined-field
 -- expect: 77:undefined-field
 -- expect: 78:undefined-field

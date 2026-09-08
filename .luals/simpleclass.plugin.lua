@@ -946,14 +946,17 @@ local function pl_isStaticMethod(docs)
     return false
 end
 
-local function pl_receiverType(method, classname)
+local function pl_receiverType(method, classname, isStatic)
     if not method or not classname then return nil end
     local first = getFirstParamName(method.params)
     if method.name == 'new' and first then
         return classname .. '.class'
     end
-    if pl_isStaticMethod(method.docs) then
-        if first == 'cls' then
+    if isStatic == nil then
+        isStatic = pl_isStaticMethod(method.docs)
+    end
+    if isStatic then
+        if first == 'cls' or first == 'self' then
             return classname .. '.class'
         end
         return nil
@@ -1238,7 +1241,10 @@ function OnSetText(uri, text)
                         for _, dl in ipairs(m.docs) do
                             if dl:match('^%-%-%-@static') then isStatic = true; break end
                         end
-                        local receiverType = pl_receiverType(m, className)
+                        local receiverType = pl_receiverType(m, className, isStatic)
+                        local ownerType = (isMeta or isStatic)
+                            and (className .. '.class')
+                            or className
                         for _, docLine in ipairs(m.docs) do
                             out[#out + 1] = docLine
                         end
@@ -1248,10 +1254,8 @@ function OnSetText(uri, text)
                         -- 挂载目标：元方法/静态方法挂类对象，其余挂实例
                         local target = (isMeta or isStatic) and className or (className .. '.__proto')
                         local receiverName = getFirstParamName(m.params)
-                        local usesColon = receiverType == className
+                        local usesColon = receiverType == ownerType
                             and receiverName == 'self'
-                            and not isStatic
-                            and not isMeta
                         if receiverType and receiverName and not usesColon
                         and not pl_hasParamDoc(m.docs, receiverName) then
                             out[#out + 1] = '---@param ' .. receiverName .. ' ' .. receiverType
@@ -1433,8 +1437,8 @@ local function pl_getClassName(outerCall)
 end
 
 ---遍历类体 table，给每个方法的接收者参数绑定类型：
----  实例方法首参数 → `<类名>`；只有名字为 self 时重发副本使用冒号语法
----  静态方法首参数 cls → `<类名>.class`
+---  实例方法首参数 → `<类名>`；@static 且首参数为 cls/self → `<类名>.class`
+---  首参类型与归属类型一致且名字为 self 时，重发副本使用冒号语法
 ---  赋值给已知字段的参数 → `@param <参数名> <字段类型>`
 ---@param ast table  AST 根
 ---@param classname string

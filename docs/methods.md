@@ -18,7 +18,7 @@
     首参为 <cls>
 是否标 @static？
     - 是：
-    首参是否名为 cls？
+    首参是否名为 cls 或 self？
         - 是： # 类方法
         归属为 <cls>.class
         首参为 <cls>.class
@@ -31,5 +31,4 @@
 
 当归属和首参类型一致，且首参名为 self 时，重发副本使用冒号语法
 
-getter/setter 除外（没有重发副本
-）
+getter/setter 除外（没有重发副本）
