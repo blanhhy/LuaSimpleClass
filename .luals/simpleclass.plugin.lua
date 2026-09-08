@@ -253,6 +253,22 @@ local function findMatchingParen(text, open)
     return nil
 end
 
+local function getFirstParamName(params)
+    return params:match('^%s*([%w_]+)')
+end
+
+-- All Lua metamethods are listed here. An empty value means that LuaLS has
+-- no matching @operator spelling, but the method is still a meta method.
+local PL_OP_FROM_META = {
+    __add = 'add', __sub = 'sub', __mul = 'mul', __div = 'div', __mod = 'mod',
+    __pow = 'pow', __idiv = 'idiv', __band = 'band', __bor = 'bor', __bxor = 'bxor',
+    __shl = 'shl', __shr = 'shr', __concat = 'concat', __unm = 'unm',
+    __bnot = 'bnot', __len = 'len', __call = 'call',
+    __eq = '', __lt = '', __le = '', __tostring = '', __index = '',
+    __newindex = '', __gc = '', __mode = '', __metatable = '', __name = '',
+    __pairs = '', __ipairs = '', __close = '',
+}
+
 local function parseMethods(body)
     local methods = {}
     local fields = {}
@@ -282,16 +298,6 @@ local function parseMethods(body)
         end
         if not name then
             break
-        end
-
-        local isGetter = false
-        local isSetter = false
-        if name:match('^get%.(.+)$') then
-            isGetter = true
-            name = name:match('^get%.(.+)$')
-        elseif name:match('^set%.(.+)$') then
-            isSetter = true
-            name = name:match('^set%.(.+)$')
         end
 
         local commentLines = {}
@@ -403,12 +409,38 @@ local function parseMethods(body)
                 end
             end
 
+            local getterName = name:match('^get%.(.+)$')
+            local setterName = name:match('^set%.(.+)$')
+            local isGetter = getterName ~= nil
+            local isSetter = setterName ~= nil
+            name = isGetter and getterName
+                or isSetter and setterName
+                or name
+
+            local operatorName = PL_OP_FROM_META[name]
+            local first = getFirstParamName(params)
+            local isStatic   = false
             local isOverride = false
-            for _, doc in ipairs(commentLines) do
-                if doc:match('^%-%-%-@[Oo]verride') then
-                    isOverride = true
-                    break
+            for _, line in ipairs(commentLines) do
+                if line:match('^%-%-%-@[Ss]tatic') then
+                    isStatic = true
                 end
+                if line:match('^%-%-%-@[Oo]verride') then
+                    isOverride = true
+                end
+            end
+
+            local kind
+            if name == 'new'            then kind = 'new'
+            elseif name == '__init'     then kind = 'init'
+            elseif operatorName ~= nil  then kind = 'meta'
+            elseif isGetter             then kind = 'getter'
+            elseif isSetter             then kind = 'setter'
+            elseif isStatic and (
+                first == 'cls' or
+                first == 'self' )       then kind = 'class'
+            elseif isStatic             then kind = 'static'
+                                        else kind = 'instance'
             end
 
             local funcBody = body:sub(funcBodyStart, k - 4)
@@ -417,8 +449,11 @@ local function parseMethods(body)
                 params = params,
                 body = funcBody,
                 docs = commentLines,
-                isGetter = isGetter,
-                isSetter = isSetter,
+                kind = kind,
+                operatorName = operatorName,
+                isMeta = kind == 'meta',
+                isStatic = isStatic,
+                isProperty = kind == 'getter' or kind == 'setter',
                 isOverride = isOverride,
                 sourceStart = nameStart,
                 sourceFinish = nameFinish,
@@ -433,18 +468,11 @@ local function parseMethods(body)
                 name = name,
                 value = fieldValue,
                 docs = commentLines,
-                isGetter = isGetter,
-                isSetter = isSetter,
             }
             i = fieldEnd
         end
     end
     return methods, fields, declareFields
-end
-
-local function getFirstParamName(params)
-    local first = params:match('^%s*([%w_]+)')
-    return first
 end
 
 local function stripFirstParam(params)
@@ -626,15 +654,6 @@ local function parseInterfaceBlock(text, startPos)
     return iname, extendsList, fields, startPos, n
 end
 
--- 类体元方法键 → LuaLS 支持的 @operator 操作符名（仅算术 / .. / len / unm / call 支持）
--- eq/lt/le/tostring 无对应操作符。
-local PL_OP_FROM_META = {
-    __add = 'add', __sub = 'sub', __mul = 'mul', __div = 'div', __mod = 'mod',
-    __pow = 'pow', __idiv = 'idiv', __band = 'band', __bor = 'bor', __bxor = 'bxor',
-    __shl = 'shl', __shr = 'shr', __concat = 'concat', __unm = 'unm',
-    __bnot = 'bnot', __len = 'len', __call = 'call',
-}
-
 -- 从参数列表字符串提取参数名（含 self）
 local function pl_paramNames(params)
     local names = {}
@@ -688,7 +707,7 @@ local function pl_fieldTypes(declareFields, methods)
         end
     end
     for _, method in ipairs(methods or {}) do
-        if method.isGetter and not types[method.name] then
+        if method.kind == 'getter' and not types[method.name] then
             local ret = pl_methodReturn(method.docs)
             if ret then
                 types[method.name] = ret
@@ -698,7 +717,7 @@ local function pl_fieldTypes(declareFields, methods)
                     types[method.name] = types[backing]
                 end
             end
-        elseif method.isSetter and not types[method.name] then
+        elseif method.kind == 'setter' and not types[method.name] then
             local backing = method.body:match('self%s*%.%s*([%w_]+)%s*=%s*[%w_]+%f[%W]')
             if backing and types[backing] then
                 types[method.name] = types[backing]
@@ -739,7 +758,7 @@ local function pl_methodParamTypes(method, fieldTypes)
         end
     end
 
-    if method.isSetter then
+    if method.kind == 'setter' then
         -- set.<property> 的属性名已经在 parseMethods 中去掉了 set. 前缀。
         if #params == 2 then
             local typ = fieldTypes[method.name]
@@ -937,7 +956,8 @@ local function pl_superParamTypes(method, classmeta, allmeta)
     return extra
 end
 
-local function pl_isStaticMethod(docs)
+-- Find the @static annotation in the comment lines
+local function pl_isStaticMember(docs)
     for _, line in ipairs(docs or {}) do
         if line:match('^%-%-%-@static') then
             return true
@@ -946,25 +966,34 @@ local function pl_isStaticMethod(docs)
     return false
 end
 
-local function pl_receiverType(method, classname, isStatic)
-    if not method or not classname then return nil end
+-- Derive class-dependent placement from the classification produced by
+-- parseMethods. This function must not reclassify the method.
+local function pl_methodInfo(method, classname)
+    local kind = method.kind
     local first = getFirstParamName(method.params)
-    if method.name == 'new' and first then
-        return classname .. '.class'
+    local isClassOwner = kind == 'new'
+        or kind == 'meta'
+        or kind == 'class'
+        or kind == 'static'
+    local ownerType = isClassOwner and (classname .. '.class') or classname
+    local receiverType
+    if kind == 'new' then
+        receiverType = first and (classname .. '.class') or nil
+    elseif kind == 'static' then
+        receiverType = nil
+    elseif kind == 'class' then
+        receiverType = classname .. '.class'
+    else
+        receiverType = first and classname or nil
     end
-    if isStatic == nil then
-        isStatic = pl_isStaticMethod(method.docs)
-    end
-    if isStatic then
-        if first == 'cls' or first == 'self' then
-            return classname .. '.class'
-        end
-        return nil
-    end
-    if first then
-        return classname
-    end
-    return nil
+
+    return {
+        ownerType = ownerType,
+        receiverType = receiverType,
+        receiverName = first,
+        target = isClassOwner and classname or (classname .. '.__proto'),
+        usesColon = receiverType == ownerType and first == 'self',
+    }
 end
 
 local function pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
@@ -1104,8 +1133,8 @@ function OnSetText(uri, text)
                 end
                 -- 元方法 → @operator 标注（元方法带 @return 才生成；参数全标注则附操作数类型）
                 for _, m in ipairs(methods) do
-                    local opName = PL_OP_FROM_META[m.name]
-                    if opName then
+                    local opName = m.operatorName
+                    if opName and opName ~= '' then
                         -- 用户已在元方法上方手写 ---@operator → 原样透传，跳过自动重构
                         local hadUserOp = false
                         for _, dl in ipairs(m.docs or {}) do
@@ -1118,7 +1147,7 @@ function OnSetText(uri, text)
                         if not hadUserOp then
                             local ret = pl_methodReturn(m.docs)
                             if ret then
-                                if m.name == '__len' or #pl_paramNames(m.params) < 2 then
+                                if opName == 'len' or #pl_paramNames(m.params) < 2 then
                                     out[#out + 1] = '---@operator ' .. opName .. ': ' .. ret
                                 else
                                     local operand = pl_operatorOperand(m.docs, m.params)
@@ -1141,13 +1170,8 @@ function OnSetText(uri, text)
                 if #implementsList > 0 then
                     local ownMembers = {}
                     for _, m in ipairs(methods) do
-                        if m.name ~= 'new' and m.name ~= '__init' then
-                            local isMeta = m.name:match('^__') ~= nil and m.name ~= '__init'
-                            local isStatic = false
-                            for _, dl in ipairs(m.docs) do
-                                if dl:match('^%-%-%-@static') then isStatic = true; break end
-                            end
-                            if not isMeta and not isStatic and not m.isGetter and not m.isSetter then
+                        if m.kind ~= 'new' and m.kind ~= 'init' then
+                            if not m.isMeta and not m.isStatic and not m.isProperty then
                                 ownMembers[#ownMembers + 1] = m.name
                             end
                         end
@@ -1162,8 +1186,8 @@ function OnSetText(uri, text)
                 local newMethod = nil
                 local initMethod = nil
                 for _, m in ipairs(methods) do
-                    if m.name == 'new' then newMethod = m end
-                    if m.name == '__init' then initMethod = m end
+                    if m.kind == 'new' then newMethod = m end
+                    if m.kind == 'init' then initMethod = m end
                 end
 
                 if newMethod then
@@ -1196,10 +1220,7 @@ function OnSetText(uri, text)
                 end
 
                 for _, f in ipairs(fields) do
-                    local isStatic = false
-                    for _, dl in ipairs(f.docs) do
-                        if dl:match('^%-%-%-@static') then isStatic = true; break end
-                    end
+                    local isStatic = pl_isStaticMember(f.docs)
                     for _, docLine in ipairs(f.docs) do
                         out[#out + 1] = docLine
                     end
@@ -1211,12 +1232,13 @@ function OnSetText(uri, text)
                 end
 
                 for _, m in ipairs(methods) do
-                    if m.isGetter then
+                    if m.kind == 'getter' then
+                        local info = pl_methodInfo(m, className)
                         local attrName = m.name
                         out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
-                        out[#out + 1] = '    ---@param self ' .. className
+                        out[#out + 1] = '    ---@param self ' .. info.receiverType
                         out[#out + 1] = '    function(' .. m.params .. ')'
-                        out[#out + 1] = '        self = self ---@class ' .. className
+                        out[#out + 1] = '        self = self ---@class ' .. info.receiverType
                         if m.body and #m.body > 0 then
                             local trimmed = trimBody(m.body)
                             if #trimmed > 0 then
@@ -1233,18 +1255,11 @@ function OnSetText(uri, text)
                 end
 
                 for _, m in ipairs(methods) do
-                    if m.name == 'new' then
-                    elseif m.isGetter or m.isSetter then
+                    local info = pl_methodInfo(m, className)
+                    if m.kind == 'new' then
+                    elseif m.isProperty then
                     else
-                        local isMeta = m.name:match('^__') ~= nil and m.name ~= '__init'
-                        local isStatic = false
-                        for _, dl in ipairs(m.docs) do
-                            if dl:match('^%-%-%-@static') then isStatic = true; break end
-                        end
-                        local receiverType = pl_receiverType(m, className, isStatic)
-                        local ownerType = (isMeta or isStatic)
-                            and (className .. '.class')
-                            or className
+                        local receiverType = info.receiverType
                         for _, docLine in ipairs(m.docs) do
                             out[#out + 1] = docLine
                         end
@@ -1252,22 +1267,18 @@ function OnSetText(uri, text)
                             out[#out + 1] = docLine
                         end
                         -- 挂载目标：元方法/静态方法挂类对象，其余挂实例
-                        local target = (isMeta or isStatic) and className or (className .. '.__proto')
-                        local receiverName = getFirstParamName(m.params)
-                        local usesColon = receiverType == ownerType
-                            and receiverName == 'self'
-                        if receiverType and receiverName and not usesColon
-                        and not pl_hasParamDoc(m.docs, receiverName) then
-                            out[#out + 1] = '---@param ' .. receiverName .. ' ' .. receiverType
+                        if receiverType and info.receiverName and not info.usesColon
+                        and not pl_hasParamDoc(m.docs, info.receiverName) then
+                            out[#out + 1] = '---@param ' .. info.receiverName .. ' ' .. receiverType
                         end
-                        if usesColon then
+                        if info.usesColon then
                             local cleanParams = stripFirstParam(m.params)
-                            out[#out + 1] = 'function ' .. target .. ':' .. m.name .. '(' .. cleanParams .. ')'
+                            out[#out + 1] = 'function ' .. info.target .. ':' .. m.name .. '(' .. cleanParams .. ')'
                         else
-                            out[#out + 1] = 'function ' .. target .. '.' .. m.name .. '(' .. m.params .. ')'
+                            out[#out + 1] = 'function ' .. info.target .. '.' .. m.name .. '(' .. m.params .. ')'
                         end
-                        if receiverType and receiverName then
-                            out[#out + 1] = '    ' .. receiverName .. ' = ' .. receiverName .. ' ---@class ' .. receiverType
+                        if receiverType and info.receiverName then
+                            out[#out + 1] = '    ' .. info.receiverName .. ' = ' .. info.receiverName .. ' ---@class ' .. receiverType
                         end
                         if m.body and #m.body > 0 then
                             local trimmed = trimBody(m.body)
@@ -1456,7 +1467,7 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
                 and tableKey:gsub('^get%.', ''):gsub('^set%.', '')
             local method = classmeta and methodName and classmeta.methods[methodName]
             if method then
-                local receiverType = pl_receiverType(method, classname)
+                local receiverType = pl_methodInfo(method, classname).receiverType
                 if receiverType then
                     local receiverName = getFirstParamName(method.params)
                     for j = 1, #value.args do

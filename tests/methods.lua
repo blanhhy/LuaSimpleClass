@@ -39,6 +39,12 @@ class "TestMethods_cfrhc5f4" {
         return self.str2 .. other.str2;
     end;
 
+    ---@param other TestMethods_cfrhc5f4
+    ---@return boolean
+    __eq = function(self, other)
+        return self.str2 == other.str2;
+    end;
+
     mytoString = tostring;
 
     ---@static
@@ -82,17 +88,23 @@ print(TestMethods_cfrhc5f4.str1)
 print(TestMethods_cfrhc5f4.method_foo)
 print(TestMethods_cfrhc5f4.mytoString)
 
--- 负向：.. 返回的是 string（非 unknown）
+-- @operator 正确作用在实例上
 print((tm .. tm).noSuchField)
+print((TestMethods_cfrhc5f4 .. TestMethods_cfrhc5f4).noSuchField)
+
+-- 验证无 @operator 的元方法也归属正确
+print(TestMethods_cfrhc5f4.__eq)
+print(tm.__eq)
 
 -- 负向诊断预期（成员挂载位置验证）
 -- method_class_self 的 self 应绑定为类对象类型
 -- expect: 28:undefined-field
--- expect: 75:undefined-field
--- expect: 76:undefined-field
--- expect: 77:undefined-field
--- expect: 78:undefined-field
 -- expect: 81:undefined-field
 -- expect: 82:undefined-field
 -- expect: 83:undefined-field
--- expect: 86:undefined-field
+-- expect: 84:undefined-field
+-- expect: 87:undefined-field
+-- expect: 88:undefined-field
+-- expect: 89:undefined-field
+-- expect: 92:undefined-field
+-- expect: 97:undefined-field
