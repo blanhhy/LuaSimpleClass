@@ -16,11 +16,6 @@ local ENABLE_PATCHES = {
     'overload_dispatch';
 }
 
----@class diff
----@field start  integer
----@field finish integer
----@field text   string
-
 -- 插件级状态，跨阶段、跨文件记录工作区信息
 local __sc_implpos = {}
 local __sc_overridepos = {}
@@ -1018,6 +1013,14 @@ local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
     return docs
 end
 
+---@class diff
+---@field start  integer
+---@field finish integer
+---@field text   string
+
+---@param uri  string
+---@param text string
+---@return diff[]?
 function OnSetText(uri, text)
     -- A file may lose its last DSL declaration during reload. Clear the
     -- per-file caches before the early return so old diagnostics cannot leak.
@@ -1419,6 +1422,38 @@ local function pl_bindClassToParam(ast, param, classname)
     doc.bindSource = param
 end
 
+-- A class-owned method may create an instance through its class receiver:
+-- `local value = cls:new(...)`. The return type has no @class annotation
+-- which causes visibility and inject-field checks to fail.
+-- So bind the local reference to the concrete class as well.
+local function pl_unwrapAssignedValue(value)
+    while value and value.type == 'select' do
+        value = value.vararg
+    end
+    return value
+end
+
+local function pl_bindCreatedInstance(ast, source, classname)
+    if not source or source.type ~= 'local' or not classname
+    or guide.isParam(source) then
+        return
+    end
+    local value = pl_unwrapAssignedValue(source.value)
+    if not value or value.type ~= 'call' then
+        return
+    end
+    local callee = value.node
+    if not callee or callee.type ~= 'getmethod'
+    or guide.getKeyName(callee) ~= 'new' then
+        return
+    end
+    luadoc.buildAndBindDoc(
+        ast,
+        source,
+        pl_buildComment('class', classname, source.start - 1)
+    )
+end
+
 ---沿 callee 链向上解析 class 调用，取回类名（即 `class "Name"` 中的 Name）
 ---@param outerCall table 外层 call 节点
 ---@return string?
@@ -1467,7 +1502,8 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
                 and tableKey:gsub('^get%.', ''):gsub('^set%.', '')
             local method = classmeta and methodName and classmeta.methods[methodName]
             if method then
-                local receiverType = pl_methodInfo(method, classname).receiverType
+                local methodInfo = pl_methodInfo(method, classname)
+                local receiverType = methodInfo.receiverType
                 if receiverType then
                     local receiverName = getFirstParamName(method.params)
                     for j = 1, #value.args do
@@ -1480,6 +1516,20 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
                             break
                         end
                     end
+                end
+                if methodInfo.ownerType == classname .. '.class'
+                and methodInfo.receiverName then
+                    guide.eachSource(value, function(source)
+                        if source.type ~= 'local' then
+                            return
+                        end
+                        local object = pl_unwrapAssignedValue(source.value)
+                        local callee = object and object.type == 'call' and object.node
+                        local receiver = callee and callee.type == 'getmethod' and callee.node
+                        if receiver and guide.getKeyName(receiver) == methodInfo.receiverName then
+                            pl_bindCreatedInstance(ast, source, classname)
+                        end
+                    end)
                 end
                 if classmeta.fieldTypes then
                     local inferred = pl_inferredParamTypes(
