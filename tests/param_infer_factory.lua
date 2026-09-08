@@ -28,3 +28,16 @@ print(account.owner)
 print(account.bank)
 -- expect: 30:inject-field
 account.extra_2 = "some_2"
+
+class "FactoryView_7c8a" {
+    ---@static
+    ---@param acnt FactoryAccount_7c8a
+    create = function(cls, acnt)
+        local view = cls:new()
+        view.account = acnt     -- 合法
+        acnt.extra_3 = "some_3" -- 给无关的类注入字段仍是非法的
+        return view
+    end;
+}
+
+-- expect: 38:inject-field
