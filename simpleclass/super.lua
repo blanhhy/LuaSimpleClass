@@ -18,8 +18,6 @@ local Super = {
     end
 }
 
-setmetatable(Super, {__mode = 'k'})
-
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
 ---@generic cls:class, obj:object
