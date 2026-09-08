@@ -1,6 +1,6 @@
 class "ParamInfer_7c8a" {
     ---@field name string
-    ---@field _count number
+    ---@field private _count number
 
     __init = function(self, name)
         print(name.noSuchField) -- 已经写了 @field 无需再写 @param，参数 name 自动推导为 string

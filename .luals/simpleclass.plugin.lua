@@ -672,7 +672,17 @@ end
 local function pl_fieldTypes(declareFields, methods)
     local types = {}
     for _, line in ipairs(declareFields or {}) do
-        local name, typ = line:match('^%-%-%-@field%s+([%w_]+)%s+(.+)$')
+        local spec = line:match('^%-%-%-@field%s+(.+)$')
+        local name, typ
+        if spec then
+            local first, rest = spec:match('^([%w_]+)%s+(.+)$')
+            if first == 'public' or first == 'protected'
+                or first == 'private' or first == 'package' then
+                name, typ = rest:match('^([%w_]+)%s+(.+)$')
+            else
+                name, typ = first, rest
+            end
+        end
         if name and typ then
             types[name] = typ:gsub('%s+$', '')
         end
