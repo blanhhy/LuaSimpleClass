@@ -6,7 +6,8 @@ local type, setmetatable, error
 local Super = {
     __mode  = 'k',
     __index = function(proxy, key)
-        local field = proxy.__class.__base[key]
+        local clazz = proxy.__class
+        local field = clazz.__base[key]
         if "function" ~= type(field) then return field end
         if proxy[field] then return proxy[field] end
         local function proxy_method(self, ...)
@@ -26,7 +27,9 @@ local Super = {
 ---@return super<cls, obj>
 function M.super(cls, obj)
     if not obj then obj = cls end
-    if not obj or type(obj) ~= "table" or not obj.__base then
+    if type(cls)        ~= "table"
+    or type(cls.__base) ~= "table"
+    or not  cls.__base.__classname then
         error("super: invalid object", 2)
     end
     local proxy = setmetatable({
