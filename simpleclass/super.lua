@@ -28,8 +28,9 @@ setmetatable(Super, {__mode = 'k'})
 ---@return super<cls, obj>
 function M.super(cls, obj)
     if not obj then obj = cls end
-    local valid = obj and (Super[obj] or type(obj) == "table" and obj.__base)
-    if not valid then error("super: invalid object", 2) end
+    if not obj or type(obj) ~= "table" or not obj.__base then
+        error("super: invalid object", 2)
+    end
     local proxy = setmetatable({
         self    = obj,
         __class = cls,
