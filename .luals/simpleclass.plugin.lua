@@ -1437,40 +1437,41 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
         local field = tableNode[i]
         local value = field and field.value
         if value and value.type == 'function' and value.args then
-            local methodName = guide.getKeyName(field)
-            if methodName then
-                methodName = methodName:gsub('^get%.', ''):gsub('^set%.', '')
-            end
+            local tableKey = guide.getKeyName(field)
+            local methodName = type(tableKey) == 'string' -- 键名不一定是 string
+                and tableKey:gsub('^get%.', ''):gsub('^set%.', '')
             local method = classmeta and methodName and classmeta.methods[methodName]
-            local receiverType = pl_receiverType(method, classname)
-            if receiverType then
-                local receiverName = getFirstParamName(method.params)
-                for j = 1, #value.args do
-                    local p = value.args[j]
-                    if guide.getKeyName(p) == receiverName then
-                        luadoc.buildAndBindDoc(
-                            ast, value,
-                            pl_buildComment('param', ('%s %s'):format(receiverName, receiverType), p.start - 1))
-                        pl_bindClassToParam(ast, p, receiverType)
-                        break
+            if method then
+                local receiverType = pl_receiverType(method, classname)
+                if receiverType then
+                    local receiverName = getFirstParamName(method.params)
+                    for j = 1, #value.args do
+                        local p = value.args[j]
+                        if guide.getKeyName(p) == receiverName then
+                            luadoc.buildAndBindDoc(
+                                ast, value,
+                                pl_buildComment('param', ('%s %s'):format(receiverName, receiverType), p.start - 1))
+                            pl_bindClassToParam(ast, p, receiverType)
+                            break
+                        end
                     end
                 end
-            end
-            if method and classmeta.fieldTypes then
-                local inferred = pl_inferredParamTypes(
-                    method,
-                    classmeta.fieldTypes,
-                    classmeta,
-                    __sc_classmeta[uri]
-                )
-                for j = 1, #value.args do
-                    local p = value.args[j]
-                    local key = guide.getKeyName(p)
-                    local typ = key and inferred[key]
-                    if typ then
-                        luadoc.buildAndBindDoc(
-                            ast, value,
-                            pl_buildComment('param', ('%s %s'):format(key, typ), p.start - 1))
+                if classmeta.fieldTypes then
+                    local inferred = pl_inferredParamTypes(
+                        method,
+                        classmeta.fieldTypes,
+                        classmeta,
+                        __sc_classmeta[uri]
+                    )
+                    for j = 1, #value.args do
+                        local p = value.args[j]
+                        local key = guide.getKeyName(p)
+                        local typ = key and inferred[key]
+                        if typ then
+                            luadoc.buildAndBindDoc(
+                                ast, value,
+                                pl_buildComment('param', ('%s %s'):format(key, typ), p.start - 1))
+                        end
                     end
                 end
             end
