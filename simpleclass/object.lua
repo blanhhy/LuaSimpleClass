@@ -3,9 +3,9 @@ local M = require "simpleclass.m" ---@class M
 local type, setmetatable
     = type, setmetatable
 
----@class M.object : object.class
----@field __init any
+---@class M.object : object.class, object
 local object = {
+    __base = false;
     __classname = "object";
     __tostring = function(self) return ("<%s object>"):format(self.__class) end;
     getClass = function(self) return self.__class end;
@@ -13,15 +13,13 @@ local object = {
     is = rawequal;
 }
 
-object.__class = object
-object.__base = false
-
 function object:__index(key)
+    local field = self.__class[key]
+    if field ~= nil then return field end
     local getter = type(key) == "string" and self.__class["get." .. key]
     if getter and type(getter) == "function" then
         return getter(self)
     end
-    return self.__class[key]
 end
 
 function object:__newindex(key, value)
@@ -32,11 +30,12 @@ function object:__newindex(key, value)
     return rawset(self, key, value)
 end
 
+---@return object
 function object:new(...)
-    local obj = setmetatable({__class = self}, self) ---@type object
-    local init = self.__init
-    if type(init) == "function" then init(obj,...) end
-    return obj
+    local inst = setmetatable({__class = self}, self)
+    local ctor = self['__init']
+    if type(ctor) == "function" then ctor(inst, ...) end
+    return inst
 end
 
 ---Check if the class extends the base class (class method)
@@ -52,26 +51,16 @@ end
 
 ---Check if the object is an instance of the class or interface  
 ---(also compatible with lua type)
----@param cls class|interface|type
-function object:isInstance(cls)
+---@param T class|interface|type
+function object:isInstance(T)
     local typ = type(self)
-
-    if typ ~= "table" or type(cls) ~= "table" then
-        return cls == typ
+    if typ ~= "table" or type(T) ~= "table" then
+        return T == typ
     end
-
-    if cls.check_impl then
-        ---@cast cls interface
-        return cls:check_impl(self)
-    end
-
-    local obj_cls = self.__class
-
-    if obj_cls then
-        ---@cast cls class
-        return obj_cls:isExtends(cls)
-    end
-
+    local check = T.check_impl
+    local clazz = self.__class
+    if check then return check(T--[[@as interface]], self) end
+    if clazz then return clazz:isExtends(T--[[@as class]]) end
     return false
 end
 

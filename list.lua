@@ -506,10 +506,11 @@ class "list" {
     sort   = table.sort;
 }
 
--- 让切片语法更简洁
--- eg: slice = arr(1, 3[, 1])
 ---@diagnostic disable-next-line: cast-type-mismatch
 local proto = list ---@cast proto list
+
+-- 让切片语法更简洁
+-- eg: slice = arr(1, 3[, 1])
 list.__call = proto.sub
 
 return list
