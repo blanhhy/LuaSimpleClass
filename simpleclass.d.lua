@@ -66,6 +66,10 @@ function o:new() end
 ---@return T
 function o.clone(obj, isDeep) end
 
+---@param self object
+---@return string
+function o.__tostring(self) end
+
 ---@class object
 ---@field __class object.class
 o.__proto = {}

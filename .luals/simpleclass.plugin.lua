@@ -1135,30 +1135,31 @@ function OnSetText(uri, text)
                     properties = propertyMeta,
                     fieldTypes = pl_fieldTypes(declareFields, methods),
                     parent = parentName,
+                    implements = implementsList or {},
                 }
                 local classmeta = __sc_classmeta[uri][className]
                 local parent = parentName or 'object'
                 local out = {}
 
-                if parentName then
-                    local overrideMethods = {}
-                    local seenOverride = {}
-                    for _, m in ipairs(methods) do
-                        if m.isOverride and m.name ~= 'new' and not seenOverride[m.name] then
-                            seenOverride[m.name] = true
-                            overrideMethods[#overrideMethods + 1] = {
-                                name = m.name,
-                                start = braceStart + m.sourceStart,
-                                finish = braceStart + m.sourceFinish,
-                            }
-                        end
-                    end
-                    if #overrideMethods > 0 then
-                        __sc_overridepos[uri][className] = {
-                            parent = parentName,
-                            methods = overrideMethods,
+                local overrideMethods = {}
+                local seenOverride = {}
+                for _, m in ipairs(methods) do
+                    if m.isOverride and m.name ~= 'new' and not seenOverride[m.name] then
+                        seenOverride[m.name] = true
+                        overrideMethods[#overrideMethods + 1] = {
+                            name = m.name,
+                            isMeta = m.isMeta,
+                            start = braceStart + m.sourceStart,
+                            finish = braceStart + m.sourceFinish,
                         }
                     end
+                end
+                if #overrideMethods > 0 then
+                    __sc_overridepos[uri][className] = {
+                        parent = parentName,
+                        interfaces = implementsList or {},
+                        methods = overrideMethods,
+                    }
                 end
                 -- 类对象：X.class 继承 class，call 运算符返回实例 X
                 out[#out + 1] = '---@class ' .. className .. '.class : class'
@@ -1853,26 +1854,39 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
         if not state or not classes then return end
 
         for className, info in pairs(classes) do
-            local parentGlobal = vm.getGlobal('type', info.parent)
-            local parentFields = {}
-            if parentGlobal then
-                for _, parentSet in ipairs(pl_docClassSets(parentGlobal, uri)) do
-                    for name in pairs(pl_vmFieldNames(parentSet)) do
-                        parentFields[name] = true
+            local instanceCandidates = {}
+            local metaCandidates = {}
+            local function addCandidates(candidates, global)
+                if not global then return end
+                for _, set in ipairs(pl_docClassSets(global, uri)) do
+                    for name in pairs(pl_vmFieldNames(set)) do
+                        candidates[name] = true
                     end
                 end
             end
+            addCandidates(
+                instanceCandidates,
+                vm.getGlobal('type', info.parent or 'object')
+            )
+            for _, interfaceName in ipairs(info.interfaces or {}) do
+                addCandidates(instanceCandidates, vm.getGlobal('type', interfaceName))
+            end
+            addCandidates(
+                metaCandidates,
+                vm.getGlobal('type', info.parent and (info.parent .. '.class') or 'object.class')
+            )
 
             for _, method in ipairs(info.methods) do
-                if not parentFields[method.name] then
+                local candidates = method.isMeta and metaCandidates or instanceCandidates
+                if not candidates[method.name] then
                     local start, finish = diagRangeFromOriginal(
                         state, method.start, method.finish)
                     if start and finish then
                         callback {
                             start = start,
                             finish = finish,
-                            message = ("%s marks '%s' with @override, but %s has no such method")
-                                :format(className, method.name, info.parent),
+                            message = ("%s marks '%s' with @override, but no parent or interface has such a method")
+                                :format(className, method.name),
                         }
                     end
                 end
