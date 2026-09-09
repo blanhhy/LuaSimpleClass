@@ -1102,11 +1102,22 @@ function OnSetText(uri, text)
             else
                 local methods, fields, declareFields = parseMethods(body)
                 local methodMeta = {}
+                local propertyMeta = {}
                 for _, method in ipairs(methods) do
-                    methodMeta[method.name] = method
+                    if method.isProperty then
+                        local property = propertyMeta[method.name]
+                        if not property then
+                            property = {}
+                            propertyMeta[method.name] = property
+                        end
+                        property[method.kind] = method
+                    else
+                        methodMeta[method.name] = method
+                    end
                 end
                 __sc_classmeta[uri][className] = {
                     methods = methodMeta,
+                    properties = propertyMeta,
                     fieldTypes = pl_fieldTypes(declareFields, methods),
                     parent = parentName,
                 }
@@ -1518,7 +1529,17 @@ local function pl_injectParams(ast, uri, classname, tableNode, classmeta)
             local tableKey = guide.getKeyName(field)
             local methodName = type(tableKey) == 'string' -- 键名不一定是 string
                 and tableKey:gsub('^get%.', ''):gsub('^set%.', '')
-            local method = classmeta and methodName and classmeta.methods[methodName]
+            local method
+            if classmeta and methodName then
+                local propertyKind = tableKey:match('^([gs]et)%.')
+                if propertyKind then
+                    local property = classmeta.properties[methodName]
+                    local methodKind = propertyKind == 'get' and 'getter' or 'setter'
+                    method = property and property[methodKind]
+                else
+                    method = classmeta.methods[methodName]
+                end
+            end
             if method then
                 local methodInfo = pl_methodInfo(method, classname)
                 local receiverType = methodInfo.receiverType
