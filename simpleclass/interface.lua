@@ -5,14 +5,8 @@ local object = M.object
 local type, setmetatable, error
     = type, setmetatable, error
 
-local Interface
-
----@class M.interface : interface
-Interface = {
-    _ENV = M._ENV;
-    global = _G; ---@class _G
-    __iname = "<anonymous>";
-}
+local G = _G        ---@class _G
+local Interface = {} ---@class M.interface : interface
 
 Interface.__index = Interface
 
@@ -86,16 +80,16 @@ function M.interface(name)
         end end
         iface.__iname = "<anonymous>"
         return setmetatable(iface, Interface)
-    elseif typ ~= "string" then
+    elseif typ ~= "string" or name == "" then
         return setmetatable({
         __iname = "<anonymous>"
         }, Interface)
     end
     local iface = {__iname = name}
-    if nil == Interface.global[name] or Interface._ENV[name] then
-        Interface.global[name] = iface
+    if M.AUTO_GLOBAL and (nil == G[name] or M._ENV[name]) then
+        G[name] = iface
     end
-    Interface._ENV[name] = iface
+    M._ENV[name] = iface
     return setmetatable(iface, Interface)
 end
 
