@@ -9,7 +9,7 @@ local sc = {}
 ---@field __classname string
 
 ---@class object
----@class object.class : class
+---@class object.class : class<object>
 ---@operator call: object
 
 ---@class interface<I>
@@ -51,12 +51,20 @@ function c:toString() end
 
 -----------------------------------------------------------------------------------------------------
 
+
 ---The base class of all classes
 ---@class object.class
 local o = {__classname = "object"}
 
 ---@return object
 function o:new() end
+
+---Clone an object (table)
+---@generic T:table
+---@param obj T
+---@param isDeep? boolean Default `true`
+---@return T
+function o.clone(obj, isDeep) end
 
 ---@class object
 ---@field __class object.class
@@ -74,6 +82,12 @@ function o.__proto:isInstance(cls) end
 ---Convert the object to a string
 ---@return string
 function o.__proto:toString() end
+
+
+---Clone the object
+---@param isDeep? boolean Default `true`
+---@return object
+function o.__proto:clone(isDeep) end
 
 o.__proto.is = rawequal
 

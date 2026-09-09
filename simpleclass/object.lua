@@ -1,7 +1,7 @@
 local M = require "simpleclass.m" ---@class M
 
-local type, setmetatable
-    = type, setmetatable
+local type, next, getmetatable, setmetatable
+    = type, next, getmetatable, setmetatable
 
 ---@class M.object : object.class, object
 local object = {
@@ -70,5 +70,29 @@ M._ENV.object = object
 M.object = object
 M.isinstance = object.isInstance
 M.issubclass = object.isExtends
+
+if debug then
+    getmetatable = debug.getmetatable or getmetatable
+    setmetatable = debug.setmetatable or setmetatable
+end
+
+---Clone the object
+---@param isDeep? boolean Default `true`
+---@return object
+function object:clone(isDeep)
+    isDeep = isDeep == nil and true or isDeep
+    local clone = {}
+    local clazz = getmetatable(self)
+    for k, v in next, self do
+        if k == "__class" and v == clazz then
+            clone[k] = clazz
+        else
+            clone[k] = (isDeep and type(v) == "table")
+                and object.clone(v, true)
+                or  v
+        end
+    end
+    return setmetatable(clone, clazz)
+end
 
 return object
