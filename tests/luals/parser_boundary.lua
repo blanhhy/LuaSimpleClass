@@ -2,14 +2,17 @@
 -- 每个方法都种一个未定义字段探针（self.probe_XXX），应恰好在【原始行】被报一次，
 -- 且不得出现副本重复报警（由 OnTransformAst 自注入 + 副本区 disable 保证）。
 --
--- expect: 42:undefined-field   (guardDo 的 do return 守卫)
--- expect: 53:undefined-field   (deep 的 for>if>while>do 深嵌套)
--- expect: 65:undefined-field   (lon 的 [==[ ]==] 长字符串内含 ]] 与 function/end)
--- expect: 72:undefined-field   (esc 的 \' / \" 转义字符串)
--- expect: 78:undefined-field   (bcom 的 --[[ ]] 块注释内含 end/function)
--- expect: 88:undefined-field   (rep 的 repeat/until 与 do break)
+-- expect: 49:undefined-field   (guardDo 的 do return 守卫)
+-- expect: 60:undefined-field   (deep 的 for>if>while>do 深嵌套)
+-- expect: 72:undefined-field   (lon 的 [==[ ]==] 长字符串内含 ]] 与 function/end)
+-- expect: 79:undefined-field   (esc 的 \' / \" 转义字符串)
+-- expect: 85:undefined-field   (bcom 的 --[[ ]] 块注释内含 end/function)
+-- expect: 95:undefined-field   (rep 的 repeat/until 与 do break)
 
 require "simpleclass"
+
+local function deferredField(className, fieldName)
+end
 
 class "Edge_qwiojediuew" {
     __init = function(self, name)
@@ -24,6 +27,10 @@ class "Edge_qwiojediuew" {
         y = { z = "brace } here" },
         list = { 1, 2, 3 },
     };
+
+    -- 顶层字段值同时支持逗号和分号；嵌套 table 的逗号不能提前截断。
+    commaField = deferredField("Edge_qwiojediuew", "commaField"),
+    semiField = deferredField("Edge_qwiojediuew", "semiField");
 
     -- 字段字符串含转义引号与 }
     msg = "closing } and \" and \' fine";

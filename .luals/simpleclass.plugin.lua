@@ -204,7 +204,7 @@ local function isWordBoundary(body, pos, n)
     return not c:match('[%w_]')
 end
 
--- 找字段值的结束位置：跳过字符串/注释/嵌套括号，返回顶层 `;` 或换行（depth==0）处的下标。
+-- 找字段值的结束位置：跳过字符串/注释/嵌套括号，返回顶层 `,`、`;` 或换行（depth==0）处的下标。
 -- 用于支持跨行 table/表达式作为字段值（否则单行截断会切错类体）。
 local function findFieldEnd(body, start)
     local n = #body
@@ -223,7 +223,7 @@ local function findFieldEnd(body, start)
             depth = depth + 1; i = i + 1
         elseif c == '}' or c == ')' or c == ']' then
             if depth > 0 then depth = depth - 1 end; i = i + 1
-        elseif (c == '\n' or c == ';') and depth == 0 then
+        elseif (c == '\n' or c == ';' or c == ',') and depth == 0 then
             return i
         else
             i = i + 1
