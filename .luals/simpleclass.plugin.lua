@@ -21,19 +21,15 @@ local __sc_implpos = {}
 local __sc_overridepos = {}
 local __sc_classmeta = {}
 
--- These names are exported by the simpleclass module.  A file opting into
--- local-import checking must bind them locally before using them bare.
-local SC_IMPORT_APIS = {
+-- These names are global variables when simpleclass is globally imported.
+-- A file opting into local-import checking must bind them locally before using them bare.
+local SC_GLOBAL_APIS = {
     class = true,
     super = true,
-    interface = true,
     object = true,
+    interface = true,
     isinstance = true,
     issubclass = true,
-    type = true,
-    env_import = true,
-    AUTO_GLOBAL = true,
-    I_FEATURE = true,
 }
 
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
@@ -1710,12 +1706,12 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
             severity = severity,
             status   = status,
         }
-        -- getDiagAndErrNameMap() 可能在插件加载前已经建立。
-        diag._diagAndErrNames = nil
         define.DiagnosticDefaultSeverity[name] = severity
         define.DiagnosticDefaultNeededFileStatus[name] = status
         package.loaded['core.diagnostics.' .. name] = handler or nil
     end
+
+    local function diagflush() diag._diagAndErrNames = nil end
 
     -- The marker may share the leading comment preamble with LuaLS file-level
     -- annotations such as @meta and @diagnostic.  Stop at the first code line
@@ -1907,7 +1903,7 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
 
         guide.eachSourceType(state.ast, 'getglobal', function (source)
             local name = source[1]
-            if SC_IMPORT_APIS[name] then
+            if SC_GLOBAL_APIS[name] then
                 callback {
                     start = source.start,
                     finish = source.finish,
@@ -1917,6 +1913,8 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
             end
         end)
     end)
+
+    diagflush()
 end
 
 
