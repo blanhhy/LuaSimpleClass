@@ -25,7 +25,7 @@ end
 function object:__newindex(key, value)
     local setter = type(key) == "string" and self.__class["set." .. key]
     if setter and type(setter) == "function" then
-        setter(self, value)
+        return setter(self, value)
     end
     return rawset(self, key, value)
 end

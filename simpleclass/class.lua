@@ -19,7 +19,7 @@ local cc = {
 function cc:extends(basename)
     local base = M._ENV[basename]
     if not base or not base.__classname then
-        error(("extends: '%s' not found or not a class"):format(basename), 2)
+        error(("bad extends: '%s' not found or not a class"):format(basename), 2)
     end
     self.base = base
     return self
@@ -42,15 +42,15 @@ function cc:def(clazz)
 
     setmetatable(clazz, M._CMT)
 
-    if self.onDef_impl_check then
-        local ok, err = self:onDef_impl_check(clazz)
+    if self.check_impl then
+        local ok, err = self:check_impl(clazz)
         if not ok then error(err, 2) end
     end
 
     if self.name ~= "<anonymous>" then
         -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
         -- 解释：G.<name> 不存在时允许注册，或已经存在且是类时也允许注册（覆盖）
-        if M.AUTO_GLOBAL and (nil == G[self.name] or M._ENV[self.name]) then
+        if M.AUTO_GLOBAL and (nil == G[self.name] or M._ENV[self.name] == G[self.name]) then
             G[self.name] = clazz
         end
         M._ENV[self.name] = clazz

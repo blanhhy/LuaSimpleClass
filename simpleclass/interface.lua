@@ -18,6 +18,10 @@ function Interface:extends(...)
     local iface, mname
     for j = 1, #bases do
         iface = bases[j]
+        if type(iface) ~= "table" or not iface.__iname then
+            error(("bad interface extends: interface expected, got %s at #%d"):
+            format(iface, j), 2)
+        end
         for i = 1, #iface do
             mname = iface[i]
             if not self[mname] then
@@ -86,7 +90,7 @@ function M.interface(name)
         }, Interface)
     end
     local iface = {__iname = name}
-    if M.AUTO_GLOBAL and (nil == G[name] or M._ENV[name]) then
+    if M.AUTO_GLOBAL and (nil == G[name] or M._ENV[name] == G[name]) then
         G[name] = iface
     end
     M._ENV[name] = iface
@@ -104,11 +108,15 @@ end
 ---@param clazz class
 ---@return boolean ok
 ---@return string? err error message
-function cc:onDef_impl_check(clazz)
+function cc:check_impl(clazz)
     if M.I_FEATURE ~= "general" then return true end
     if not self.ifaces then return true end
     for i = 1, #self.ifaces do
         local iface = self.ifaces[i]
+        if type(iface) ~= "table" or not iface.check_impl then
+            error(("bad implements: interface expected, got %s at #%d"):
+            format(iface, i), 2)
+        end
         local ok, mname = iface:check_impl(clazz)
         if not ok then return false,
         ("class %s implements %s but does not implement method '%s'.")
@@ -123,8 +131,9 @@ function object:isImplements(...)
     if M.I_FEATURE ~= "general" then return true end
     local ifaces = {...}
     for i = 1, #ifaces do
-        if not ifaces[i]:check_impl(self) then
-        return false, i
+        if not ifaces[i].check_impl
+        or not ifaces[i]:check_impl(self)
+        then return false, i
     end end
     return true
 end
