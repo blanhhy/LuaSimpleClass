@@ -17,7 +17,11 @@ local cc = {
 ---@param basename? string
 ---@return _ClassCreator<T>
 function cc:extends(basename)
-    self.base = M._ENV[basename]
+    local base = M._ENV[basename]
+    if not base or not base.__classname then
+        error(("extends: '%s' not found or not a class"):format(basename), 2)
+    end
+    self.base = base
     return self
 end
 

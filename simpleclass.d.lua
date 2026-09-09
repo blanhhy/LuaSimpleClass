@@ -6,6 +6,7 @@ local sc = {}
 
 ---@class class<o>
 ---@field __proto o
+---@field __classname string
 
 ---@class object
 ---@class object.class : class
