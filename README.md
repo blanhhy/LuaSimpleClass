@@ -131,6 +131,8 @@ Getter & Setter 属性：
 
 - `super`：接收当前类与 `self`，如 `super(subclass, self):__init()`
 
+  如果 `debug` 库可用，`super` 可以自动获取上下文，和 Python 类似，无需传递参数
+
 > 示例：单继承
 >
 > ```lua

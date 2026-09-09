@@ -172,8 +172,12 @@ function sc.interface(name) end
 ---@return interface
 function sc.interface(body) end
 
----To call superclass methods  
----eg: `super(cls, self):__init()`
+--[[To call superclass methods  
+eg: `super(cls, self):__init()`  
+
+> If `debug` is available, it can automatically get the context,  
+> so you can omit parameters in an instance method.  
+> eg: `super():__init()` ]]
 ---@generic cls:class, obj:object
 ---@param cls cls
 ---@param obj? obj
