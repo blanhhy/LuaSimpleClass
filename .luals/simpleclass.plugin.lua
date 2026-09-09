@@ -1252,23 +1252,26 @@ function OnSetText(uri, text)
                 for _, m in ipairs(methods) do
                     if m.kind == 'getter' then
                         local info = pl_methodInfo(m, className)
-                        local attrName = m.name
-                        out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
-                        out[#out + 1] = '    ---@param self ' .. info.receiverType
-                        out[#out + 1] = '    function(' .. m.params .. ')'
-                        out[#out + 1] = '        self = self ---@class ' .. info.receiverType
-                        if m.body and #m.body > 0 then
-                            local trimmed = trimBody(m.body)
-                            if #trimmed > 0 then
-                                out[#out + 1] = '        ---@diagnostic disable'
-                                for line in trimmed:gmatch('([^\n]+)') do
-                                    out[#out + 1] = '    ' .. line
+                        if info.receiverType then
+                            local attrName = m.name
+                            local params = m.params or ''
+                            out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
+                            out[#out + 1] = '    ---@param self ' .. info.receiverType
+                            out[#out + 1] = '    function(' .. params .. ')'
+                            out[#out + 1] = '        self = self ---@class ' .. info.receiverType
+                            if m.body and #m.body > 0 then
+                                local trimmed = trimBody(m.body)
+                                if #trimmed > 0 then
+                                    out[#out + 1] = '        ---@diagnostic disable'
+                                    for line in trimmed:gmatch('([^\n]+)') do
+                                        out[#out + 1] = '    ' .. line
+                                    end
+                                    out[#out + 1] = '        ---@diagnostic enable'
                                 end
-                                out[#out + 1] = '        ---@diagnostic enable'
                             end
+                            out[#out + 1] = '    end'
+                            out[#out + 1] = ')(' .. className .. '.__proto)'
                         end
-                        out[#out + 1] = '    end'
-                        out[#out + 1] = ')(' .. className .. '.__proto)'
                     end
                 end
 
