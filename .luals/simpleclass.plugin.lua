@@ -1006,6 +1006,21 @@ local function pl_methodInfo(method, classname)
     }
 end
 
+local function pl_hasGetClassOverride(classmeta, allmeta)
+    local seen = {}
+    while classmeta and not seen[classmeta] do
+        seen[classmeta] = true
+        if classmeta.methods and classmeta.methods.getClass then
+            return true
+        end
+        if not classmeta.parent then
+            break
+        end
+        classmeta = allmeta and allmeta[classmeta.parent]
+    end
+    return false
+end
+
 local function pl_inferredParamTypes(method, fieldTypes, classmeta, allmeta)
     local inferred = pl_methodParamTypes(method, fieldTypes)
     method.inferred = inferred
@@ -1246,6 +1261,13 @@ function OnSetText(uri, text)
                 else
                     out[#out + 1] = '---@return ' .. className
                     out[#out + 1] = 'function ' .. className .. ':new()return self.__proto end'
+                end
+
+                -- object:getClass() returns the concrete class object at runtime.
+                -- Keep an explicit override authoritative, including inherited ones.
+                if not pl_hasGetClassOverride(classmeta, __sc_classmeta[uri]) then
+                    out[#out + 1] = '---@return ' .. className .. '.class'
+                    out[#out + 1] = 'function ' .. className .. '.__proto:getClass() return self.__class end'
                 end
 
                 for _, f in ipairs(fields) do
