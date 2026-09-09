@@ -34,14 +34,10 @@ end
 
 function Interface:check_impl(clazz)
     if M.I_FEATURE ~= "general" then return true end
-    ---@diagnostic disable-next-line: inject-field
-    clazz.__implemented = clazz.__implemented or {}
-    if clazz.__implemented[self] then return true end
     for i = 1, #self do
         if type(clazz[self[i]]) ~= "function" then
         return false, self[i]
     end end
-    clazz.__implemented[self] = true
     return true
 end
 
@@ -61,9 +57,8 @@ function Interface:__call(mnames)
 end
 
 function Interface:__tostring()
-    if M.I_FEATURE == "lexical" then return "" end
     return ("<interface '%s'>")
-    :format(self.__iname)
+    :format(self.__iname or '?')
 end
 
 ---Define a new interface
@@ -113,7 +108,7 @@ function cc:check_impl(clazz)
     if not self.ifaces then return true end
     for i = 1, #self.ifaces do
         local iface = self.ifaces[i]
-        if type(iface) ~= "table" or not iface.check_impl then
+        if not iface or not iface.__iname or not iface.check_impl then
             error(("bad implements: interface expected, got %s at #%d"):
             format(iface, i), 2)
         end
