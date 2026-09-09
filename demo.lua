@@ -18,7 +18,7 @@ class "Person" {
 class "Student" : extends "Person" {
     ---@param grade string
     __init = function(self, name, age, grade)
-        super(Student, self):__init(name, age)
+        super():__init(name, age)
         self.grade = grade
     end;
     ---@override
@@ -32,6 +32,7 @@ p1:sayHello()
 
 -- Output: Hello, my name is John and I am 25 years old.
 
+-- 使用 :new 可以获得 LuaLS 的参数提示和类型检查
 local s1 = Student:new("Jane", 20, "senior")
 s1:sayHello()
 
@@ -49,7 +50,8 @@ print(sc.type(s1)) --> Student
 --#==========================================
 class "CollageStudent" : extends "Student" {
     __init = function(self, name, age, grade)
-        super(CollageStudent, self):__init(name, age, grade)
+        -- 在实例方法里，可以省略 super 的参数
+        super():__init(name, age, grade)
     end;
 }
 
@@ -114,6 +116,34 @@ eagle:nest()  --> Eagle is nesting
 
 print(Eagle:isImplements(BirdLike)) --> true
 print(eagle:isInstance(BirdLike))   --> true
+
+--#==========================================
+--# 多态应用
+--#==========================================
+-- 接口的多态
+---@param flyable CanFly
+local function makeFly(flyable)
+    assert(isinstance(flyable, CanFly), "flyable must be a CanFly object")
+    flyable:fly()
+end
+
+-- 继承的多态
+---@param bird Bird
+local function makeBirdFly(bird)
+    assert(isinstance(bird, Bird), "bird must be a Bird object")
+    makeFly(bird)
+end
+
+-- 合法调用
+makeFly(bird)
+makeBirdFly(eagle)
+
+-- 错误调用
+xpcall(function()
+    ---@diagnostic disable-next-line: param-type-mismatch
+    makeFly(Person())
+    -- Output: flyable must be a CanFly object
+end, print)
 
 --#==========================================
 --# Getter / Setter
