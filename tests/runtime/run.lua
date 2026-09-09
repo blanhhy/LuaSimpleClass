@@ -15,12 +15,26 @@ package.path = table.concat({
     package.path,
 }, ';')
 
-local tests = {
-    'super.lua',
-}
+local function listDir(dir)
+    local isWin = package.config:sub(1, 1) == '\\'
+    local command = isWin and ('dir /b "%s"'):format(dir)
+        or ('ls "%s"'):format(dir)
+    local handle = io.popen(command)
+    if not handle then return {} end
+
+    local files = {}
+    for name in (handle:read('*a') or ''):gmatch('[^\r\n]+') do
+        if name:match('%.lua$') and name ~= 'run.lua' then
+            files[#files + 1] = name
+        end
+    end
+    handle:close()
+    table.sort(files)
+    return files
+end
 
 local passed, failed = 0, 0
-for _, name in ipairs(tests) do
+for _, name in ipairs(listDir(source)) do
     local ok, err = pcall(dofile, source .. sep .. name)
     if ok then
         passed = passed + 1
