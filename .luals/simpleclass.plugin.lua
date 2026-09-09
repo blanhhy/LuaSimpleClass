@@ -21,6 +21,21 @@ local __sc_implpos = {}
 local __sc_overridepos = {}
 local __sc_classmeta = {}
 
+-- These names are exported by the simpleclass module.  A file opting into
+-- local-import checking must bind them locally before using them bare.
+local SC_IMPORT_APIS = {
+    class = true,
+    super = true,
+    interface = true,
+    object = true,
+    isinstance = true,
+    issubclass = true,
+    type = true,
+    env_import = true,
+    AUTO_GLOBAL = true,
+    I_FEATURE = true,
+}
+
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
 -- 跳过一段短字符串（含 \ 转义）。i 指向开引号 " 或 '，返回闭引号后的位置
@@ -1655,6 +1670,46 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
         package.loaded['core.diagnostics.' .. name] = handler or nil
     end
 
+    -- The marker may share the leading comment preamble with LuaLS file-level
+    -- annotations such as @meta and @diagnostic.  Stop at the first code line
+    -- so strings and later comments cannot turn into directives.
+    local function hasLocalImportMarker(text)
+        if type(text) ~= 'string' then
+            return false
+        end
+        local n = #text
+        local i = 1
+        if text:sub(1, 3) == '\239\187\191' then
+            i = 4
+        end
+        while i <= n do
+            while i <= n and text:sub(i, i):match('%s') do
+                i = i + 1
+            end
+            if i > n then
+                return false
+            end
+
+            if text:sub(i, i) == '-' and text:sub(i + 1, i + 1) == '-' then
+                local after = i + 2
+                local longEnd = after <= n and skipLongBracket(text, after)
+                if longEnd then
+                    i = longEnd
+                else
+                    local finish = text:find('\n', i, true) or (n + 1)
+                    local line = text:sub(i, finish - 1)
+                    if line:match('^%-%-%-%s*@simpleclass%s+local%-import%s*$') then
+                        return true
+                    end
+                    i = finish
+                end
+            else
+                return false
+            end
+        end
+        return false
+    end
+
     -- 把原始源码字节偏移转换为诊断器需要的 diff 后 packed 位置。
     ---@param startOffset  integer 原始源码字节偏移
     ---@param finishOffset integer 原始源码字节偏移
@@ -1777,6 +1832,30 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
                 end
             end
         end
+    end)
+
+    -- LuaLS global declarations are workspace-wide.  This diagnostic is
+    -- intentionally file-local and therefore does not use vm.isUndefinedGlobal.
+    registerDiagnostic('simpleclass-missing-import', 'Warning', 'Any', function (uri, callback)
+        local state = files.getState(uri)
+        if not state then return end
+
+        local text = state.originText or state.text or state.lua
+        if not hasLocalImportMarker(text) then
+            return
+        end
+
+        guide.eachSourceType(state.ast, 'getglobal', function (source)
+            local name = source[1]
+            if SC_IMPORT_APIS[name] then
+                callback {
+                    start = source.start,
+                    finish = source.finish,
+                    message = ('simpleclass API `%s` is not locally imported')
+                        :format(name),
+                }
+            end
+        end)
     end)
 end
 
