@@ -84,7 +84,9 @@ function object:clone(isDeep)
     local clone = {}
     local clazz = getmetatable(self)
     for k, v in next, self do
-        if k == "__class" and v == clazz then
+        if v == self then
+            clone[k] = self
+        elseif k == "__class" and v == clazz then
             clone[k] = clazz
         else
             clone[k] = (isDeep and type(v) == "table")
