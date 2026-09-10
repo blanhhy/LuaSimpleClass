@@ -2016,15 +2016,17 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
 
                             -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
                             local missing = {}
+                            local required = {}
                             for idx = 2, #set.extends do
                                 local ifname = set.extends[idx][1]
                                 local ig = ifname and vm.getGlobal('type', ifname)
                                 if ig then
                                     for _, s2 in ipairs(ig:getSets(uri)) do
-                                        if s2.type == 'doc.class' and s2.fields then
-                                            for _, fld in ipairs(s2.fields) do
-                                                local k = vm.getKeyName(fld)
-                                                if k and type(k) == 'string' and not clsFields[k] then
+                                        if s2.type == 'doc.class' then
+                                            -- VM 已经展开接口继承链；不要在插件中重复递归。
+                                            for k in pairs(pl_vmFieldNames(s2)) do
+                                                if not clsFields[k] and not required[k] then
+                                                    required[k] = true
                                                     missing[#missing + 1] = ('%s.%s'):format(ifname, k)
                                                 end
                                             end
