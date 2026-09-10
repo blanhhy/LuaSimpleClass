@@ -64,8 +64,8 @@ function cc:def(clazz)
         if item and type(item) == "table" and item._ALIAS then
             local origin = item.origin
             local target, err = Alias.getTarget(item, clazz)
-            if not target then error(err, 2) end
-            clazz[origin] = target
+            if target  then clazz[origin] = target
+            elseif err then error(err, 2) end
         end
     end
 
@@ -143,15 +143,27 @@ end
 ---@return function? target alias target function
 ---@return string?   errmsg 
 function Alias.getTarget(alias, clazz)
-    local origin, target = alias.origin, alias.target
-    if clazz[origin] ~= nil or clazz[target] == nil then
-        return nil, ("bad alias: '%s' already defined or '%s' not found"):
-        format(origin, target)
+    local origin = clazz[alias.origin]
+    local target = clazz[alias.target]
+
+    if target == nil then
+        return nil, ("bad alias: '%s' not found"):format(alias.target)
+    end
+    if origin ~= nil then
+        return nil, origin == target
+                    and not alias.args
+                    and nil -- 直接别名情况下，两者本就一致时可静默跳过
+        or ("bad alias: '%s' already defined"):format(alias.origin)
     end
 
-    local aliased_to = clazz[target]
+    local aliased_to = target
     local fixed_args = alias.args
     if not fixed_args then return aliased_to end
+
+    if type(target) ~= "function" then
+        return nil, ("bad alias: cannot make partial for non-function field '%s'")
+        :format(alias.target)
+    end
 
     if not alias.kwarg then
         return function(...)
