@@ -3,6 +3,7 @@
 
 local sc = require "simpleclass"
 local class = sc.class
+local alias = sc.alias
 local cls_type = sc.type
 local isinstance = sc.isinstance
 
@@ -459,6 +460,10 @@ class "list" {
         return left:rep(right)
     end;
 
+    -- 让切片语法更简洁
+    -- eg: slice = arr(1, 3[, 1])
+    alias.__call:sub();
+
     -- 重载 < 和 > 符号, 基于数组长度和第一个不等元素
     __lt = function(left, right)
         if type(left) ~= "table" or type(right) ~= "table" then -- 允许list和普通的数组比较
@@ -505,12 +510,5 @@ class "list" {
     ipairs = ipairs;
     sort   = table.sort;
 }
-
----@diagnostic disable-next-line: cast-type-mismatch
-local proto = list ---@cast proto list
-
--- 让切片语法更简洁
--- eg: slice = arr(1, 3[, 1])
-list.__call = proto.sub
 
 return list

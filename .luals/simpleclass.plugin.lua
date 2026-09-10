@@ -1057,6 +1057,33 @@ local function pl_methodInfo(method, classname)
     }
 end
 
+-- An alias has two independent method identities: its exposed name decides
+-- the owner, while its target supplies the callable signature.
+local function pl_aliasMethodInfo(alias, target, classname)
+    local name = alias.origin
+    local first = target and getFirstParamName(target.params or '')
+    local operatorName = PL_OP_FROM_META[name]
+    local kind
+    if name == 'new' then
+        kind = 'new'
+    elseif name == '__init' then
+        kind = 'init'
+    elseif operatorName ~= nil then
+        kind = 'meta'
+    elseif alias.isStatic then
+        kind = (first == 'cls' or first == 'self') and 'class' or 'static'
+    else
+        kind = 'instance'
+    end
+    local info = pl_methodInfo({
+        kind = kind,
+        params = target and target.params or '',
+    }, classname)
+    info.kind = kind
+    info.operatorName = operatorName
+    return info
+end
+
 local function pl_hasGetClassOverride(classmeta, allmeta)
     local seen = {}
     while classmeta and not seen[classmeta] do
@@ -1219,6 +1246,11 @@ function OnSetText(uri, text)
                         methodMeta[method.name] = method
                     end
                 end
+                local aliasInfoMeta = {}
+                for _, aliasEntry in ipairs(aliases) do
+                    aliasInfoMeta[aliasEntry.origin] = pl_aliasMethodInfo(
+                        aliasEntry, methodMeta[aliasEntry.target], className)
+                end
                 __sc_classmeta[uri][className] = {
                     methods = methodMeta,
                     properties = propertyMeta,
@@ -1226,6 +1258,7 @@ function OnSetText(uri, text)
                     parent = parentName,
                     implements = implementsList or {},
                     aliases = aliases,
+                    aliasInfo = aliasInfoMeta,
                 }
                 local classmeta = __sc_classmeta[uri][className]
                 local parent = parentName or 'object'
@@ -1245,11 +1278,12 @@ function OnSetText(uri, text)
                     end
                 end
                 for _, a in ipairs(aliases) do
+                    local aliasInfo = aliasInfoMeta[a.origin]
                     if a.isOverride and not seenOverride[a.origin] then
                         seenOverride[a.origin] = true
                         overrideMethods[#overrideMethods + 1] = {
                             name = a.origin,
-                            isMeta = false,
+                            isMeta = aliasInfo and aliasInfo.kind == 'meta' or false,
                             start = braceStart + a.start,
                             finish = braceStart + a.finish,
                         }
@@ -1323,7 +1357,8 @@ function OnSetText(uri, text)
                         end
                     end
                     for _, a in ipairs(aliases) do
-                        if not a.isStatic then
+                        local aliasInfo = aliasInfoMeta[a.origin]
+                        if aliasInfo and aliasInfo.ownerType == className then
                             ownMembers[#ownMembers + 1] = a.origin
                         end
                     end
@@ -1459,26 +1494,30 @@ function OnSetText(uri, text)
                 end
                 for _, a in ipairs(aliases) do
                     local targetMethod = methodByName[a.target]
+                    local originInfo = pl_aliasMethodInfo(a, targetMethod, className)
+                    local targetInfo = targetMethod
+                        and pl_methodInfo(targetMethod, className)
+                    local originOwner = originInfo.target
+                    local targetOwner = targetInfo and targetInfo.target or originOwner
                     local hasArgs = a.args and a.args:match('%S') ~= nil
                     if not hasArgs then
-                        local owner = a.isStatic and className or (className .. '.__proto')
                         local fieldFinish = tonumber(a.fieldFinish)
                             or tonumber(a.finish)
                             or 1
                         local sourceText = ' ' .. a.origin .. ' = '
-                            .. owner .. '.' .. a.target .. ';'
+                            .. targetOwner .. '.' .. a.target .. ';'
                         diffs[#diffs + 1] = {
                             start = braceStart + fieldFinish + 1,
                             finish = braceStart + fieldFinish,
                             text = sourceText,
                         }
                         out[#out + 1] = '---@diagnostic disable-next-line: undefined-field'
-                        out[#out + 1] = owner .. '.' .. a.origin .. ' = '
-                            .. owner .. '.' .. a.target
+                        out[#out + 1] = originOwner .. '.' .. a.origin .. ' = '
+                            .. targetOwner .. '.' .. a.target
                     elseif targetMethod then
                         local exposed = pl_aliasParamInfo(a, targetMethod)
                         local docs, explicit, allowed = pl_aliasDocs(
-                            targetMethod, exposed, not a.isStatic)
+                            targetMethod, exposed, originInfo.usesColon)
                         for _, docLine in ipairs(docs) do
                             out[#out + 1] = docLine
                         end
@@ -1493,16 +1532,16 @@ function OnSetText(uri, text)
                                 out[#out + 1] = ('---@param %s %s'):format(name, inferred[name])
                             end
                         end
-                        if a.isStatic then
-                            out[#out + 1] = 'function ' .. className .. '.' .. a.origin
-                                .. '(' .. table.concat(exposed, ', ') .. ') end'
-                        else
+                        if originInfo.usesColon then
                             local params = {}
                             for i = 2, #exposed do
                                 params[#params + 1] = exposed[i]
                             end
-                            out[#out + 1] = 'function ' .. className .. '.__proto:' .. a.origin
+                            out[#out + 1] = 'function ' .. originOwner .. ':' .. a.origin
                                 .. '(' .. table.concat(params, ', ') .. ') end'
+                        else
+                            out[#out + 1] = 'function ' .. originOwner .. '.' .. a.origin
+                                .. '(' .. table.concat(exposed, ', ') .. ') end'
                         end
                     end
                 end
