@@ -21,17 +21,6 @@ local __sc_implpos = {}
 local __sc_overridepos = {}
 local __sc_classmeta = {}
 
--- These names are global variables when simpleclass is globally imported.
--- A file opting into local-import checking must bind them locally before using them bare.
-local SC_GLOBAL_APIS = {
-    class = true,
-    super = true,
-    object = true,
-    interface = true,
-    isinstance = true,
-    issubclass = true,
-}
-
 -- ===== 词法助手：统一处理 Lua 字符串 / 长字符串 / 注释，避免手写扫描被转义和长括号干扰 =====
 
 -- 跳过一段短字符串（含 \ 转义）。i 指向开引号 " 或 '，返回闭引号后的位置
@@ -1969,6 +1958,45 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
         return false
     end
 
+    local function getCanonicalVariableName(source, uri)
+        local module = vm.getGlobal('type', 'simpleclass')
+        if module then
+            for _, set in ipairs(pl_docClassSets(module, uri)) do
+                for _, field in ipairs(vm.getFields(set)) do
+                    if vm.getKeyName(field) == vm.getKeyName(source) then
+                        return 'simpleclass.' .. vm.getKeyName(source)
+                    end
+                end
+            end
+        end
+
+        local variable = vm.getVariableNode(source)
+        if variable and variable.getCodeName then
+            return variable:getCodeName()
+        end
+
+        for _, definition in ipairs(vm.getDefs(source) or {}) do
+            local value = vm.getObjectValue(definition)
+            local parent = value and value.node
+            local fieldName = value and vm.getKeyName(value)
+            if parent and fieldName then
+                local okInfer, infer = pcall(vm.getInfer, value)
+                local okClass, parentClass
+                if okInfer then
+                    okClass, parentClass = pcall(infer.viewClass, infer)
+                end
+                if okClass and parentClass == 'simpleclass' then
+                    return 'simpleclass.' .. fieldName
+                end
+            end
+
+            local valueVariable = value and vm.getVariableNode(value)
+            if valueVariable and valueVariable.getCodeName then
+                return valueVariable:getCodeName()
+            end
+        end
+    end
+
     -- 把原始源码字节偏移转换为诊断器需要的 diff 后 packed 位置。
     ---@param startOffset  integer 原始源码字节偏移
     ---@param finishOffset integer 原始源码字节偏移
@@ -2120,13 +2148,13 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
         end
 
         guide.eachSourceType(state.ast, 'getglobal', function (source)
-            local name = source[1]
-            if SC_GLOBAL_APIS[name] then
+            local canonicalName = getCanonicalVariableName(source, uri)
+            if canonicalName and canonicalName:match('^simpleclass%.') then
                 callback {
                     start = source.start,
                     finish = source.finish,
                     message = ('simpleclass API `%s` is not locally imported')
-                        :format(name),
+                        :format(source[1]),
                 }
             end
         end)
