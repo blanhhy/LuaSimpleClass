@@ -223,6 +223,34 @@ sc.object = o
 ---@type {object: object.class, [string]: class|interface}
 sc._ENV = {object = o}
 
+---Create an alias or a partial function for a method.  
+---> Can only be used in class body.   
+------
+---To create an alias, do like this:
+---```lua
+---class "Person" {
+---    walk = function(self) end;
+---    alias.move :walk();
+---}
+---print(Person().move == Person().walk) --> true
+---```
+------
+---To create a partial function, pass some arguments to the alias:  
+---```lua
+---class "Calculator" {
+---    add = function(a, b) return a + b end;
+---    alias.add1 .add(1);
+---}
+---print(Calculator.add1(2)) --> 3
+---```
+------  
+---## 「:」vs「.」
+---It’s simple:   
+---If a method is expected to be called with “:”, then its alias must also use the “:” syntax;  
+---conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.
+---@type table<string, table<string, function>>
+sc.alias = {}
+
 
 -----------------------------------------------------------------------------------------------------
 

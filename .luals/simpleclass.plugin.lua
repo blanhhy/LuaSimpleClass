@@ -275,16 +275,69 @@ local PL_OP_FROM_META = {
     __pairs = '', __ipairs = '', __close = '',
 }
 
-local function parseMethods(body)
+local function parseAliasEntry(body, start, aliasNames)
+    local prefix, origin, separator, target, open = body:sub(start):match(
+        '^([%w_]+)%s*%.%s*([%w_]+)%s*([:.])%s*([%w_]+)%s*%(()')
+    if not prefix or not aliasNames[prefix] then
+        local moduleName, moduleOrigin, moduleSeparator, moduleTarget, moduleOpen = body:sub(start):match(
+            '^([%w_]+)%s*%.%s*alias%s*%.%s*([%w_]+)%s*([:.])%s*([%w_]+)%s*%(()')
+        if not moduleName or not aliasNames[moduleName] then
+            return nil
+        end
+        prefix = moduleName
+        origin = moduleOrigin
+        separator = moduleSeparator
+        target = moduleTarget
+        open = moduleOpen
+    end
+
+    local close = findMatchingParen(body, start + open - 2)
+    if not close then return nil end
+    local finish = findFieldEnd(body, close + 1)
+    local before = body:sub(1, start - 1)
+    local isOverride = before:match('^%s*%-%-%-@override%s*$')
+        or before:match('\n%s*%-%-%-@override%s*$')
+    return {
+        origin = origin,
+        target = target,
+        isStatic = separator == '.',
+        args = body:sub(start + open - 1, close - 1),
+        start = start,
+        finish = close,
+        isOverride = isOverride ~= nil,
+    }, finish
+end
+
+local function findAliasNames(text)
+    local names = { alias = true }
+    for name in text:gmatch('local%s+([%w_]+)%s*=%s*[%w_%.]+%s*%.%s*alias%f[%W]') do
+        names[name] = true
+    end
+    for name in text:gmatch('local%s+([%w_]+)%s*=%s*require%s*%(%s*["\']simpleclass') do
+        names[name] = true
+    end
+    for name in text:gmatch('local%s+([%w_]+)%s*=%s*require%s*["\']simpleclass') do
+        names[name] = true
+    end
+    return names
+end
+
+local function parseMethods(body, aliasNames)
     local methods = {}
     local fields = {}
     local declareFields = {}
+    local aliases = {}
     local n = #body
     local i = 1
     while i <= n do
         i = skipCommentsAndWhitespace(body, i, declareFields)
         if i > n then break end
 
+        local aliasEntry, aliasEnd = parseAliasEntry(body, i, aliasNames or {})
+        if aliasEntry then
+            aliases[#aliases + 1] = aliasEntry
+            i = aliasEnd
+        else
         local name, afterFieldStart
         local nameStart, nameFinish
         do
@@ -477,8 +530,9 @@ local function parseMethods(body)
             }
             i = fieldEnd
         end
+        end
     end
-    return methods, fields, declareFields
+    return methods, fields, declareFields, aliases
 end
 
 local function stripFirstParam(params)
@@ -1039,6 +1093,43 @@ local function pl_inferredParamDocs(method, fieldTypes, classmeta, allmeta)
     return docs
 end
 
+local function pl_aliasParamInfo(alias, target)
+    local args = pl_splitCallArgs(alias.args or '', 1, #(alias.args or ''))
+    local fixedCount = 0
+    if not (alias.args or ''):match('^%s*$') then
+        fixedCount = #args
+    end
+    local names = pl_paramNames(target.params)
+    local first = alias.isStatic and 1 or 2
+    local exposed = {}
+    if not alias.isStatic and names[1] then
+        exposed[#exposed + 1] = names[1]
+    end
+    for i = first + fixedCount, #names do
+        exposed[#exposed + 1] = names[i]
+    end
+    return exposed
+end
+
+local function pl_aliasDocs(target, exposed, skipReceiver)
+    local allowed = {}
+    local explicit = {}
+    for i, name in ipairs(exposed) do
+        if not (skipReceiver and i == 1) then
+            allowed[name] = true
+        end
+    end
+    local docs = {}
+    for _, line in ipairs(target.docs or {}) do
+        local name = line:match('^%-%-%-@param%s+([%w_]+)')
+        if (name and allowed[name]) or line:match('^%-%-%-@return%s+') then
+            docs[#docs + 1] = line
+            if name then explicit[name] = true end
+        end
+    end
+    return docs, explicit, allowed
+end
+
 ---@class diff
 ---@field start  integer
 ---@field finish integer
@@ -1059,6 +1150,7 @@ function OnSetText(uri, text)
         return
     end
     local diffs = {}
+    local aliasNames = findAliasNames(text)
 
     local pos = 1
     local n = #text
@@ -1111,7 +1203,7 @@ function OnSetText(uri, text)
             if not className then
                 pos = nextPos + 5
             else
-                local methods, fields, declareFields = parseMethods(body)
+                local methods, fields, declareFields, aliases = parseMethods(body, aliasNames)
                 local methodMeta = {}
                 local propertyMeta = {}
                 for _, method in ipairs(methods) do
@@ -1132,6 +1224,7 @@ function OnSetText(uri, text)
                     fieldTypes = pl_fieldTypes(declareFields, methods),
                     parent = parentName,
                     implements = implementsList or {},
+                    aliases = aliases,
                 }
                 local classmeta = __sc_classmeta[uri][className]
                 local parent = parentName or 'object'
@@ -1147,6 +1240,17 @@ function OnSetText(uri, text)
                             isMeta = m.isMeta,
                             start = braceStart + m.sourceStart,
                             finish = braceStart + m.sourceFinish,
+                        }
+                    end
+                end
+                for _, a in ipairs(aliases) do
+                    if a.isOverride and not seenOverride[a.origin] then
+                        seenOverride[a.origin] = true
+                        overrideMethods[#overrideMethods + 1] = {
+                            name = a.origin,
+                            isMeta = false,
+                            start = braceStart + a.start,
+                            finish = braceStart + a.finish,
                         }
                     end
                 end
@@ -1215,6 +1319,11 @@ function OnSetText(uri, text)
                             if not m.isMeta and not m.isStatic and not m.isProperty then
                                 ownMembers[#ownMembers + 1] = m.name
                             end
+                        end
+                    end
+                    for _, a in ipairs(aliases) do
+                        if not a.isStatic then
+                            ownMembers[#ownMembers + 1] = a.origin
                         end
                     end
                     -- 空类体也要生成（空类型），否则"一个方法都没实现"的场景会被诊断器跳过而漏报
@@ -1340,6 +1449,47 @@ function OnSetText(uri, text)
                             end
                         end
                         out[#out + 1] = 'end'
+                    end
+                end
+
+                local methodByName = {}
+                for _, m in ipairs(methods) do
+                    methodByName[m.name] = m
+                end
+                for _, a in ipairs(aliases) do
+                    local targetMethod = methodByName[a.target]
+                    if targetMethod then
+                        local exposed = pl_aliasParamInfo(a, targetMethod)
+                        local docs, explicit, allowed = pl_aliasDocs(
+                            targetMethod, exposed, not a.isStatic)
+                        for _, docLine in ipairs(docs) do
+                            out[#out + 1] = docLine
+                        end
+                        out[#out + 1] = '---@diagnostic disable: missing-return'
+                        local inferred = pl_inferredParamTypes(
+                            targetMethod, classmeta.fieldTypes,
+                            classmeta, __sc_classmeta[uri])
+                        for i, name in ipairs(exposed) do
+                            if not (not a.isStatic and i == 1)
+                            and allowed[name] and not explicit[name]
+                            and inferred[name] then
+                                out[#out + 1] = ('---@param %s %s'):format(name, inferred[name])
+                            end
+                        end
+                        if a.isStatic then
+                            out[#out + 1] = 'function ' .. className .. '.' .. a.origin
+                                .. '(' .. table.concat(exposed, ', ') .. ')'
+                        else
+                            local params = {}
+                            for i = 2, #exposed do
+                                params[#params + 1] = exposed[i]
+                            end
+                            out[#out + 1] = 'function ' .. className .. '.__proto:' .. a.origin
+                                .. '(' .. table.concat(params, ', ') .. ')'
+                            out[#out + 1] = '    self = self ---@class ' .. className
+                        end
+                        out[#out + 1] = 'end'
+                        out[#out + 1] = '---@diagnostic enable'
                     end
                 end
                 if #declareFields > 0 then
