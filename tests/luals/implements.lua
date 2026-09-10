@@ -13,3 +13,8 @@ class "Bird_uebxyu21" : implements(CanEat_uebxyu21, CanFly_uebxyu21) {
     eat = function(self) return self end;
     fly = function(self) return self end;
 }
+
+class "Bird_impl_uebxyu21" : impl(CanEat_uebxyu21, CanFly_uebxyu21) {
+    eat = function(self) return self end;
+    fly = function(self) return self end;
+}

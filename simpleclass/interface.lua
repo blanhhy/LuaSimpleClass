@@ -102,6 +102,8 @@ function cc:implements(...)
     return self
 end
 
+cc.impl = cc.implements
+
 ---@param clazz class
 ---@return boolean ok
 ---@return string? err error message

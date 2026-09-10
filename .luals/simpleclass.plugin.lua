@@ -155,8 +155,8 @@ local function parseClassBlock(text, startPos)
             parentName = text:sub(pnameStart, pnameEnd - 1)
             pos = pnameEnd + 1
         else
-            local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
-            if impStart then
+            local impStart, impEnd, impKeyword = text:find('^:%s*([%a_]+)%s*%(', pos)
+            if impStart and (impKeyword == 'implements' or impKeyword == 'impl') then
                 -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
                 local k = impStart + 1
                 while text:sub(k, k):match('%s') do k = k + 1 end

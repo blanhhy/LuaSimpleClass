@@ -116,6 +116,8 @@ function cc:extends(basename) end
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function cc:implements(...) end
 
+cc.impl = cc.implements
+
 ---Define the class body
 ---@generic T
 ---@param tbl table
