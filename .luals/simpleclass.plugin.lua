@@ -304,6 +304,7 @@ local function parseAliasEntry(body, start, aliasNames)
         args = body:sub(start + open - 1, close - 1),
         start = start,
         finish = close,
+        fieldFinish = finish,
         isOverride = isOverride ~= nil,
     }, finish
 end
@@ -1458,14 +1459,30 @@ function OnSetText(uri, text)
                 end
                 for _, a in ipairs(aliases) do
                     local targetMethod = methodByName[a.target]
-                    if targetMethod then
+                    local hasArgs = a.args and a.args:match('%S') ~= nil
+                    if not hasArgs then
+                        local owner = a.isStatic and className or (className .. '.__proto')
+                        local fieldFinish = tonumber(a.fieldFinish)
+                            or tonumber(a.finish)
+                            or 1
+                        local sourceText = ' ' .. a.origin .. ' = '
+                            .. owner .. '.' .. a.target .. ';'
+                        diffs[#diffs + 1] = {
+                            start = braceStart + fieldFinish + 1,
+                            finish = braceStart + fieldFinish,
+                            text = sourceText,
+                        }
+                        out[#out + 1] = '---@diagnostic disable-next-line: undefined-field'
+                        out[#out + 1] = owner .. '.' .. a.origin .. ' = '
+                            .. owner .. '.' .. a.target
+                    elseif targetMethod then
                         local exposed = pl_aliasParamInfo(a, targetMethod)
                         local docs, explicit, allowed = pl_aliasDocs(
                             targetMethod, exposed, not a.isStatic)
                         for _, docLine in ipairs(docs) do
                             out[#out + 1] = docLine
                         end
-                        out[#out + 1] = '---@diagnostic disable: missing-return'
+                        out[#out + 1] = '---@diagnostic disable-next-line: missing-return'
                         local inferred = pl_inferredParamTypes(
                             targetMethod, classmeta.fieldTypes,
                             classmeta, __sc_classmeta[uri])
@@ -1478,18 +1495,15 @@ function OnSetText(uri, text)
                         end
                         if a.isStatic then
                             out[#out + 1] = 'function ' .. className .. '.' .. a.origin
-                                .. '(' .. table.concat(exposed, ', ') .. ')'
+                                .. '(' .. table.concat(exposed, ', ') .. ') end'
                         else
                             local params = {}
                             for i = 2, #exposed do
                                 params[#params + 1] = exposed[i]
                             end
                             out[#out + 1] = 'function ' .. className .. '.__proto:' .. a.origin
-                                .. '(' .. table.concat(params, ', ') .. ')'
-                            out[#out + 1] = '    self = self ---@class ' .. className
+                                .. '(' .. table.concat(params, ', ') .. ') end'
                         end
-                        out[#out + 1] = 'end'
-                        out[#out + 1] = '---@diagnostic enable'
                     end
                 end
                 if #declareFields > 0 then

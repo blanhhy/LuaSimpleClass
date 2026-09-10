@@ -36,3 +36,8 @@ local validSum = sum
 
 -- expect: 38:param-type-mismatch
 local invalidSum = AliasStaticTypeCheck_73a1.addFive("7")
+
+-- expect: 42:undefined-field
+class "AliasMissingTarget_73a1" {
+    exported.missing:doesNotExist(), -- 不存在的方法，会报诊断
+}
