@@ -3,14 +3,32 @@
 local G = _G                      ---@class _G
 local M = require "simpleclass.m" ---@class M
 
-local type, setmetatable, error
-    = type, setmetatable, error
+local type, setmetatable, error, select, next
+    = type, setmetatable, error, select, next
+
+local move = table.move or function(t1, f, e, t, t2)
+    for i = f, e do
+        t2[t + i - f] = t1[i]
+    end
+    return t2
+end
+
+---@diagnostic disable-next-line: deprecated
+local unpack = table.unpack or _G.unpack
+local object = require("simpleclass.object")
+
+_ENV = nil
 
 ---@class M.creator<T> : _ClassCreator<T>
 local cc = {
     name = "<anonymous>";
-    base = require("simpleclass.object");
+    base = object;
 }
+
+local alias = {}
+local Alias = {}
+
+setmetatable(alias, Alias)
 
 ---Single inheritance keyword
 ---@generic T
@@ -39,8 +57,17 @@ function cc:def(clazz)
 
     clazz.__classname = self.name
     clazz.__base = base
-
     setmetatable(clazz, M._CMT)
+
+    for i = 1, #clazz do
+        local item = clazz[i]
+        if item and type(item) == "table" and item._ALIAS then
+            local origin = item.origin
+            local target, err = Alias.getTarget(item, clazz)
+            if not target then error(err, 2) end
+            clazz[origin] = target
+        end
+    end
 
     if self.check_impl then
         local ok, err = self:check_impl(clazz)
@@ -62,8 +89,95 @@ end
 cc.__index = cc
 cc.__call  = cc.def
 
-M.creator = cc
 
+function Alias:__index(key)
+    if self == alias then
+        return setmetatable({
+            -- 为了避免语法解析途中 alias 的数据字段和方法名重名  
+            -- 这里需要反过来将方法名作为数据字段名，而数据字段名作为值  
+            -- 等待 target 名也设置完毕后，就可以正常地用字段名存储了
+            [key] = "origin"
+        }, Alias)
+    end
+    local key1, val1 = next(self)
+    local key2, val2 = next(self, key1)
+    if key1 ~= nil and key2 ~= nil then
+        error(("bad alias: got duplicate target '%s'"):
+        format(key), 2)
+    end
+    if key1 and val1 == "origin" then
+        self[key1] = nil
+        self.origin = key1
+    end
+    if key2 and val2 == "origin" then
+        self[key2] = nil
+        self.origin = key2
+    end
+    self.target = key
+    self._ALIAS = true
+    return self
+end
+
+function Alias:__call(...)
+    if self == alias then return self end
+    local static = self  ~=  (...) -- 区分 ':' 和 '.' 语法，前者在构造偏函数时须保留 self 槽
+    local offset = static and 0 or 1
+    local nargs = select('#', ...)
+    local first = static and (...) -- 首参为唯一参数且为表时，视作关键字参数用法
+    if not static then local _ _, first = ... end
+    if nargs ~= offset then
+        self.kwarg = nargs == offset + 1 and type(first) == "table"
+        self.args  = self.kwarg and first or {...}
+        if not self.kwarg then
+            self.args['i'] = offset + 1
+            self.args['j'] = nargs
+        end
+    else
+        self.kwarg = false
+        self.args  = false
+    end
+    self.isStatic = static
+    return self
+end
+
+---@return function? target alias target function
+---@return string?   errmsg 
+function Alias.getTarget(alias, clazz)
+    local origin, target = alias.origin, alias.target
+    if clazz[origin] ~= nil or clazz[target] == nil then
+        return nil, ("bad alias: '%s' already defined or '%s' not found"):
+        format(origin, target)
+    end
+
+    local aliased_to = clazz[target]
+    local fixed_args = alias.args
+    if not fixed_args then return aliased_to end
+
+    if not alias.kwarg then
+        return function(...)
+            local narg = select('#', ...)
+            local args = {...}
+            local merged = {fixed_args.i == 2 and (...)}
+            move(fixed_args, fixed_args.i, fixed_args.j, fixed_args.i, merged)
+            move(args, fixed_args.i, narg, fixed_args.j + 1, merged)
+            return aliased_to(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
+        end
+    end
+
+    return alias.isStatic and function(kwargs, ...)
+        kwargs = kwargs or {}
+        for k, v in next, fixed_args do kwargs[k] = v end
+        return aliased_to(kwargs, ...)
+    end or function(self, kwargs, ...)
+        kwargs = kwargs or {}
+        for k, v in next, fixed_args do kwargs[k] = v end
+        return aliased_to(self, kwargs, ...)
+    end
+end
+
+
+M.creator = cc
+M.alias = alias
 
 function M.class(name)
     local typ = type(name)
