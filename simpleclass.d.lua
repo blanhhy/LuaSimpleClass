@@ -223,6 +223,10 @@ sc.object = o
 ---@type {object: object.class, [string]: class|interface}
 sc._ENV = {object = o}
 
+---@alias alias.target function
+---@alias alias.origin table<string, alias.target>
+---@alias simpleclass.alias table<string, alias.origin>
+
 ---Create an alias or a partial function for a method.  
 ---> Can only be used in class body.   
 ------
@@ -248,7 +252,7 @@ sc._ENV = {object = o}
 ---It’s simple:   
 ---If a method is expected to be called with “:”, then its alias must also use the “:” syntax;  
 ---conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.
----@type table<string, table<string, function>>
+---@type simpleclass.alias
 sc.alias = {}
 
 
