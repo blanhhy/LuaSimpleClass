@@ -144,51 +144,54 @@ local function parseClassBlock(text, startPos)
     local braceStart
     local impKwStart, impFin
 
-    -- Short form: `class "Child" : Base { ... }`.
-    -- The empty capture gives us the exact position of `{`, so this form
-    -- cannot accidentally consume a longer modifier chain.
-    local shortStart, shortEnd, shortParent, shortBrace = text:find(
-        '^%s*:%s*([%w_]+)%s*()', pos)
-    if shortStart and text:sub(shortBrace, shortBrace) == '{' then
-        parentName = shortParent
-        braceStart = shortBrace
-    else
-        local extStart, extEnd = text:find('^%s*:?%s*extends?%s*"', pos)
+    while true do
+        pos = skipCommentsAndWhitespace(text, pos) or pos
+
+        local extStart, extEnd = text:find('^:%s*extends?%s*"', pos)
         if extStart then
             local pnameStart = extEnd + 1
             local pnameEnd = text:find('"', pnameStart, true)
-            if pnameEnd then
-                parentName = text:sub(pnameStart, pnameEnd - 1)
-                pos = pnameEnd + 1
-            end
-        end
-        pos = skipCommentsAndWhitespace(text, pos) or pos
-        local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
-        if impStart then
-            -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
-            local k = impStart + 1
-            while text:sub(k, k):match('%s') do k = k + 1 end
-            impKwStart = k
-            pos = impEnd + 1
-            while pos <= n do
-                local c = text:sub(pos, pos)
-                if c == ')' then
-                    impFin = pos
-                    break
-                elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
-                    pos = skipComment(text, pos)
-                elseif c:match('[%w_]') then
-                    local iend = text:find('[%s,)]', pos)
-                    if iend then
-                        local iname = text:sub(pos, iend - 1)
-                        implementsList[#implementsList + 1] = iname
-                        pos = iend
-                    else
+            if not pnameEnd then return nil end
+            parentName = text:sub(pnameStart, pnameEnd - 1)
+            pos = pnameEnd + 1
+        else
+            local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
+            if impStart then
+                -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
+                local k = impStart + 1
+                while text:sub(k, k):match('%s') do k = k + 1 end
+                impKwStart = impKwStart or k
+                pos = impEnd + 1
+                while pos <= n do
+                    local c = text:sub(pos, pos)
+                    if c == ')' then
+                        impFin = pos
+                        pos = pos + 1
                         break
+                    elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
+                        pos = skipComment(text, pos)
+                    elseif c:match('[%w_]') then
+                        local iend = text:find('[%s,)]', pos)
+                        if iend then
+                            local iname = text:sub(pos, iend - 1)
+                            implementsList[#implementsList + 1] = iname
+                            pos = iend
+                        else
+                            break
+                        end
+                    else
+                        pos = pos + 1
                     end
-                else
-                    pos = pos + 1
                 end
+            else
+                -- Short form: `class "Child" : Base { ... }`.
+                local shortStart, shortEnd, shortParent, shortBrace = text:find(
+                    '^:%s*([%w_]+)%s*()', pos)
+                if shortStart and text:sub(shortBrace, shortBrace) == '{' then
+                    parentName = shortParent
+                    braceStart = shortBrace
+                end
+                break
             end
         end
     end
