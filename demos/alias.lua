@@ -6,7 +6,7 @@ local alias = require "simpleclass".alias
 interface "Movable" {"move"}
 interface "Flyable" {"fly"}
 
-class "Human" : implements(Movable) {
+class "Human" : impl(Movable) {
     walk = function(self)
         print("Human walk")
     end;
@@ -16,7 +16,7 @@ class "Human" : implements(Movable) {
 
 print(Human().move == Human().walk) --> true
 
-class "Plane" : implements(Movable, Flyable) {
+class "Plane" : impl(Movable, Flyable) {
     ---@override
     fly = function(self)
         print("Plane fly")

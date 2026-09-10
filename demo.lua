@@ -27,7 +27,7 @@ class "Student" : extends "Person" {
     end;
 }
 
-local p1 = Person("John", 25)
+local p1 = Person:new("John", 25)
 p1:sayHello()
 
 -- Output: Hello, my name is John and I am 25 years old.
@@ -48,6 +48,7 @@ print(sc.type(s1)) --> Student
 --#==========================================
 --# 深层继承
 --#==========================================
+-- 继承的简洁写法，':' + 基类
 class "CollageStudent" : Student {
     __init = function(self, name, age, grade)
         -- 在实例方法里，可以省略 super 的参数
@@ -55,6 +56,7 @@ class "CollageStudent" : Student {
     end;
 }
 
+-- 实例化的简洁写法；但 LS 对此无签名分析支持
 local c1 = CollageStudent("Alice", 22, "junior")
 c1:sayHello()
 -- Output: Hello, my name is Alice and I am a junior year old student.
