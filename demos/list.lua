@@ -2,10 +2,8 @@
 ---仿 Python 的 list 类
 
 local sc = require "simpleclass"
-local class = sc.class
-local alias = sc.alias
-local cls_type = sc.type
-local isinstance = sc.isinstance
+local alias      = sc.alias
+local cls_type   = sc.type
 
 local isJIT = pcall(require, "jit")
 local is5_5 = _VERSION >= "Lua 5.5"
@@ -20,10 +18,11 @@ if is5_5 then
     table_new = table.create
 end
 
-local Int = math.floor
-local type, tostring, setmetatable = type, tostring, setmetatable
+local type, tostring, setmetatable
+    = type, tostring, setmetatable
 local insert, concat, remove = table.insert, table.concat, table.remove
 local unpack = table.unpack or unpack
+local int = math.floor
 
 class "list" {
     -- 静态属性
@@ -41,7 +40,7 @@ class "list" {
     chkidx = function(index, lim, length)
         if not list.chkidxEnabled then return index end
         local err = (
-            (type(index) ~= "number" or Int(index) ~= index) and
+            (type(index) ~= "number" or int(index) ~= index) and
             ("<integer> expected, got <%s>."):format(cls_type(index))
         ) or (
             (index == 0 or index > lim or -index > lim) and
@@ -346,7 +345,7 @@ class "list" {
     ---@param n integer
     ---@return list
     rep = function(self, n)
-        if type(n) ~= "number" or Int(n) ~= n then
+        if type(n) ~= "number" or int(n) ~= n then
             error(("<integer> expected, got <%s>."):format(n))
         end
 
