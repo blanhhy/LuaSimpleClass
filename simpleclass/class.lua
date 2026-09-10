@@ -47,7 +47,8 @@ end
 ---@generic T
 ---@param clazz table
 ---@return T
-function cc:def(clazz)
+function cc:def(clazz, c2)
+    if self == clazz then clazz = c2 end
     local base = self.base
 
     for i = 1, #M._MMS do
@@ -86,8 +87,13 @@ function cc:def(clazz)
     return clazz
 end
 
-cc.__index = cc
-cc.__call  = cc.def
+cc.__call = cc.def
+
+function cc:__index(key)
+    local keywd = cc[key]
+    if keywd ~= nil then return keywd end
+    return cc.extends(self, key)
+end
 
 
 function Alias:__index(key)

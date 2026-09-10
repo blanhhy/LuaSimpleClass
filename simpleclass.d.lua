@@ -101,6 +101,7 @@ o.__proto.is = rawequal
 
 ---@alias _ClassDefiner<T> fun(tbl: table): T
 ---@class _ClassCreator<T>
+---@field [string] fun(cc: _ClassCreator<T>, tbl: table): T
 local cc = {}
 
 ---Single inheritance keyword

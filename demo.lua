@@ -48,7 +48,7 @@ print(sc.type(s1)) --> Student
 --#==========================================
 --# 深层继承
 --#==========================================
-class "CollageStudent" : extends "Student" {
+class "CollageStudent" : Student {
     __init = function(self, name, age, grade)
         -- 在实例方法里，可以省略 super 的参数
         super():__init(name, age, grade)

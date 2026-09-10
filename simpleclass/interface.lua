@@ -92,6 +92,8 @@ function M.interface(name)
     return setmetatable(iface, Interface)
 end
 
+cc.ifaces = false
+
 ---Implements the interfaces
 ---@param ... interface
 function cc:implements(...)

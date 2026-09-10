@@ -152,50 +152,63 @@ local function parseClassBlock(text, startPos)
     pos = nameEnd + 1
     local parentName = nil
     local implementsList = {}
-    local extStart, extEnd = text:find('^%s*:?%s*extends?%s*"', pos)
-    if extStart then
-        local pnameStart = extEnd + 1
-        local pnameEnd = text:find('"', pnameStart, true)
-        if pnameEnd then
-            parentName = text:sub(pnameStart, pnameEnd - 1)
-            pos = pnameEnd + 1
-        end
-    end
-    pos = skipCommentsAndWhitespace(text, pos) or pos
-    local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
+    local braceStart
     local impKwStart, impFin
-    if impStart then
-        -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
-        local k = impStart + 1
-        while text:sub(k, k):match('%s') do k = k + 1 end
-        impKwStart = k
-        pos = impEnd + 1
-        while pos <= n do
-            local c = text:sub(pos, pos)
-            if c == ')' then
-                impFin = pos
-                break
-            elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
-                pos = skipComment(text, pos)
-            elseif c:match('[%w_]') then
-                local iend = text:find('[%s,)]', pos)
-                if iend then
-                    local iname = text:sub(pos, iend - 1)
-                    implementsList[#implementsList + 1] = iname
-                    pos = iend
-                else
+
+    -- Short form: `class "Child" : Base { ... }`.
+    -- The empty capture gives us the exact position of `{`, so this form
+    -- cannot accidentally consume a longer modifier chain.
+    local shortStart, shortEnd, shortParent, shortBrace = text:find(
+        '^%s*:%s*([%w_]+)%s*()', pos)
+    if shortStart and text:sub(shortBrace, shortBrace) == '{' then
+        parentName = shortParent
+        braceStart = shortBrace
+    else
+        local extStart, extEnd = text:find('^%s*:?%s*extends?%s*"', pos)
+        if extStart then
+            local pnameStart = extEnd + 1
+            local pnameEnd = text:find('"', pnameStart, true)
+            if pnameEnd then
+                parentName = text:sub(pnameStart, pnameEnd - 1)
+                pos = pnameEnd + 1
+            end
+        end
+        pos = skipCommentsAndWhitespace(text, pos) or pos
+        local impStart, impEnd = text:find('^:%s*implements%s*%(', pos)
+        if impStart then
+            -- implements 关键字起点（跳过冒号与空白），供诊断定位到原始 implements(...) 块
+            local k = impStart + 1
+            while text:sub(k, k):match('%s') do k = k + 1 end
+            impKwStart = k
+            pos = impEnd + 1
+            while pos <= n do
+                local c = text:sub(pos, pos)
+                if c == ')' then
+                    impFin = pos
                     break
+                elseif c == '-' and text:sub(pos + 1, pos + 1) == '-' then
+                    pos = skipComment(text, pos)
+                elseif c:match('[%w_]') then
+                    local iend = text:find('[%s,)]', pos)
+                    if iend then
+                        local iname = text:sub(pos, iend - 1)
+                        implementsList[#implementsList + 1] = iname
+                        pos = iend
+                    else
+                        break
+                    end
+                else
+                    pos = pos + 1
                 end
-            else
-                pos = pos + 1
             end
         end
     end
-    local braceStart = text:find('{', pos)
+    braceStart = braceStart or text:find('{', pos)
     if not braceStart then return nil end
     local braceEnd = findBraceEnd(text, braceStart)
     if not braceEnd then return nil end
-    return className, parentName, implementsList, startPos, braceEnd, text:sub(braceStart + 1, braceEnd - 1), braceStart, impKwStart, impFin
+    return className, parentName, implementsList, startPos, braceEnd,
+        text:sub(braceStart + 1, braceEnd - 1), braceStart, impKwStart, impFin
 end
 
 local function isWordBoundary(body, pos, n)

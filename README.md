@@ -125,13 +125,17 @@ Getter & Setter 属性：
 
 ### 类的继承
 
-- 单继承：simpleclass 仅支持单继承，使用 `extends` 关键字
+- 单继承：simpleclass 仅支持单继承
 
-> `extends` 接受类名字符串，因此匿名类不能作为父类；但匿名类可以继承其他类，这一点与 Java 类似
+  经典语法：使用 `extends` 关键字 + 类名字符串  
+  简短语法：直接书写基类名，示例：`class "Myclass" : Base {}`
 
-- `super`：接收当前类与 `self`，如 `super(subclass, self):__init()`
+> 简短语法下，基类必须紧跟类体，如有其他关键字（如 `implements`）需要在它之前使用
 
-  如果 `debug` 库可用，`super` 可以自动获取上下文，和 Python 类似，无需传递参数
+- `super`：以子类对象身份调用父类方法
+
+  接收当前类与 `self`，示例： `super(thisclass, self):__init()`  
+  如果 `debug` 库可用，`super()` 可以无需传递参数，和 Python 类似
 
 > 示例：单继承
 >
