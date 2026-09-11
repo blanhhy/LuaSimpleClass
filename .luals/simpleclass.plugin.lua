@@ -652,6 +652,34 @@ local function collectInterfaceFields(body)
     return fields
 end
 
+local function splitInterfaceMembers(fields)
+    local instanceFields = {}
+    local metaFields = {}
+    for _, name in ipairs(fields or {}) do
+        if PL_OP_FROM_META[name] ~= nil then
+            metaFields[#metaFields + 1] = name
+        else
+            instanceFields[#instanceFields + 1] = name
+        end
+    end
+    return instanceFields, metaFields
+end
+
+local INTERFACE_OPERATOR_RETURNS = {
+    eq = 'boolean',
+    lt = 'boolean',
+    le = 'boolean',
+    len = 'integer',
+    tostring = 'string',
+}
+
+local function interfaceOperatorDoc(interfaceName, metaName)
+    local operatorName = PL_OP_FROM_META[metaName]
+    if not operatorName then return nil end
+    local returnType = INTERFACE_OPERATOR_RETURNS[operatorName] or interfaceName
+    return ('---@operator %s: %s'):format(operatorName, returnType)
+end
+
 local function parseInterfaceBlock(text, startPos)
     local n = #text
     local pos = startPos
@@ -1210,6 +1238,7 @@ function OnSetText(uri, text)
             if not iname then
                 pos = nextPos + 9
             else
+                local instanceFields, metaFields = splitInterfaceMembers(fields)
                 local out = {}
                 -- 第一部分：接口变量标注为 interface 的子类
                 out[#out + 1] = iname .. ' = {__iname="' .. iname .. '"} ---@class I.' .. iname .. ' : interface'
@@ -1221,7 +1250,25 @@ function OnSetText(uri, text)
                     classLine = classLine .. ' : object'
                 end
                 out[#out + 1] = classLine
-                for _, f in ipairs(fields or {}) do
+                for _, f in ipairs(instanceFields) do
+                    out[#out + 1] = '---@field ' .. f .. ' function'
+                end
+                for _, f in ipairs(metaFields) do
+                    local operatorDoc = interfaceOperatorDoc(iname, f)
+                    if operatorDoc then
+                        out[#out + 1] = operatorDoc
+                    end
+                end
+                local metaClassLine = '---@class ' .. iname .. '.meta'
+                if extendsList and #extendsList > 0 then
+                    local metaParents = {}
+                    for _, parentName in ipairs(extendsList) do
+                        metaParents[#metaParents + 1] = parentName .. '.meta'
+                    end
+                    metaClassLine = metaClassLine .. ' : ' .. table.concat(metaParents, ', ')
+                end
+                out[#out + 1] = metaClassLine
+                for _, f in ipairs(metaFields) do
                     out[#out + 1] = '---@field ' .. f .. ' function'
                 end
                 diffs[#diffs + 1] = {
@@ -1269,6 +1316,19 @@ function OnSetText(uri, text)
                 local parent = parentName or 'object'
                 local out = {}
 
+                local metaMembers = {}
+                for _, m in ipairs(methods) do
+                    if m.isMeta and m.kind ~= 'new' and m.kind ~= 'init' then
+                        metaMembers[#metaMembers + 1] = m.name
+                    end
+                end
+                for _, a in ipairs(aliases) do
+                    local aliasInfo = aliasInfoMeta[a.origin]
+                    if aliasInfo and aliasInfo.kind == 'meta' then
+                        metaMembers[#metaMembers + 1] = a.origin
+                    end
+                end
+
                 local overrideMethods = {}
                 local seenOverride = {}
                 for _, m in ipairs(methods) do
@@ -1301,9 +1361,15 @@ function OnSetText(uri, text)
                         methods = overrideMethods,
                     }
                 end
-                -- 类对象：X.class 继承 class，call 运算符返回实例 X
-                out[#out + 1] = '---@class ' .. className .. '.class : class'
+                -- 类对象拥有独立的继承链：只继承 Base.class，不继承接口。
+                -- 类方法、静态方法和元方法都挂在这条链上。
+                local classBase = parentName and (parentName .. '.class') or 'class'
+                local classTypeLine = '---@class ' .. className .. '.class : ' .. classBase
+                out[#out + 1] = classTypeLine
                 out[#out + 1] = '---@operator call:' .. className
+                for _, mn in ipairs(metaMembers) do
+                    out[#out + 1] = '---@field ' .. mn .. ' function'
+                end
                 out[#out + 1] = className .. ' = {}'
                 -- 实例：X 继承父类实例 parent
                 local classLine = '---@class ' .. className .. ' : ' .. parent
@@ -1381,6 +1447,17 @@ function OnSetText(uri, text)
                     if m.kind == 'init' then initMethod = m end
                 end
 
+                local constructor = newMethod or initMethod
+                local inheritedConstructor = false
+                if not constructor and parentName then
+                    local parentMeta = __sc_classmeta[uri][parentName]
+                    if parentMeta then
+                        constructor = parentMeta.constructor
+                        inheritedConstructor = constructor ~= nil
+                    end
+                end
+                classmeta.constructor = constructor
+
                 if newMethod then
                     local paramStr = stripFirstParam(newMethod.params)
                     for _, docLine in ipairs(newMethod.docs) do
@@ -1406,8 +1483,25 @@ function OnSetText(uri, text)
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
                 else
+                    local paramStr = constructor and stripFirstParam(constructor.params) or ''
+                    if inheritedConstructor and constructor then
+                        local constructorDocs = constructor.docs or {}
+                        local constructorParams = constructor.params or ''
+                        local constructorInferred = constructor.inferred or {}
+                        for _, docLine in ipairs(constructorDocs) do
+                            if not docLine:match('^%-%-%-@return%s') then
+                                out[#out + 1] = docLine
+                            end
+                        end
+                        for _, name in ipairs(pl_paramNames(constructorParams)) do
+                            local typ = constructorInferred[name]
+                            if typ and not pl_hasParamDoc(constructorDocs, name) then
+                                out[#out + 1] = ('---@param %s %s'):format(name, typ)
+                            end
+                        end
+                    end
                     out[#out + 1] = '---@return ' .. className
-                    out[#out + 1] = 'function ' .. className .. ':new()return self.__proto end'
+                    out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
                 end
 
                 -- object:getClass() returns the concrete class object at runtime.
@@ -2044,6 +2138,17 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
                         if ownDef then
                             -- 类实现成员集合（X.__own 不含接口，展开即类自己写的）
                             local clsFields = pl_vmFieldNames(ownDef)
+                            local clsMetaFields = {}
+                            local classGlobal = vm.getGlobal('type', selfName .. '.class')
+                            if classGlobal then
+                                for _, classSet in ipairs(pl_docClassSets(classGlobal, uri)) do
+                                    if classSet.class and classSet.class[1] == selfName .. '.class' then
+                                        for name in pairs(pl_vmFieldNames(classSet)) do
+                                            clsMetaFields[name] = true
+                                        end
+                                    end
+                                end
+                            end
 
                             -- 接口要求成员：extends[2..] 都是接口，读其 ---@field
                             local missing = {}
@@ -2051,12 +2156,25 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
                             for idx = 2, #set.extends do
                                 local ifname = set.extends[idx][1]
                                 local ig = ifname and vm.getGlobal('type', ifname)
+                                local interfaceMetaFields = {}
+                                local metaG = ifname and vm.getGlobal('type', ifname .. '.meta')
+                                if metaG then
+                                    for _, metaSet in ipairs(metaG:getSets(uri)) do
+                                        if metaSet.type == 'doc.class'
+                                            and metaSet.class and metaSet.class[1] == ifname .. '.meta' then
+                                            for name in pairs(pl_vmFieldNames(metaSet)) do
+                                                interfaceMetaFields[name] = true
+                                            end
+                                        end
+                                    end
+                                end
                                 if ig then
                                     for _, s2 in ipairs(ig:getSets(uri)) do
                                         if s2.type == 'doc.class' then
                                             -- VM 已经展开接口继承链；不要在插件中重复递归。
                                             for k in pairs(pl_vmFieldNames(s2)) do
-                                                if not clsFields[k] and not required[k] then
+                                                if not interfaceMetaFields[k]
+                                                    and not clsFields[k] and not required[k] then
                                                     required[k] = true
                                                     missing[#missing + 1] = ('%s.%s'):format(ifname, k)
                                                 end
@@ -2064,28 +2182,42 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
                                         end
                                     end
                                 end
-                            end
-
-                            if #missing == 0 then break end
-
-                            -- posRange 记录原始源码中 implements(...) 的字节偏移；
-                            -- 诊断 start/finish 须为 diff 后文本的 packed 位置（row*10000+col），
-                            -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
-                            local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
-                            local start, finish = set.start, set.finish
-                            if posRange then
-                                local rangeStart, rangeFinish = diagRangeFromOriginal(
-                                    state, posRange.start, posRange.finish)
-                                if rangeStart and rangeFinish then
-                                    start, finish = rangeStart, rangeFinish
+                                if metaG then
+                                    for _, metaSet in ipairs(metaG:getSets(uri)) do
+                                        if metaSet.type == 'doc.class'
+                                            and metaSet.class and metaSet.class[1] == ifname .. '.meta' then
+                                            for name in pairs(pl_vmFieldNames(metaSet)) do
+                                                local key = '@meta:' .. name
+                                                if not clsMetaFields[name] and not required[key] then
+                                                    required[key] = true
+                                                    missing[#missing + 1] = ('%s.meta.%s'):format(ifname, name)
+                                                end
+                                            end
+                                        end
+                                    end
                                 end
                             end
-                            callback {
-                                start   = start,
-                                finish  = finish,
-                                message = ('%s implements interfaces but does not implement method: %s')
-                                    :format(selfName, table.concat(missing, ', ')),
-                            }
+
+                            if #missing > 0 then
+                                -- posRange 记录原始源码中 implements(...) 的字节偏移；
+                                -- 诊断 start/finish 须为 diff 后文本的 packed 位置（row*10000+col），
+                                -- packPosition 会再经 diffedOffsetBack 映射回原始行/列。
+                                local posRange = __sc_implpos[uri] and __sc_implpos[uri][selfName]
+                                local start, finish = set.start, set.finish
+                                if posRange then
+                                    local rangeStart, rangeFinish = diagRangeFromOriginal(
+                                        state, posRange.start, posRange.finish)
+                                    if rangeStart and rangeFinish then
+                                        start, finish = rangeStart, rangeFinish
+                                    end
+                                end
+                                callback {
+                                    start   = start,
+                                    finish  = finish,
+                                    message = ('%s implements interfaces but does not implement method: %s')
+                                        :format(selfName, table.concat(missing, ', ')),
+                                }
+                            end
                         end
                     end
                 end

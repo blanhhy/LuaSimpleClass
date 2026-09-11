@@ -50,7 +50,7 @@ class "AccessControlChild_6c91" : extends "AccessControl_6c91" {
     end;
 }
 
-local child = AccessControlChild_6c91:new()
+local child = AccessControlChild_6c91:new(1, "protected")
 child:seeInfo()
 -- expect: 41:invisible
 -- expect: 49:invisible
