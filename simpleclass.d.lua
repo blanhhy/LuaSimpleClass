@@ -270,6 +270,7 @@ sc.alias = {}
 ---@alias simpleclass.FIELD
 ---| "class"
 ---| "super"
+---| "alias"
 ---| "interface"
 ---| "type"
 ---| "object"
