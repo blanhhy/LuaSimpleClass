@@ -497,7 +497,7 @@ local function parseMethods(body, aliasNames)
 
             local kind
             if name == 'new'            then kind = 'new'
-            elseif name == '__init'     then kind = 'init'
+            elseif name == '__init' or name == 'constructor' then kind = 'init'
             elseif operatorName ~= nil  then kind = 'meta'
             elseif isGetter             then kind = 'getter'
             elseif isSetter             then kind = 'setter'
@@ -507,6 +507,10 @@ local function parseMethods(body, aliasNames)
             elseif isStatic             then kind = 'static'
                                         else kind = 'instance'
             end
+
+            -- `constructor` is a runtime alias of `__init`; use one canonical
+            -- name so inheritance, super inference, and override checks agree.
+            if name == 'constructor' then name = '__init' end
 
             local funcBody = body:sub(funcBodyStart, k - 4)
             methods[#methods + 1] = {
@@ -1099,7 +1103,7 @@ local function pl_aliasMethodInfo(alias, target, classname)
     local kind
     if name == 'new' then
         kind = 'new'
-    elseif name == '__init' then
+    elseif name == '__init' or name == 'constructor' then
         kind = 'init'
     elseif operatorName ~= nil then
         kind = 'meta'

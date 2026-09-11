@@ -17,7 +17,7 @@ end
 local load = loadstring or load
 
 ---@diagnostic disable-next-line: deprecated
-local unpack = table.unpack or _G.unpack
+local unpack = table.unpack or G.unpack
 local concat = table.concat
 local object = require("simpleclass.object")
 
@@ -60,20 +60,32 @@ function cc:def(clazz, c2)
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
-    clazz.__classname = self.name
-    clazz.__base = base
-    setmetatable(clazz, M._CMT)
-
     for i = 1, #clazz do
         local item = clazz[i]
         if item and type(item) == "table" and item._ALIAS == Alias then
             clazz[i] = nil
             local origin = item.origin
-            local target, err = Alias.getTarget(item, clazz)
+            local target, err = Alias.getTarget(item, clazz, base)
             if target ~= nil then clazz[origin] = target
             else error(err, 2) end
         end
     end
+
+    local init = clazz.__init
+    local ctor = clazz.constructor
+    if init ~= ctor then
+        init = init or ctor
+        ctor = ctor or init
+    end
+    if init ~= ctor then
+        error("bad class definition: different '__init' and 'constructor'", 2)
+    end
+
+    clazz.__base = base
+    clazz.__init = init
+    clazz.constructor = ctor
+    clazz.__classname = self.name
+    setmetatable(clazz, M._CMT)
 
     if self.check_impl then
         local ok, err = self:check_impl(clazz)
@@ -153,18 +165,20 @@ end
 
 ---@return function? target alias target function
 ---@return string?   errmsg 
-function Alias.getTarget(alias, clazz)
-    if clazz[alias.target] == nil then
-        return nil, ("bad alias: '%s' not found"):format(alias.target)
+function Alias.getTarget(alias, clazz, base)
+    local target = clazz[alias.target]
+    if target == nil then target = base[alias.target] end
+    if target == nil then return nil
+        , ("bad alias: '%s' not found")
+        : format(alias.target)
     end
 
-    local aliased_to = clazz[alias.target]
     local fixed_args = alias.args
-    if not fixed_args then return aliased_to end
+    if not fixed_args then return target end
 
-    if type(aliased_to) ~= "function" then
-        return nil, ("bad alias: cannot make partial for non-function field '%s'")
-        :format(alias.target)
+    if type(target) ~= "function" then return nil
+        , ("bad alias: cannot make partial for non-function field '%s'")
+        : format(alias.target)
     end
 
     if not alias.kwarg then
@@ -184,7 +198,7 @@ function Alias.getTarget(alias, clazz)
                 stmts[i + count + 2] = ("arg%d, "):format(i)
             end
             local maker = load(concat(stmts, ''))
-            partial = type(maker) == "function" and maker(fixed_args, aliased_to)
+            partial = type(maker) == "function" and maker(fixed_args, target)
         end
         -- 参数过大或不明原因编译失败，回退旧版通用包装函数
         partial = partial or function(...)
@@ -193,7 +207,7 @@ function Alias.getTarget(alias, clazz)
             local merged = {fixed_args.i == 2 and (...) }
             move(fixed_args, fixed_args.i, fixed_args.j, fixed_args.i, merged)
             move(args, fixed_args.i, narg, fixed_args.j + 1, merged)
-            return aliased_to(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
+            return target(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
         end
         return partial
     end
@@ -201,11 +215,11 @@ function Alias.getTarget(alias, clazz)
     return alias.isStatic and function(kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return aliased_to(kwargs, ...)
+        return target(kwargs, ...)
     end or function(self, kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return aliased_to(self, kwargs, ...)
+        return target(self, kwargs, ...)
     end
 end
 

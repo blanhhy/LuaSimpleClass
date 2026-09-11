@@ -33,7 +33,7 @@ end
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
-    local ctor = self['__init']
+    local ctor = self['__init'] or self['constructor']
     if type(ctor) == "function" then ctor(inst, ...) end
     return inst
 end
