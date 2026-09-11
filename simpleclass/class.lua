@@ -62,7 +62,8 @@ function cc:def(clazz, c2)
 
     for i = 1, #clazz do
         local item = clazz[i]
-        if item and type(item) == "table" and item._ALIAS then
+        if item and type(item) == "table" and item._ALIAS == Alias then
+            clazz[i] = nil
             local origin = item.origin
             local target, err = Alias.getTarget(item, clazz)
             if target  then clazz[origin] = target
@@ -120,7 +121,7 @@ function Alias:__index(key)
         self.origin = key2
     end
     self.target = key
-    self._ALIAS = true
+    self._ALIAS = Alias
     return self
 end
 
