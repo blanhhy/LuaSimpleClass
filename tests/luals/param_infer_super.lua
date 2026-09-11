@@ -13,6 +13,6 @@ class "SuperInferChild_7c8a" : extends "SuperInferBase_7c8a" {
     end;
 }
 
-local c = SuperInferChild_7c8a()
+local c = SuperInferChild_7c8a:new()
 -- expect: 18:param-type-mismatch
 c:setName(123)

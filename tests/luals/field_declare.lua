@@ -20,7 +20,7 @@ class "Note_fldec" {
     end;
 }
 
-local n = Note_fldec()
+local n = Note_fldec:new()
 print(n.title.missing)
 print(n.meta.nope)
 print(n.tags[1].nope)

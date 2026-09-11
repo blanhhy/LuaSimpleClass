@@ -37,7 +37,7 @@ class "RobustChild_parser_7c8a" : extends "RobustBase_parser_7c8a" : implements(
     end;
 }
 
-local child = RobustChild_parser_7c8a()
+local child = RobustChild_parser_7c8a:new()
 
 -- The child parameters are inferred from the parent method.
 -- expect: 44:param-type-mismatch

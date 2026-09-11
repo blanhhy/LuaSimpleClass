@@ -20,4 +20,4 @@ class "OrderImpl_73a1" : implements(IndirectChild_73a1) : extends "OrderBase_73a
 
 ---@param value OrderBase_73a1
 local function acceptOrderBase(value) end
-acceptOrderBase(OrderImpl_73a1())
+acceptOrderBase(OrderImpl_73a1:new())

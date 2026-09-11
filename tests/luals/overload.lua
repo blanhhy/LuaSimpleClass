@@ -5,7 +5,7 @@ local sc = require "simpleclass"
 class "OverloadBase_7c8a" {}
 class "OverloadChild_7c8a" : extends "OverloadBase_7c8a" {}
 
-local child = OverloadChild_7c8a()
+local child = OverloadChild_7c8a:new()
 
 local classResult = sc.type(child) -- 应为 class<OverloadChild_7c8a> 而非 class|type
 local typeResult = sc.type("value") -- 应为 type 而非 class|type

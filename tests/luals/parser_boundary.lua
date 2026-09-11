@@ -102,5 +102,5 @@ class "Edge_qwiojediuew" {
     end;
 }
 
-local o = Edge_qwiojediuew("x")
+local o = Edge_qwiojediuew:new("x")
 print(o:guardDo())

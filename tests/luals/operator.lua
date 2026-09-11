@@ -11,7 +11,7 @@ class "Vec_nwnwsiiu2" {
     end;
 }
 
-local v = Vec_nwnwsiiu2()
+local v = Vec_nwnwsiiu2:new()
 print((v + v).noSuchField)
 
 class "Num_nwnwsiiu2" {
@@ -20,7 +20,7 @@ class "Num_nwnwsiiu2" {
     end;
 }
 
-local n = Num_nwnwsiiu2()
+local n = Num_nwnwsiiu2:new()
 print((n * n).alsoNoSuch)
 
 -- 双操作数不对称（如 __mul(left,right)，左右可互换）只能靠用户手写 @operator 。
@@ -32,6 +32,6 @@ class "Pair_nwnwsiiu2" {
     end;
 }
 
-local p = Pair_nwnwsiiu2()
+local p = Pair_nwnwsiiu2:new()
 -- expect: 37:undefined-field
 print((p * 3).noSuchPair)

@@ -12,7 +12,7 @@ class "Acct1_pos" {
     end;
 }
 
-local acc1 = Acct1_pos()
+local acc1 = Acct1_pos:new()
 local b1 = acc1.balance          -- 单引号 getter：读取类型为 number
 
 class "Acct2_pos" {
@@ -24,7 +24,7 @@ class "Acct2_pos" {
     end;
 }
 
-local acc2 = Acct2_pos()
+local acc2 = Acct2_pos:new()
 local b2 = acc2.balance          -- 双引号 getter：读取类型为 number
 
 -- number 与 number 相加，类型正确时不报警；getter 未被识别则会在上方报 undefined-field

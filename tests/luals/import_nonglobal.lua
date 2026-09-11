@@ -14,5 +14,5 @@ local MyClass = class "NonGlobal_mn1" {
     end;
 }
 
-local obj = MyClass()
+local obj = MyClass:new()
 print(assert(obj:probe() == nil))

@@ -11,7 +11,7 @@ local sc = import("simpleclass", {GLOBAL_IMPORT = false})
 local class = sc.class
 
 local Good = class "LocalImportGood_9d31" {}
-local value = Good()
+local value = Good:new()
 print(sc.isinstance(value, Good))
 
 -- This must be reported by the file-local diagnostic even if simpleclass.d.lua

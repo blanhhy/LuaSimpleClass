@@ -25,5 +25,5 @@ class "CleanT_ebdenjewni" {
     msg = 'plain } string';
 }
 
-local c = CleanT_ebdenjewni(3)
+local c = CleanT_ebdenjewni:new(3)
 print(c:a())

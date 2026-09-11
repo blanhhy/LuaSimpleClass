@@ -5,5 +5,5 @@ class "ShortExtendsBase_73a1" {
 
 class "ShortExtendsChild_73a1" : ShortExtendsBase_73a1 {}
 
-local child = ShortExtendsChild_73a1()
+local child = ShortExtendsChild_73a1:new()
 print(child.inherited) -- 预期零诊断
