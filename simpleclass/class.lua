@@ -70,8 +70,8 @@ function cc:def(clazz, c2)
             clazz[i] = nil
             local origin = item.origin
             local target, err = Alias.getTarget(item, clazz)
-            if target  then clazz[origin] = target
-            elseif err then error(err, 2) end
+            if target ~= nil then clazz[origin] = target
+            else error(err, 2) end
         end
     end
 
@@ -154,24 +154,15 @@ end
 ---@return function? target alias target function
 ---@return string?   errmsg 
 function Alias.getTarget(alias, clazz)
-    local origin = clazz[alias.origin]
-    local target = clazz[alias.target]
-
-    if target == nil then
+    if clazz[alias.target] == nil then
         return nil, ("bad alias: '%s' not found"):format(alias.target)
     end
-    if origin ~= nil then
-        return nil, origin == target
-                    and not alias.args
-                    and nil -- 直接别名情况下，两者本就一致时可静默跳过
-        or ("bad alias: '%s' already defined"):format(alias.origin)
-    end
 
-    if not alias.args then return target end
-    local aliased_to = target
+    local aliased_to = clazz[alias.target]
     local fixed_args = alias.args
+    if not fixed_args then return aliased_to end
 
-    if type(target) ~= "function" then
+    if type(aliased_to) ~= "function" then
         return nil, ("bad alias: cannot make partial for non-function field '%s'")
         :format(alias.target)
     end
