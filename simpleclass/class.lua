@@ -198,7 +198,7 @@ function Alias.getTarget(alias, clazz, base)
                 stmts[i + count + 2] = ("arg%d, "):format(i)
             end
             local maker = load(concat(stmts, ''))
-            partial = type(maker) == "function" and maker(fixed_args, target)
+            partial = maker and maker(fixed_args, target)
         end
         -- 参数过大或不明原因编译失败，回退旧版通用包装函数
         partial = partial or function(...)
