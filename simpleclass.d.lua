@@ -165,9 +165,9 @@ function sc.type(v) end
 ---Define a new class  
 ---eg:
 ---```lua
----class "MyClass" : extends "MyBaseClass" {
+---class "MyClass" : MyBase {
 ---    __init = function(self)
----        super(self):__init()
+---        super():__init()
 ---    end
 ---}
 ---```
