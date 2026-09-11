@@ -71,10 +71,8 @@ M.object = object
 M.isinstance = object.isInstance
 M.issubclass = object.isExtends
 
-if debug then
-    getmetatable = debug.getmetatable or getmetatable
-    setmetatable = debug.setmetatable or setmetatable
-end
+local rawgetmt = debug and debug.getmetatable or getmetatable
+local rawsetmt = debug and debug.setmetatable or setmetatable
 
 ---Clone the object
 ---@param isDeep? boolean Default `true`
@@ -82,7 +80,7 @@ end
 function object:clone(isDeep)
     isDeep = isDeep == nil and true or isDeep
     local clone = {}
-    local clazz = getmetatable(self)
+    local clazz = rawgetmt(self)
     for k, v in next, self do
         if v == self then
             clone[k] = self
@@ -94,7 +92,8 @@ function object:clone(isDeep)
                 or  v
         end
     end
-    return setmetatable(clone, clazz)
+    rawsetmt(clone, clazz)
+    return clone
 end
 
 return object
