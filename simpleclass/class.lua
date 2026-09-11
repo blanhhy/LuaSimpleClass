@@ -14,7 +14,11 @@ local move = table.move or function(t1, f, e, t, t2)
 end
 
 ---@diagnostic disable-next-line: deprecated
+local load = loadstring or load
+
+---@diagnostic disable-next-line: deprecated
 local unpack = table.unpack or _G.unpack
+local concat = table.concat
 local object = require("simpleclass.object")
 
 _ENV = nil
@@ -163,9 +167,9 @@ function Alias.getTarget(alias, clazz)
         or ("bad alias: '%s' already defined"):format(alias.origin)
     end
 
+    if not alias.args then return target end
     local aliased_to = target
     local fixed_args = alias.args
-    if not fixed_args then return aliased_to end
 
     if type(target) ~= "function" then
         return nil, ("bad alias: cannot make partial for non-function field '%s'")
@@ -173,14 +177,34 @@ function Alias.getTarget(alias, clazz)
     end
 
     if not alias.kwarg then
-        return function(...)
+        local partial
+        local MAX_ARGS = 32 -- 避免某些情况下局部变量和上值数量的限制
+        if load and fixed_args.j <= MAX_ARGS then
+            local count = fixed_args.j - fixed_args.i + 1
+            local stmts = {
+                [1] = "local fixed, aliased = ...\n",
+                [count + 2] = alias.isStatic
+                    and "return function(...) return aliased("
+                    or  "return function(self, ...) return aliased(self,",
+                [count + count + 3] = "...) end"
+            }
+            for i = 1, count do
+                stmts[i + 1] = ("local arg%d = fixed[%d]\n"):format(i, i + fixed_args.i - 1)
+                stmts[i + count + 2] = ("arg%d, "):format(i)
+            end
+            local maker = load(concat(stmts, ''))
+            partial = type(maker) == "function" and maker(fixed_args, aliased_to)
+        end
+        -- 参数过大或不明原因编译失败，回退旧版通用包装函数
+        partial = partial or function(...)
             local narg = select('#', ...)
             local args = {...}
-            local merged = {fixed_args.i == 2 and (...)}
+            local merged = {fixed_args.i == 2 and (...) }
             move(fixed_args, fixed_args.i, fixed_args.j, fixed_args.i, merged)
             move(args, fixed_args.i, narg, fixed_args.j + 1, merged)
             return aliased_to(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
         end
+        return partial
     end
 
     return alias.isStatic and function(kwargs, ...)

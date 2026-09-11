@@ -17,6 +17,9 @@ class "RuntimeAlias_5a21" {
     countNil = function(self, ...)
         return select('#', ...), select(1, ...)
     end;
+    countMany = function(self, ...)
+        return select('#', ...)
+    end;
     config = function(self, options)
         return options
     end;
@@ -25,6 +28,7 @@ class "RuntimeAlias_5a21" {
     alias.combineAB:combine("a", "b"),
     alias.countABC:count("a", "b"),
     alias.countWithNil:countNil(nil),
+    alias.countManyFixed:countMany(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33),
     alias.configured:config({locked = "fixed"}),
 }
 
@@ -38,6 +42,7 @@ local nilCount, nilValue = instance:countNil("c")
 assert(nilCount == 1 and nilValue == "c")
 local aliasNilCount, aliasNilValue = instance:countWithNil("c")
 assert(aliasNilCount == 2 and aliasNilValue == nil)
+assert(instance:countManyFixed("tail") == 34)
 local passed = {locked = "passed", extra = true}
 local configured = instance:configured(passed)
 assert(configured == passed)
