@@ -73,7 +73,7 @@ class "list" {
     -- 可以从参数列表或已有的数组来创建数组, 也可以创建空数组  
     -- （由于 jit 和 5.5 情况下有预分配空间的需求，所以用了 new 而不是 __init）
     ---@param ... any
-    ---@overload fun(cls:list.class, array:any[])
+    ---@overload fun(cls:list.class, array:any[]):list
     new = function(cls, ...)
         local nargs = select('#', ...)
 
