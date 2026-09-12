@@ -2,8 +2,8 @@
 ---仿 Python 的 list 类
 
 local sc = require "simpleclass"
-local alias      = sc.alias
-local cls_type   = sc.type
+local alias = sc.alias
+local ctype = sc.type
 
 local isJIT = pcall(require, "jit")
 local is5_5 = _VERSION >= "Lua 5.5"
@@ -41,7 +41,7 @@ class "list" {
         if not list.chkidxEnabled then return index end
         local err = (
             (type(index) ~= "number" or int(index) ~= index) and
-            ("<integer> expected, got <%s>."):format(cls_type(index))
+            ("<integer> expected, got <%s>."):format(ctype(index))
         ) or (
             (index == 0 or index > lim or -index > lim) and
             "list index out of range"
@@ -84,7 +84,7 @@ class "list" {
         local array = nargs == 1 and type(...) == "table" and (...) or {...}
         local newArr
 
-        if isJIT or is5_5 then
+        if table_new then
             newArr = table_new(#array, 2)
             newArr.__class = cls
             setmetatable(newArr, cls)
@@ -108,7 +108,7 @@ class "list" {
     _newContainter = function(cls, length)
         local newArr
 
-        if isJIT then
+        if table_new then
             newArr = table_new(length, 2)
             newArr.__class = cls
             setmetatable(newArr, cls)
@@ -145,6 +145,7 @@ class "list" {
     -- 弹出指定索引的元素, 返回其值
     ---@param index? integer 默认在数组末尾
     pop = function(self, index)
+        if self.length == 0 then error("pop from empty list", 2) end
         index = index and list.chkidx(index, self.length, self.length) or self.length
         self.length = self.length - 1
         return remove(self, index)
@@ -152,9 +153,7 @@ class "list" {
 
     -- 移除指定值, 只移除第一个, 返回其原来的索引
     remove = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
-        end
+        if nil == value then error("non-nil value expected.", 2) end
         for i = 1, self.length do
             if value == self[i] then
                 remove(self, i)
@@ -162,14 +161,11 @@ class "list" {
                 return i
             end
         end
-        return nil
     end;
 
     -- 移除指定值, 只移除最后一个, 返回其原来的索引
     removeLast = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
-        end
+        if nil == value then error("non-nil value expected.", 2) end
         for i = self.length, 1, -1 do
             if value == self[i] then
                 remove(self, i)
@@ -177,29 +173,27 @@ class "list" {
                 return i
             end
         end
-        return nil
     end;
 
     -- 移除指定值, 移除所有, 返回被移除的个数
     removeAll = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
+        if value == nil then error("non-nil value expected.", 2) end
+        local n, k = self.length, 0
+        for i = 1, n do
+            local v = self[i]
+            if v ~= value then k = k + 1; self[k] = v end
         end
-        local old_length = self.length
-        for i = self.length, 1, -1 do
-            if value == self[i] then
-                remove(self, i)
-                self.length = self.length - 1
-            end
-        end
-        return old_length - self.length
+        for i = k + 1, n do self[i] = nil end
+        self.length = k
+        return n - k
     end;
 
     -- 清空数组, 长度归零
     clear = function(self)
-        if isJIT then
+        local cls = self.__class
+        if table_clear then
             table_clear(self, self.length) -- 保留元表
-            self.__class = list -- 重绑class
+            self.__class = cls -- 重绑class
             self.length = 0 -- 重置length
             return self
         end
@@ -214,7 +208,7 @@ class "list" {
     ---@param array table
     extend = function(self, array)
         if type(array) ~= "table" then
-            error(("<table?> expected, got <%s>."):format(cls_type(array)), 2)
+            error(("<table?> expected, got <%s>."):format(ctype(array)), 2)
         end
         local length = self.length
         local count = 0
@@ -260,9 +254,7 @@ class "list" {
     -- 找到第一个匹配的索引, 返回 nil 则表示没有找到
     ---@return integer?
     index = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
-        end
+        if nil == value then return nil end
         for i = 1, self.length do
             if value == self[i] then return i end
         end
@@ -272,9 +264,7 @@ class "list" {
     -- 找到最后一个匹配的索引, 返回 nil 则表示没有找到
     ---@return integer?
     lastIndex = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
-        end
+        if nil == value then return nil end
         for i = self.length, 1, -1 do
             if value == self[i] then return i end
         end
@@ -284,9 +274,7 @@ class "list" {
     -- 找到所有匹配的索引, 返回值是包含所有索引的 list 对象
     ---@return list
     indices = function(self, value)
-        if nil == value then
-            error("non-nil value expected.", 2)
-        end
+        if nil == value then return list() end
         local indices = setmetatable({__class = list}, list) -- 为了简化调用栈, 直接用原始方式了
         local count = 0
         for i = 1, self.length do
@@ -328,7 +316,7 @@ class "list" {
         j = j and list.chkidx(j, self.length, self.length) or self.length
         step = step and list.chkidx(step, math.huge) or 1
 
-        local slice = setmetatable({__class = list}, list) -- 内部构造函数, 为了下面手动初始化
+        local slice = setmetatable({__class = list}, list)
         local count = 0
 
         for o = i, j, step do
@@ -346,7 +334,7 @@ class "list" {
     ---@return list
     rep = function(self, n)
         if type(n) ~= "number" or int(n) ~= n then
-            error(("<integer> expected, got <%s>."):format(n))
+            error(("<integer> expected, got <%s>."):format(ctype(n)), 2)
         end
 
         if n <= 0 then return list() end
@@ -433,7 +421,7 @@ class "list" {
     __concat = function(arr1, arr2)
         if not isinstance(arr1, list) or not isinstance(arr2, list) then
             error(("attempt to concat list with a %s value")
-                :format(isinstance(arr1, list) and cls_type(arr2) or cls_type(arr1)), 2)
+                :format(isinstance(arr1, list) and ctype(arr2) or ctype(arr1)), 2)
         end
 
         local newArr = list:_newContainter(arr1.length + arr2.length)
@@ -467,7 +455,7 @@ class "list" {
     __lt = function(left, right)
         if type(left) ~= "table" or type(right) ~= "table" then -- 允许list和普通的数组比较
             error(("attempt to compare list with a %s value")
-                :format(type(left) == "table" and cls_type(right) or cls_type(left)), 2)
+                :format(type(left) == "table" and ctype(right) or ctype(left)), 2)
         end
         local len1, len2 = left.length or #left, right.length or #right
         if len1 ~= len2 then return len1 < len2 end
@@ -482,7 +470,7 @@ class "list" {
     __le = function(left, right)
         if type(left) ~= "table" or type(right) ~= "table" then -- 允许list和普通的数组比较
             error(("attempt to compare list with a %s value")
-                :format(type(left) == "table" and cls_type(right) or cls_type(left)), 2)
+                :format(type(left) == "table" and ctype(right) or ctype(left)), 2)
         end
         local len1, len2 = left.length or #left, right.length or #right
         if len1 ~= len2 then return len1 <= len2 end
