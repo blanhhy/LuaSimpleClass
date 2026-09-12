@@ -20,12 +20,11 @@ object.__index = object
 _ENV = nil
 
 function object:__getter(key)
-    local clazz = self.__class
-    local field = clazz[key]
-    if field ~= nil then return field end
-    local prop = clazz["__property"]
-    local gett = prop and prop[key] and clazz["get." .. key]
+    local claz = self.__class
+    local prop = claz["__property"]
+    local gett = prop and prop[key] and claz["get." .. key]
     if gett then return gett(self) end
+    return claz[key]
 end
 
 function object:__setter(key, v)

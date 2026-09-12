@@ -51,13 +51,13 @@ class "RuntimeStaticProperty_4a82" {
     property.value;
     value = 42;
     ["get.value"] = function()
-        error('the getter must not override a class field')
+        return "inst"
     end;
 }
 
 local staticField = RuntimeStaticProperty_4a82:new()
-expect(staticField.value, 42,
-    'a same-name class field must take priority over the getter')
+expect(staticField.value, "inst",
+    'a same-name static field must not take priority over the instance property')
 
 class "RuntimeSetterOnlyProperty_4a82" {
     property.value;
