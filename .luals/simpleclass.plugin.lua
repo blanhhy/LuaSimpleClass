@@ -333,6 +333,7 @@ local function parseMethods(body, aliasNames)
     local fields = {}
     local declareFields = {}
     local aliases = {}
+    local declaredProperties = {}
     local n = #body
     local i = 1
     while i <= n do
@@ -362,8 +363,17 @@ local function parseMethods(body, aliasNames)
             end
         end
         if not name then
-            break
-        end
+            -- 类体中的无键字段是 Lua table 的数组元素。普通数组元素不影响
+            -- 后续方法扫描；property.name 则是 simpleclass 的属性声明语法。
+            local fieldEnd = findFieldEnd(body, i)
+            local arrayValue = body:sub(i, fieldEnd - 1)
+                :gsub('^%s+', ''):gsub('%s+$', '')
+            local propertyName = arrayValue:match('^property%s*%.%s*([%w_]+)$')
+            if propertyName then
+                declaredProperties[propertyName] = true
+            end
+            i = fieldEnd
+        else
 
         local commentLines = {}
         local ci = i - 1
@@ -542,7 +552,8 @@ local function parseMethods(body, aliasNames)
         end
         end
     end
-    return methods, fields, declareFields, aliases
+    end
+    return methods, fields, declareFields, aliases, declaredProperties
 end
 
 local function stripFirstParam(params)
@@ -1287,9 +1298,12 @@ function OnSetText(uri, text)
             if not className then
                 pos = nextPos + 5
             else
-                local methods, fields, declareFields, aliases = parseMethods(body, aliasNames)
+                local methods, fields, declareFields, aliases, declaredProperties = parseMethods(body, aliasNames)
                 local methodMeta = {}
                 local propertyMeta = {}
+                for propertyName in pairs(declaredProperties) do
+                    propertyMeta[propertyName] = { declared = true }
+                end
                 for _, method in ipairs(methods) do
                     if method.isProperty then
                         local property = propertyMeta[method.name]
@@ -1297,6 +1311,7 @@ function OnSetText(uri, text)
                             property = {}
                             propertyMeta[method.name] = property
                         end
+                        property.declared = declaredProperties[method.name] == true
                         property[method.kind] = method
                     else
                         methodMeta[method.name] = method
@@ -1310,6 +1325,7 @@ function OnSetText(uri, text)
                 __sc_classmeta[uri][className] = {
                     methods = methodMeta,
                     properties = propertyMeta,
+                    declaredProperties = declaredProperties,
                     fieldTypes = pl_fieldTypes(declareFields, methods),
                     parent = parentName,
                     implements = implementsList or {},
@@ -1527,29 +1543,41 @@ function OnSetText(uri, text)
                     end
                 end
 
-                for _, m in ipairs(methods) do
-                    if m.kind == 'getter' then
-                        local info = pl_methodInfo(m, className)
-                        if info.receiverType then
-                            local attrName = m.name
-                            local params = m.params or ''
-                            out[#out + 1] = className .. '.__proto.' .. attrName .. ' = ('
-                            out[#out + 1] = '    ---@param self ' .. info.receiverType
-                            out[#out + 1] = '    function(' .. params .. ')'
-                            out[#out + 1] = '        self = self ---@class ' .. info.receiverType
-                            if m.body and #m.body > 0 then
-                                local trimmed = trimBody(m.body)
-                                if #trimmed > 0 then
-                                    out[#out + 1] = '        ---@diagnostic disable'
-                                    for line in trimmed:gmatch('([^\n]+)') do
-                                        out[#out + 1] = '    ' .. line
-                                    end
-                                    out[#out + 1] = '        ---@diagnostic enable'
-                                end
-                            end
-                            out[#out + 1] = '    end'
-                            out[#out + 1] = ')(' .. className .. '.__proto)'
+                for propertyName, property in pairs(classmeta.properties) do
+                    if property.declared then
+                        local getter = property.getter
+                        local info = getter and pl_methodInfo(getter, className)
+                        local receiverType = info and info.receiverType or className
+                        local params = getter and getter.params or 'self'
+                        if params:match('^%s*$') then
+                            params = '_self'
                         end
+                        local hasSelf = params:match('^%s*self%s*[,)]') ~= nil
+                        out[#out + 1] = className .. '.__proto.' .. propertyName .. ' = ('
+                        if hasSelf then
+                            out[#out + 1] = '    ---@param self ' .. receiverType
+                        end
+                        local propertyType = getter and classmeta.fieldTypes[propertyName]
+                        if propertyType then
+                            -- 手写 ---@field 或 getter/setter 推导出的字段类型优先。
+                            out[#out + 1] = '    ---@return ' .. propertyType
+                        end
+                        out[#out + 1] = '    function(' .. params .. ')'
+                        if hasSelf then
+                            out[#out + 1] = '        self = self ---@class ' .. receiverType
+                        end
+                        if getter and getter.body and #getter.body > 0 then
+                            local trimmed = trimBody(getter.body)
+                            if #trimmed > 0 then
+                                out[#out + 1] = '        ---@diagnostic disable'
+                                for line in trimmed:gmatch('([^\n]+)') do
+                                    out[#out + 1] = '    ' .. line
+                                end
+                                out[#out + 1] = '        ---@diagnostic enable'
+                            end
+                        end
+                        out[#out + 1] = '    end'
+                        out[#out + 1] = ')(' .. className .. '.__proto)'
                     end
                 end
 

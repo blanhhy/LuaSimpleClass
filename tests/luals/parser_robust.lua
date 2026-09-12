@@ -39,8 +39,20 @@ class "RobustChild_parser_7c8a" : extends "RobustBase_parser_7c8a" : implements(
 
 local child = RobustChild_parser_7c8a:new()
 
+-- 无键数组元素不应截断后续类体扫描。
+class "ArrayFields_parser_7c8a" {
+    1;
+    { 2, 3 };
+    run = function(self)
+        return 1
+    end;
+}
+
+local arrayFields = ArrayFields_parser_7c8a:new()
+print(arrayFields:run())
+
 -- The child parameters are inferred from the parent method.
--- expect: 44:param-type-mismatch
+-- expect: 56:param-type-mismatch
 child:run(123, {}, "ok")
--- expect: 46:param-type-mismatch
+-- expect: 58:param-type-mismatch
 child:run("ok", {}, 456)

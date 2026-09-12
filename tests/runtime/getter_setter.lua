@@ -59,4 +59,18 @@ local staticField = RuntimeStaticProperty_4a82:new()
 expect(staticField.value, 42,
     'a same-name class field must take priority over the getter')
 
+class "RuntimeSetterOnlyProperty_4a82" {
+    property.value;
+    ["set.value"] = function(self, value)
+        self._value = value * 2
+    end;
+}
+
+local setterOnly = RuntimeSetterOnlyProperty_4a82:new()
+setterOnly.value = 5
+expect(setterOnly._value, 10,
+    'a setter-only property must route assignment through the setter')
+assert(rawget(setterOnly, 'value') == nil,
+    'a setter-only property must not create a raw field')
+
 return true

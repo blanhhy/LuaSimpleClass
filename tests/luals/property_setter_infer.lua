@@ -1,5 +1,6 @@
 class "PropertySetterInfer_8f31" {
     ---@field _value PropertySetterInfer_8f31?
+    property.value;
     ['get.value'] = function(self)
         return self._value
     end;
@@ -13,4 +14,4 @@ class "PropertySetterInfer_8f31" {
 }
 
 -- The field type must be propagated to the unannotated setter parameter.
--- expect: 10:undefined-field
+-- expect: 11:undefined-field

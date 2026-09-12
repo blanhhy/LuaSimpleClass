@@ -7,6 +7,7 @@ class "Acct1_pos" {
     __init = function(self)
         self._balance = 0
     end;
+    property.balance;
     ['get.balance'] = function(self)
         return self._balance
     end;
@@ -19,6 +20,7 @@ class "Acct2_pos" {
     __init = function(self)
         self._balance = 0
     end;
+    property.balance;
     ["get.balance"] = function(self)
         return self._balance
     end;

@@ -7,6 +7,7 @@ class "ParamInfer_7c8a" {
         self.name = name
     end;
 
+    property.count;
     ['get.count'] = function(self)
         self._count = self._count or 0
         return self._count
@@ -28,4 +29,4 @@ print(o.count + 1)
 
 -- 如果字段类型已知，可以推导出赋给该字段的参数类型
 -- expect: 6:undefined-field
--- expect: 16:undefined-field
+-- expect: 17:undefined-field
