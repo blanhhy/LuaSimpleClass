@@ -228,7 +228,6 @@ sc._ENV = {object = o}
 
 ---@alias alias.target function
 ---@alias alias.origin table<string, alias.target>
----@alias simpleclass.alias table<string, alias.origin>
 
 ---Create an alias or a partial function for a method.  
 ---> Can only be used in class body.   
@@ -254,13 +253,13 @@ sc._ENV = {object = o}
 ---## 「:」vs「.」
 ---It’s simple:   
 ---If a method is expected to be called with “:”, then its alias must also use the “:” syntax;  
----conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.
----@type simpleclass.alias
+---conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.s
+---@alias simpleclass.alias table<string, alias.origin>
+---@type  simpleclass.alias
 sc.alias = {}
 
 ---@alias property function
----@alias simpleclass.property table<string, property>
----@type simpleclass.property
+
 ---Declare a property in the class body.  
 ---> eg: `property.my_prop;`  
 ---Once declared, the property can bind getter and setter methods.  
@@ -274,6 +273,8 @@ sc.alias = {}
 ---}
 ---print(MyClass().six) --> 6
 ---```
+---@alias simpleclass.property table<string, property>
+---@type  simpleclass.property
 sc.property = {}
 
 
