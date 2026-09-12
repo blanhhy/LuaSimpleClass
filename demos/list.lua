@@ -50,18 +50,13 @@ class "list" {
 
     ---@static
     ---@param length integer
-    ---@param value? any
+    ---@param value? any 默认为 0
     -- 创建一个指定长度的数组, 并填充默认值
     create = function(length, value)
         if nil == value then value = 0 end
         length = list.chkidx(length, math.huge)
-
         local arr = list:_newContainter(length)
-
-        for i = 1, length do
-            arr[i] = value
-        end
-
+        for i = 1, length do arr[i] = value end
         return arr
     end;
 
@@ -406,7 +401,9 @@ class "list" {
     __tostring = function(self)
         local strList = {}
         for i = 1, self.length do
-            strList[i] = tostring(self[i])
+            strList[i] = type(self[i]) == "string"
+                and ("%q"):format(self[i])
+                or  tostring(self[i])
         end
         return '{'..concat(strList, ", ")..'}'
     end;
