@@ -9,6 +9,7 @@ local rawsetmt = debug and debug.setmetatable or setmetatable
 ---@class M.object : object.class, object
 local object = {
     __base = false;
+    __property = false;
     __classname = "object";
     __tostring = function(self) return ("<%s object>"):format(self.__class) end;
     getClass = function(self) return self.__class end;

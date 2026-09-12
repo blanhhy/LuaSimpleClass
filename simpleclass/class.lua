@@ -47,6 +47,14 @@ function cc:extends(basename)
     return self
 end
 
+--[[
+类独立字段，必须在定义时显示置为非nil值以阻断继承
+__classname：类名，占位"<anonymous>" 
+__base：基类，（仅object内）占位false
+__index：实例方法提供器，占位该类自身
+__property：属性集合，需合并基类，占位false
+]]
+
 ---Define the class body
 ---@generic T
 ---@param clazz table
@@ -55,13 +63,14 @@ function cc:def(clazz, c2)
     if self == clazz then clazz = c2 end
     local base = self.base
 
+    -- 继承元方法（元方法只能由raw字段触发）
     for i = 1, #M._MMS do
         local mm = M._MMS[i]
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
     -- 如果基类的 __index 是平凡的，子类的 __index 也要是平凡的
-    if base.__index == base then clazz.__index = clazz end
+    if clazz.__index == base then clazz.__index = clazz end
 
     for i = 1, #clazz do
         local item = clazz[i]
@@ -83,11 +92,12 @@ function cc:def(clazz, c2)
         end
     end
 
-    if clazz.__property and base["__property"] then
-        local pp1 = clazz.__property
-        local pp2 = base["__property"]
+    local pp1 = clazz.__property
+    local pp2 = base["__property"]
+    if pp1 and pp2 then
         for k, v in next, pp2 do pp1[k] = v end
     end
+    clazz.__property = pp1 or pp2
 
     local ctor = clazz.constructor
     local init = clazz.__init or ctor
