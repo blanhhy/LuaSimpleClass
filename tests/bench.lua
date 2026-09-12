@@ -118,14 +118,15 @@ local holder = {}      -- 逃逸槽：阻止 JIT 消除分配
 
 local function measure(f)
     for _ = 1, 6000 do f() end                    -- 预热 / JIT
-    local n, dt = 100000, 0
+    local n, dt, ran = 100000, 0, 0
     repeat
+        ran = n                                   -- 记录本次实际执行的次数
         local t0 = os.clock()
         for _ = 1, n do f() end
         dt = os.clock() - t0
         if dt < 0.12 then n = n * 4 end
     until dt >= 0.12 or n >= 50000000
-    return dt * 1e6 / n, n
+    return dt * 1e6 / ran, ran
 end
 
 local function bench(name, f, ref)
@@ -142,9 +143,6 @@ bench('plainInit()', function() holder[1] = plainInit() end, ref_new)
 bench('BenchBase()', function() holder[1] = BenchBase_7b01() end, ref_new)
 bench('BenchLeaf() [depth5]', function() holder[1] = BenchLeaf_7b01() end, ref_new)
 
--- 本地化 new：消除 __call 与 :new 的继承链查找，仅保留 new 本体
-local leafNew = BenchLeaf_7b01.new
-bench('BenchLeaf.new(cls) [loc new]', function() holder[1] = leafNew(BenchLeaf_7b01) end, ref_new)
 -- 纯分配：setmetatable + 建表（new 的本体下限）
 local function rawNew(cls)
     return setmetatable({ __class = cls }, cls)
