@@ -155,6 +155,7 @@ class "Account" {
     __init = function(self, balance)
         self._balance = balance or 0
     end;
+    property.balance;
     ['get.balance'] = function(self)
         return self._balance
     end;
@@ -164,7 +165,9 @@ class "Account" {
 }
 
 local account = Account(100)
-print(account.balance) --> 100
 
-account.balance = 200
+account.balance = account.balance + 100
 print(account.balance) --> 200
+
+account.balance = account.balance - 50
+print(account.balance) --> 150

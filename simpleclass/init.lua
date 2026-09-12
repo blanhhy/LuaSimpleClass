@@ -80,6 +80,7 @@ if options.GLOBAL_IMPORT then
         "super",
         "interface",
         "object",
+        "property",
         "isinstance",
         "issubclass",
     }

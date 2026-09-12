@@ -60,14 +60,26 @@ function cc:def(clazz, c2)
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
+    -- 如果基类的 __index 是平凡的，子类的 __index 也要是平凡的
+    if base.__index == base then clazz.__index = clazz end
+
     for i = 1, #clazz do
         local item = clazz[i]
-        if item and type(item) == "table" and item._ALIAS == Alias then
+        local tipe = item and type(item)
+        local PROP = "@simpleclass.property."
+        if tipe == "table" and item._ALIAS == Alias then
             clazz[i] = nil
             local origin = item.origin
             local target, err = Alias.getTarget(item, clazz, base)
             if target ~= nil then clazz[origin] = target
             else error(err, 2) end
+        elseif tipe == "string" and item:sub(1, #PROP) == PROP then
+            local key = item:sub(#PROP + 1)
+            if key and key ~= "" then
+                clazz[i] = nil
+                clazz.__property = clazz.__property or {}
+                clazz.__property[key] = true
+            end
         end
     end
 
@@ -85,7 +97,13 @@ function cc:def(clazz, c2)
     clazz.__init = init
     clazz.constructor = ctor
     clazz.__classname = self.name
+
     setmetatable(clazz, M._CMT)
+
+    if clazz.__property then
+        clazz.__index = clazz.__index ~= clazz and clazz.__index or clazz.__getter
+        clazz.__newindex = clazz.__newindex or clazz.__setter
+    end
 
     if self.check_impl then
         local ok, err = self:check_impl(clazz)
@@ -226,6 +244,12 @@ end
 
 M.creator = cc
 M.alias = alias
+
+M.property = setmetatable({}, {
+    __index = function(_, key)
+        return "@simpleclass.property."..key
+    end;
+})
 
 function M.class(name)
     local typ = type(name)

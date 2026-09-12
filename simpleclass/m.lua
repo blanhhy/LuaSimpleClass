@@ -7,10 +7,10 @@ local class_MT = {
 }
 
 local mm_names = {
-    "__add", "__sub", "__mul", "__div", "__idiv", "__mod", "__pow",
-    "__unm", "__band", "__bor", "__bxor", "__bnot", "__shl", "__shr",
-    "__concat", "__len", "__eq", "__lt", "__le", "__call", "__gc",
-    "__tostring", "__index", "__newindex",
+    "__add", "__sub", "__mul", "__div", "__mod", "__pow", "__idiv", "__unm",
+    "__band", "__bor", "__bxor", "__bnot", "__shl", "__shr", "__eq", "__lt",
+    "__le", "__concat", "__len", "__tostring", "__pairs", "__gc", "__close",
+    "__index", "__newindex", "__call",
 }
 
 ---@class M : simpleclass

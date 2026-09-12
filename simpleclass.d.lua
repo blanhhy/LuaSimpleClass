@@ -258,6 +258,11 @@ sc._ENV = {object = o}
 ---@type simpleclass.alias
 sc.alias = {}
 
+---@alias property function
+---@alias simpleclass.property table<string, property>
+---@type simpleclass.property
+sc.property = {}
+
 
 -----------------------------------------------------------------------------------------------------
 
@@ -274,6 +279,7 @@ sc.alias = {}
 ---| "interface"
 ---| "type"
 ---| "object"
+---| "property"
 ---| "isinstance"
 ---| "issubclass"
 
@@ -314,6 +320,7 @@ isinstance = sc.isinstance
 issubclass = sc.issubclass
 
 object = sc.object
+property = sc.property
 
 
 -----------------------------------------------------------------------------------------------------

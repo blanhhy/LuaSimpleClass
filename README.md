@@ -81,6 +81,8 @@ obj:foo() --> "foo from    MyClass"
 
 Getter & Setter 属性：
 
+使用 `property` 定义属性，属性可以拥有 Getter & Setter 方法
+
 - Getter：函数名为 `get.<attr>`，使得 `obj.attr` 可读取
 - Setter：函数名为 `set.<attr>`，使得 `obj.attr` 可赋值
 
@@ -91,6 +93,7 @@ Getter & Setter 属性：
 >     __init = function(self, init)
 >         self._count = init or 0
 >     end;
+>     property.count;
 >     ['get.count'] = function(self)
 >         return self._count
 >     end;
@@ -104,7 +107,7 @@ Getter & Setter 属性：
 > obj.count = 20
 > print(obj.count) --> 20
 > ```
-> 注：并不需要同时实现，可以只读或只写
+> 注：并不需要同时实现，可以只读或只写，甚至没有
 
 匿名类：临时使用的类，无需命名，也不注册环境
 

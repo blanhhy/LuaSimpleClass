@@ -13,21 +13,23 @@ local object = {
     is = rawequal;
 }
 
-function object:__index(key)
-    local field = self.__class[key]
-    if field ~= nil then return field end
-    local getter = type(key) == "string" and self.__class["get." .. key]
-    if getter and type(getter) == "function" then
-        return getter(self)
+object.__index = object
+
+function object:__getter(key)
+    local item = self.__class[key]
+    if item ~= nil then return item end
+    local prop = self.__class["__property"]
+    local gett = prop and prop[key] and self.__class["get." .. key]
+    if gett and type(gett) == "function" then
+        return gett(self)
     end
 end
 
-function object:__newindex(key, value)
-    local setter = type(key) == "string" and self.__class["set." .. key]
-    if setter and type(setter) == "function" then
-        return setter(self, value)
-    end
-    return rawset(self, key, value)
+function object:__setter(key, value)
+    local prop = self.__class["__property"]
+    if not prop or not prop[key] then rawset(self, key, value) end
+    local set = self.__class["set." .. key]
+    if set and type(set) == "function" then set(self, value) end
 end
 
 ---@return object

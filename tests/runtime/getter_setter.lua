@@ -9,6 +9,7 @@ class "RuntimeProperty_4a82" {
     __init = function(self)
         self._value = 1
     end;
+    property.value;
     ["get.value"] = function(self)
         return self._value
     end;
@@ -27,5 +28,35 @@ assert(rawget(obj, 'value') == nil,
 
 obj._value = 9
 expect(obj.value, 9, 'getter must read the backing field')
+
+class "RuntimeDeclaredProperty_4a82" {
+    __init = function(self)
+        self._value = 4
+    end;
+    property.value;
+    ["get.value"] = function(self)
+        return self._value
+    end;
+}
+
+local noSetter = RuntimeDeclaredProperty_4a82:new()
+expect(noSetter.value, 4, 'declared property getter without setter')
+noSetter.value = 8
+assert(rawget(noSetter, 'value') == nil,
+    'declared property without setter must not create an instance field')
+expect(noSetter.value, 4,
+    'assignment without setter must not change the property value')
+
+class "RuntimeStaticProperty_4a82" {
+    property.value;
+    value = 42;
+    ["get.value"] = function()
+        error('the getter must not override a class field')
+    end;
+}
+
+local staticField = RuntimeStaticProperty_4a82:new()
+expect(staticField.value, 42,
+    'a same-name class field must take priority over the getter')
 
 return true
