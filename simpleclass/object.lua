@@ -41,7 +41,7 @@ end
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
-    local ctor = self['__init'] or self['constructor']
+    local ctor = self['__init']
     if ctor then ctor(inst, ...) end
     return inst
 end

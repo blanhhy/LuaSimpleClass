@@ -518,8 +518,8 @@ local function parseMethods(body, aliasNames)
                                         else kind = 'instance'
             end
 
-            -- `constructor` is a runtime alias of `__init`; use one canonical
-            -- name so inheritance, super inference, and override checks agree.
+            -- `constructor` is consumed as the initialization source during
+            -- class definition; the generated class only keeps `__init`.
             if name == 'constructor' then name = '__init' end
 
             local funcBody = body:sub(funcBodyStart, k - 4)
@@ -1467,16 +1467,16 @@ function OnSetText(uri, text)
                     if m.kind == 'init' then initMethod = m end
                 end
 
-                local constructor = newMethod or initMethod
-                local inheritedConstructor = false
-                if not constructor and parentName then
+                local newSource = newMethod or initMethod
+                local inheritedNewSource = false
+                if not newSource and parentName then
                     local parentMeta = __sc_classmeta[uri][parentName]
                     if parentMeta then
-                        constructor = parentMeta.constructor
-                        inheritedConstructor = constructor ~= nil
+                        newSource = parentMeta.newSource
+                        inheritedNewSource = newSource ~= nil
                     end
                 end
-                classmeta.constructor = constructor
+                classmeta.newSource = newSource
 
                 if newMethod then
                     local paramStr = stripFirstParam(newMethod.params)
@@ -1503,19 +1503,19 @@ function OnSetText(uri, text)
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
                 else
-                    local paramStr = constructor and stripFirstParam(constructor.params) or ''
-                    if inheritedConstructor and constructor then
-                        local constructorDocs = constructor.docs or {}
-                        local constructorParams = constructor.params or ''
-                        local constructorInferred = constructor.inferred or {}
-                        for _, docLine in ipairs(constructorDocs) do
+                    local paramStr = newSource and stripFirstParam(newSource.params) or ''
+                    if inheritedNewSource and newSource then
+                        local sourceDocs = newSource.docs or {}
+                        local sourceParams = newSource.params or ''
+                        local sourceInferred = newSource.inferred or {}
+                        for _, docLine in ipairs(sourceDocs) do
                             if not docLine:match('^%-%-%-@return%s') then
                                 out[#out + 1] = docLine
                             end
                         end
-                        for _, name in ipairs(pl_paramNames(constructorParams)) do
-                            local typ = constructorInferred[name]
-                            if typ and not pl_hasParamDoc(constructorDocs, name) then
+                        for _, name in ipairs(pl_paramNames(sourceParams)) do
+                            local typ = sourceInferred[name]
+                            if typ and not pl_hasParamDoc(sourceDocs, name) then
                                 out[#out + 1] = ('---@param %s %s'):format(name, typ)
                             end
                         end

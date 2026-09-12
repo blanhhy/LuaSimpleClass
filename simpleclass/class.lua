@@ -89,21 +89,14 @@ function cc:def(clazz, c2)
         for k, v in next, pp2 do pp1[k] = v end
     end
 
-    local init = clazz.__init
     local ctor = clazz.constructor
-    if init ~= ctor then
-        init = init or ctor
-        ctor = ctor or init
-    end
-    if init ~= ctor then
-        error("bad class definition: different '__init' and 'constructor'", 2)
-    end
-    
+    local init = clazz.__init or ctor
+    clazz.__init = init
+    clazz.constructor = nil
+
     clazz.new = clazz.new or base.new
 
     clazz.__base = base
-    clazz.__init = init
-    clazz.constructor = ctor
     clazz.__classname = self.name
     setmetatable(clazz, M._CMT)
 

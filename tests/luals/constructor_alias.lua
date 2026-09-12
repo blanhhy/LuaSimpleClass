@@ -1,5 +1,7 @@
--- `constructor` and `__init` share the constructor signature, including inheritance.
--- expect: 14:param-type-mismatch
+-- `constructor` is only a definition-time source for `new`; the generated
+-- class keeps the signature but does not expose a `constructor` field.
+-- expect: 16:param-type-mismatch
+-- expect: 17:undefined-field
 
 class "ConstructorAliasBase_5a21" {
     ---@param name string
@@ -12,4 +14,5 @@ class "ConstructorAliasChild_5a21" : extends "ConstructorAliasBase_5a21" {}
 
 local valid = ConstructorAliasChild_5a21:new("ok")
 local invalid = ConstructorAliasChild_5a21:new(123)
-print(valid.name, invalid)
+local discarded = ConstructorAliasChild_5a21.constructor
+print(valid.name, invalid, discarded)

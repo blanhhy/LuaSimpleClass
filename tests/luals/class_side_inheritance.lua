@@ -1,5 +1,5 @@
 -- Class objects inherit Base.class, while interfaces stay on the instance side.
--- expect: 30:undefined-field
+-- expect: 31:undefined-field
 
 require "simpleclass"
 
@@ -21,7 +21,8 @@ class "ClassSideChild_73a1" : extends "ClassSideBase_73a1" : implements(Instance
     end;
 }
 
--- The static field and constructor are inherited through ClassSideBase.class.
+-- The static field and the inherited `new` signature come through
+-- ClassSideBase.class.
 print(ClassSideChild_73a1.kind)
 local child = ClassSideChild_73a1:new("ok")
 print(child:describe())
