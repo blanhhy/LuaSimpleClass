@@ -2,7 +2,6 @@
 ---仿 Python 的 list 类
 
 local sc = require "simpleclass"
-local alias = sc.alias
 local ctype = sc.type
 
 local isJIT = pcall(require, "jit")
@@ -23,6 +22,14 @@ local type, tostring, setmetatable
 local insert, concat, remove = table.insert, table.concat, table.remove
 local unpack = table.unpack or unpack
 local int = math.floor
+
+local tonumber = tonumber
+local tointeger = math.tointeger
+or function(x) ---@return integer?
+    local n = tonumber(x)
+    if n == nil then return end
+    if n == int(n) then return n end
+end
 
 class "list" {
     -- 静态属性
@@ -312,9 +319,9 @@ class "list" {
     ---@param step? integer 切片的步长
     ---@return list
     sub = function(self, i, j, step)
-        i = i and list.chkidx(i, self.length, self.length) or 1
-        j = j and list.chkidx(j, self.length, self.length) or self.length
         step = step and list.chkidx(step, math.huge) or 1
+        i = i and list.chkidx(i, self.length, self.length) or (step > 0 and 1 or self.length)
+        j = j and list.chkidx(j, self.length, self.length) or (step > 0 and self.length or 1)
 
         local slice = setmetatable({__class = list}, list)
         local count = 0
@@ -448,8 +455,17 @@ class "list" {
     end;
 
     -- 让切片语法更简洁
-    -- eg: slice = arr(1, 3[, 1])
-    alias.__call:sub();
+    -- eg: slice = arr[[1:3:1]]
+    ---@param str string
+    ---@return list
+    __call = function(self, str)
+        if type(str) ~= "string" then error("attempt to call a list value", 2) end
+        local i, j, k = str:match "^([^:]*):?([^:]*):?([^:]*)$"
+        local b = i and i ~= '' and (tonumber(i) or error("slice syntax error: "..str, 2)) or nil
+        local e = j and j ~= '' and (tonumber(j) or error("slice syntax error: "..str, 2)) or nil
+        local s = k and k ~= '' and (tonumber(k) or error("slice syntax error: "..str, 2)) or nil
+        return self:sub(b, e, s)
+    end;
 
     -- 重载 < 和 > 符号, 基于数组长度和第一个不等元素
     __lt = function(left, right)
