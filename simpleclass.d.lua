@@ -261,6 +261,19 @@ sc.alias = {}
 ---@alias property function
 ---@alias simpleclass.property table<string, property>
 ---@type simpleclass.property
+---Declare a property in the class body.  
+---> eg: `property.my_prop;`  
+---Once declared, the property can bind getter and setter methods.  
+---A getter method should be named as `['get.my_prop']`, while setter as `['set.my_prop']`.  
+------
+---Here is a basic usage:  
+---```lua
+---class "MyClass" {
+---    property.six;
+---    ['get.six'] = function(self) return 6 end;
+---}
+---print(MyClass().six) --> 6
+---```
 sc.property = {}
 
 
