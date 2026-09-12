@@ -1,34 +1,37 @@
 local M = require "simpleclass.m" ---@class M
 
-local type, setmetatable, error
-    = type, setmetatable, error
+local type, setmetatable, error, next
+    = type, setmetatable, error, next
 
 local getinfo  = debug and debug.getinfo
 local getlocal = debug and debug.getlocal
-local getcontext, pack, unpack
+local getcontext, context
 
 if getinfo and getlocal then
     function getcontext()
-        local _, obj, cls, proxy
-        if getinfo(4) then
-            _, proxy = getlocal(4, 1)
-            if type(proxy) == "table" and proxy.__super then
-                obj = proxy.self
-                cls = proxy.__class.__base
+        context = context or setmetatable({}, {__mode = 'kv'})
+        local wt = "f"
+        local _, this = getlocal(3, 1)
+        local imethod = getinfo(3, wt)
+
+        local objcls = this.__class or this
+        local method = imethod.func
+        local funcls = context[method]
+        if funcls then return funcls, this end
+
+        while not funcls and objcls do
+            for _, v in next, objcls do
+                if v == method then
+                    funcls = objcls
+                    break
+                end
             end
+            objcls = objcls.__base
         end
-        if not obj or not cls then
-            _, obj = getlocal(3, 1)
-            cls = type(obj) == "table" and obj.__class
-        end
-        return obj, cls
+
+        context[method] = funcls
+        return funcls, this
     end
-    local is52p = tonumber(_VERSION:sub(5)) > 5.1
-    pack = is52p and table.pack or function(...)
-            return {..., n = select('#', ...)}
-        end
-    ---@diagnostic disable-next-line: deprecated
-    unpack = is52p and table.unpack or _G.unpack
 end
 
 
@@ -39,16 +42,11 @@ local Super = {
         local field = clazz.__base[key]
         if "function" ~= type(field) then return field end
         if proxy[field] then return proxy[field] end
-        local proxy_method = getcontext and function (this, ...)
-            local ret = pack(field(this == proxy        -- 保留调用栈，维持 super 上下文
-                    and proxy.self
-                    or  this, ...))
-            return unpack(ret, 1, ret.n)
-        end or function (self, ...)
+        local proxy_method = function(self, ...)
             self = self == proxy and proxy.self or self -- 重定向 self 指针
             return field(self, ...)
         end
-        proxy[field] = proxy_method                     -- proxy 存在期间会缓存闭包
+        proxy[field] = proxy_method -- proxy 存在期间会缓存闭包
         return proxy_method
     end,
     __tostring = function(proxy)
@@ -67,7 +65,7 @@ local Super = {
 ---@return super<cls, obj>
 function M.super(cls, obj)
     if not obj and not cls and getcontext then
-        obj, cls = getcontext()
+        cls, obj = getcontext()
     end
     if not obj then obj = cls end
     if type(cls)        ~= "table"
