@@ -4,31 +4,21 @@
 local sc = require "simpleclass"
 local ctype = sc.type
 
-local isJIT = pcall(require, "jit")
-local is5_5 = _VERSION >= "Lua 5.5"
-local table_new, table_clear
-
-if isJIT then
-    table_new = require "table.new"
-    table_clear = require "table.clear"
-end
-
-if is5_5 then
-    table_new = table.create
-end
-
-local type, tostring, setmetatable
-    = type, tostring, setmetatable
+local type, tostring, setmetatable, tonumber
+    = type, tostring, setmetatable, tonumber
 local insert, concat, remove = table.insert, table.concat, table.remove
 local unpack = table.unpack or unpack
 local int = math.floor
 
-local tonumber = tonumber
-local tointeger = math.tointeger
-or function(x) ---@return integer?
-    local n = tonumber(x)
-    if n == nil then return end
-    if n == int(n) then return n end
+local table_new, table_clr
+
+if pcall(require, "jit") then
+    local ok_new, new = pcall(require, "table.new")
+    local ok_clr, clr = pcall(require, "table.clear")
+    table_new = ok_new and new or nil
+    table_clr = ok_clr and clr or nil
+elseif _VERSION >= "Lua 5.5" then
+    table_new = table.create
 end
 
 class "list" {
@@ -114,7 +104,6 @@ class "list" {
     -- 产生一个空容器，内部使用，必须立即填充值
     _newContainter = function(cls, length)
         local newArr
-
         if table_new then
             newArr = table_new(length, 2)
             newArr.__class = cls
@@ -122,7 +111,6 @@ class "list" {
         else
             newArr = setmetatable({__class = cls}, cls)
         end
-
         newArr.length = length
         return newArr
     end;
@@ -132,21 +120,27 @@ class "list" {
     -- 在尾部追加元素
     append = function(self, value)
         if nil == value then
-            error("Cannot add nil into a list", 2)
+            error("cannot add nil into a list", 2)
         end
         self.length = self.length + 1
         self[self.length] = value
+        return self
     end;
 
     -- 向指定索引处插入元素
     ---@param index? integer 默认在数组末尾
+    ---@overload fun(self:list, value:any):list
     insert = function(self, index, value)
-        index = index and list.chkidx(index, self.length + 1, self.length) or self.length + 1
-        if nil == value then
-            error("Cannot add nil into a list", 2)
+        if value == nil then
+            if index == nil then error("cannot add nil into a list", 2) end
+            value = index
+            index = self.length + 1
+        else
+            index = list.chkidx(index, self.length + 1, self.length)
         end
+        insert(self, index, value)
         self.length = self.length + 1
-        return insert(self, index, value)
+        return self
     end;
 
     -- 弹出指定索引的元素, 返回其值
@@ -198,8 +192,8 @@ class "list" {
     -- 清空数组, 长度归零
     clear = function(self)
         local cls = self.__class
-        if table_clear then
-            table_clear(self, self.length) -- 保留元表
+        if table_clr then
+            table_clr(self, self.length) -- 保留元表
             self.__class = cls -- 重绑class
             self.length = 0 -- 重置length
             return self
@@ -232,7 +226,7 @@ class "list" {
     ---@param j? integer
     fill = function(self, value, i, j)
         if nil == value then
-            error("Cannot add nil into a list", 2)
+            error("cannot add nil into a list", 2)
         end
         i = i and list.chkidx(i, self.length, self.length) or 1
         j = j and list.chkidx(j, self.length, self.length) or self.length
@@ -343,18 +337,14 @@ class "list" {
         if type(n) ~= "number" or int(n) ~= n then
             error(("<integer> expected, got <%s>."):format(ctype(n)), 2)
         end
-
         if n <= 0 then return list() end
-
-        local newArr = list:_newContainter(self.length * n)
-
+        local rep = list:_newContainter(self.length * n)
         for i = 1, self.length do
             for j = 0, n - 1 do
-                newArr[i + j * self.length] = self[i]
+                rep[i + j * self.length] = self[i]
             end
         end
-
-        return newArr
+        return rep
     end;
 
     -- 获取去重数组
@@ -389,6 +379,7 @@ class "list" {
     -- 统计方法
 
     -- 获取数组中的最大值, 要求值可以互相比较
+    ---@return any
     max = function(self)
         local max = self[1]
         if self.length < 2 then return max end
@@ -399,6 +390,7 @@ class "list" {
     end;
 
     -- 获取数组中的最小值, 要求值可以互相比较
+    ---@return any
     min = function(self)
         local min = self[1]
         if self.length < 2 then return min end
