@@ -137,8 +137,9 @@ Getter & Setter 属性：
 
 - `super`：以子类对象身份调用父类方法
 
-  接收当前类与 `self`，示例： `super(thisclass, self):__init()`  
+  接收当前类与 `self`，示例： `super(thisclass, self):foo()`  
   如果 `debug` 库可用，`super()` 可以无需传递参数，和 Python 类似
+  如果明确要调用构造函数，可以省略名字，示例：`super(cls, self)()`
 
 > 示例：单继承
 >

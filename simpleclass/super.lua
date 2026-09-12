@@ -34,10 +34,15 @@ if getinfo and getlocal then
     end
 end
 
+local function superinit(proxy, ...)
+    return proxy.__class.__base.__init(proxy.self, ...)
+end
 
 local Super = {
     __mode  = 'k',
+    __call  = superinit,
     __index = function(proxy, key)
+        if key == "__init" then return superinit end
         local clazz = proxy.__class
         local field = clazz.__base[key]
         if "function" ~= type(field) then return field end

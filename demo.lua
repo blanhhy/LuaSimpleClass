@@ -52,7 +52,8 @@ print(sc.type(s1)) --> Student
 class "CollageStudent" : Student {
     __init = function(self, name, age, grade)
         -- 在实例方法里，可以省略 super 的参数
-        super():__init(name, age, grade)
+        -- 如果是构造函数，还可以省略名字
+        super()(name, age, grade)
     end;
 }
 
