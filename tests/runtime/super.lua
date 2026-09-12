@@ -61,4 +61,28 @@ local explicitResult, explicitSelf = explicit:visit()
 expect(explicitResult, 'base>explicit', 'explicit super result')
 expect(explicitSelf, explicit, 'explicit super self')
 
+local inheritedTrace = {}
+
+class "RuntimeSuperDefinitionBase_7f21" {
+    foo = function(self)
+        inheritedTrace[#inheritedTrace + 1] = 'base'
+        return 'base'
+    end;
+}
+
+class "RuntimeSuperDefinitionMiddle_7f21" : extends "RuntimeSuperDefinitionBase_7f21" {
+    foo = function(self)
+        inheritedTrace[#inheritedTrace + 1] = 'middle'
+        return super():foo() .. '>middle'
+    end;
+}
+
+class "RuntimeSuperDefinitionChild_7f21" : extends "RuntimeSuperDefinitionMiddle_7f21" {}
+
+local inherited = RuntimeSuperDefinitionChild_7f21:new()
+expect(inherited:foo(), 'base>middle',
+    'zero-argument super must start from the method definition class')
+expect(table.concat(inheritedTrace, '>'), 'middle>base',
+    'inherited override must not execute twice')
+
 return true
