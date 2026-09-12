@@ -1,7 +1,10 @@
 local M = require "simpleclass.m" ---@class M
 
-local type, next, getmetatable, setmetatable
-    = type, next, getmetatable, setmetatable
+local type, next, getmetatable, setmetatable, rawset
+    = type, next, getmetatable, setmetatable, rawset
+
+local rawgetmt = debug and debug.getmetatable or getmetatable
+local rawsetmt = debug and debug.setmetatable or setmetatable
 
 ---@class M.object : object.class, object
 local object = {
@@ -14,29 +17,32 @@ local object = {
 }
 
 object.__index = object
+_ENV = nil
 
 function object:__getter(key)
-    local item = self.__class[key]
-    if item ~= nil then return item end
-    local prop = self.__class["__property"]
-    local gett = prop and prop[key] and self.__class["get." .. key]
-    if gett and type(gett) == "function" then
-        return gett(self)
-    end
+    local clazz = self.__class
+    local field = clazz[key]
+    if field ~= nil then return field end
+    local prop = clazz["__property"]
+    local gett = prop and prop[key] and clazz["get." .. key]
+    if gett then return gett(self) end
 end
 
-function object:__setter(key, value)
-    local prop = self.__class["__property"]
-    if not prop or not prop[key] then rawset(self, key, value) end
-    local set = self.__class["set." .. key]
-    if set and type(set) == "function" then set(self, value) end
+function object:__setter(key, v)
+    local clazz = self.__class
+    local prope = clazz["__property"]
+    if not prope or not prope[key] then
+        return rawset(self, key, v)
+    end
+    local sett = clazz["set." .. key]
+    if sett then return sett(self, v) end
 end
 
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
     local ctor = self['__init'] or self['constructor']
-    if type(ctor) == "function" then ctor(inst, ...) end
+    if ctor then ctor(inst, ...) end
     return inst
 end
 
@@ -72,9 +78,6 @@ M._ENV.object = object
 M.object = object
 M.isinstance = object.isInstance
 M.issubclass = object.isExtends
-
-local rawgetmt = debug and debug.getmetatable or getmetatable
-local rawsetmt = debug and debug.setmetatable or setmetatable
 
 ---Clone the object
 ---@param isDeep? boolean Default `true`
