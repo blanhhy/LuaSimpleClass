@@ -140,14 +140,13 @@ end
 print('\n== 实例创建 ==')
 local ref_new = bench('{}', function() holder[1] = {} end)
 bench('plainInit()', function() holder[1] = plainInit() end, ref_new)
-bench('BenchBase()', function() holder[1] = BenchBase_7b01() end, ref_new)
-bench('BenchLeaf() [depth5]', function() holder[1] = BenchLeaf_7b01() end, ref_new)
 
--- 纯分配：setmetatable + 建表（new 的本体下限）
 local function rawNew(cls)
     return setmetatable({ __class = cls }, cls)
 end
-bench('rawNew(cls) [alloc only]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
+bench('rawNew(cls) [no ctor]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
+bench('BenchBase()', function() holder[1] = BenchBase_7b01() end, ref_new)
+bench('BenchLeaf() [depth5]', function() holder[1] = BenchLeaf_7b01() end, ref_new)
 -- 有构造器的类（主流场景）
 bench('BenchCtorSelf(1) [own ctor]', function() holder[1] = BenchCtorSelf_7b01(1) end, ref_new)
 bench('BenchCtorChild(2) [inh ctor]', function() holder[1] = BenchCtorChild_7b01(2) end, ref_new)
