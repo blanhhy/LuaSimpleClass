@@ -39,20 +39,16 @@ local function superinit(proxy, ...)
 end
 
 local Super = {
-    __mode  = 'k',
     __call  = superinit,
     __index = function(proxy, key)
         if key == "__init" then return superinit end
         local clazz = proxy.__class
         local field = clazz.__base[key]
         if "function" ~= type(field) then return field end
-        if proxy[field] then return proxy[field] end
-        local proxy_method = function(self, ...)
+        return function(self, ...)
             self = self == proxy and proxy.self or self -- 重定向 self 指针
             return field(self, ...)
         end
-        proxy[field] = proxy_method -- proxy 存在期间会缓存闭包
-        return proxy_method
     end,
     __tostring = function(proxy)
         return ("super<%s, %s>"):format(
@@ -82,7 +78,6 @@ function M.super(cls, obj)
     local proxy = setmetatable({
         self    = obj,
         __class = cls,
-        __super = true
     }, Super)
     return proxy
 end
