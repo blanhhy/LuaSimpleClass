@@ -1,4 +1,5 @@
 local sc = require "simpleclass"
+local ctype = sc.type
 
 --#==========================================
 --# 基础使用
@@ -18,7 +19,7 @@ class "Person" {
 class "Student" : extends "Person" {
     ---@param grade string
     __init = function(self, name, age, grade)
-        super():__init(name, age)
+        super(Student, self):__init(name, age)
         self.grade = grade
     end;
     ---@override
@@ -43,13 +44,13 @@ print(s1:isInstance(Person))   --> true
 print(s1:isInstance(object))   --> true
 print(isinstance(s1, "table")) --> true
 
-print(sc.type(s1)) --> Student
+print(ctype(s1)) --> Student
 
 --#==========================================
 --# 深层继承
 --#==========================================
 -- 继承的简洁写法，':' + 基类
-class "CollageStudent" : Student {
+class "CollageStu" : Student {
     __init = function(self, name, age, grade)
         -- 在实例方法里，可以省略 super 的参数
         -- 如果是构造函数，还可以省略名字
@@ -57,8 +58,8 @@ class "CollageStudent" : Student {
     end;
 }
 
--- 实例化的简洁写法；但 LS 对此无签名分析支持
-local c1 = CollageStudent("Alice", 22, "junior")
+-- 实例化的简洁写法；但 LS 对此无签名提示与检查支持
+local c1 = CollageStu("Alice", 22, "junior")
 c1:sayHello()
 -- Output: Hello, my name is Alice and I am a junior year old student.
 
@@ -147,28 +148,3 @@ xpcall(function()
     makeFly(Person())
     -- Output: flyable must be a CanFly object
 end, print)
-
---#==========================================
---# Getter / Setter
---#==========================================
-class "Account" {
-    ---@field private _balance number
-    __init = function(self, balance)
-        self._balance = balance or 0
-    end;
-    property.balance;
-    ['get.balance'] = function(self)
-        return self._balance
-    end;
-    ['set.balance'] = function(self, value)
-        self._balance = value
-    end;
-}
-
-local account = Account(100)
-
-account.balance = account.balance + 100
-print(account.balance) --> 200
-
-account.balance = account.balance - 50
-print(account.balance) --> 150

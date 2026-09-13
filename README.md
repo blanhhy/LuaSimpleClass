@@ -2,11 +2,29 @@
 
 可能是第一个有着现代语法，但不干扰——反而增强静态检查工具的 Lua 类库
 
-作为 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版提供，极大简化了运行时行为，但保留核心 OOP 能力，能显著改善 Lua 的 OOP 体验
+作为 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版提供，简化了运行时行为，但保留核心 OOP 能力
 
-## 安装 & 导入
+## 安装
 
-`simpleclass` 是纯 Lua 实现的，只需要下载 [此文件夹](simpleclass)，然后在 Lua 代码中导入即可
+`simpleclass` 是纯 Lua 实现的，只需要下载 [此文件夹](simpleclass) 即可在任何地方使用
+
+兼容 Lua 5.1 及以上版本，含 LuaJIT
+
+如果你使用 [LuaRocks](https://luarocks.org/)，也可以用如下命令安装：
+
+```bash
+luarocks install simpleclass
+```
+
+或从源码构建到当前 rocks 树（如 `luarocks init` 生成的 `lua_modules/`）：
+
+```bash
+luarocks make --tree=lua_modules simpleclass-1.0.0-1.rockspec
+```
+
+## 快速开始
+
+### 导入模块
 
 ```lua
 require "simpleclass"
@@ -20,13 +38,9 @@ require "simpleclass"
 > local sc = require "simpleclass.with" {GLOBAL_IMPORT = false}
 > ```
 
-## 快速开始
-
-简单的情况用起来与 Luaclass 相差无几
+### 定义第一个类
 
 ```lua
-require "simpleclass"
-
 class "MyClass" {
     foo = function(self)
         print("foo from", self:getClass())
@@ -37,35 +51,37 @@ local obj = MyClass()
 obj:foo() --> "foo from    MyClass"
 ```
 
-详细指导参考下方 [特性](#特性) 或 [演示脚本](demo.lua)
+更多示例代码可以参考 [Demo](demo/)
 
 ## 特性
 
 ### 类
 
-类是 simpleclass 的核心，类是生成对象的蓝图，使多个对象共享相同的方法，同时在构造函数中规定对象应有的属性
+定义命名类：
 
-定义命名类：语法为 `class "<name>" {<body>}`
+语法为 `class "<name>" {<body>}`
 
 > 命名类创建后位于 `simpleclass._ENV` 环境中，同名的类会覆盖之前的定义；如果开启了 [自动全局类](#自动全局类)，还会为类注册全局变量
 
 类的成员：
 
-- 静态字段：直接在类体中定义，属于类本身，所有对象共享
-- 实例字段：在构造函数中定义，每个对象都有自己的实例字段，类无法访问它们
-- Getter & Setter 属性：本质是一对实例方法，但向外暴露一个逻辑上的字段
-- 实例方法：预期首参为实例的方法，习惯将首参命名为 `self`，用 `:` 调用
-- 类方法：预期首参为类的方法，习惯将首参命名为 `cls` 或 `self`，用 `:` 调用
-- 静态方法：挂载在类对象上的普通函数，不依赖于实例或类，用 `.` 调用
-- 构造函数：名为 `__init` 的方法，是特殊的实例方法，在对象创建时调用
-- 元方法：Lua 原生的元方法，定义在类对象上，影响实例对象的行为
+静态字段、实例字段、实例属性、实例方法、类方法、静态方法、构造函数和元方法
 
-实例化：`clazz()` 或 `clazz:new()` 均可，这里以前者为例
+> 在 Lua 中，实例方法需要用 `:` 调用，习惯上将函数第一个参数命名为 `self`；类方法逻辑类似
+> 
+> SimpleClass 以 `__init` 作为构造函数名，也兼容 `constructor` 作为定义时的别名
+> 
+> 直接在类体中定义的字段会成为静态字段，所有对象共享；而元方法是 Lua 原生的元方法，类是实例的元表，因此可以定义元方法来改变实例的行为
+
+实例化：
+
+使用 `clazz:new()` 或 `clazz()` 均可  
+如果你正在使用 LuaLS，前者是更推荐的写法 
 
 > 示例：命名类
 >
 > ```lua
-> class "MyNamedClass" {
+> class "NamedCls" {
 >     __init = function(self, arg1, arg2)
 >         self.arg1 = arg1
 >         self.arg2 = arg2
@@ -75,7 +91,7 @@ obj:foo() --> "foo from    MyClass"
 >     end;
 > }
 >
-> local obj = MyNamedClass("hello", "world")
+> local obj = NamedCls:new("hello", "world")
 > obj:print() --> "hello world"
 > ```
 
@@ -107,7 +123,7 @@ Getter & Setter 属性：
 > obj.count = 20
 > print(obj.count) --> 20
 > ```
-> 注：并不需要同时实现，可以只读或只写，甚至没有
+> 注：并不需要同时实现，可以只读或只写，甚至都没有
 
 匿名类：临时使用的类，无需命名，也不注册环境
 
@@ -124,36 +140,40 @@ Getter & Setter 属性：
 > obj:foo() --> "foo from anonymous class"
 > ```
 >
-> 注：定义有名类时如果传入空参数，空字符串，非字符串参数，一律会被解释为匿名类；如 `class () {}` 也能创建匿名类，甚至可以使用 `extends` `implements`
+> 注：  
+> 定义有名类时如果传入空参数，空字符串，非字符串参数，一律会被解释为匿名类  
+> 如 `class() {}` 也能创建匿名类，甚至可以使用 `extends` `implements`
 
 ### 类的继承
 
 - 单继承：simpleclass 仅支持单继承
 
   经典语法：使用 `extends` 关键字 + 类名字符串  
-  简短语法：直接书写基类名，示例：`class "Myclass" : Base {}`
+  简短语法：直接书写基类名，示例：`class "Cls" : Base {}`
 
 > 简短语法下，基类必须紧跟类体，如有其他关键字（如 `implements`）需要在它之前使用
 
 - `super`：以子类对象身份调用父类方法
 
-  接收当前类与 `self`，示例： `super(thisclass, self):foo()`  
+  接收当前类与 `self`，示例： `super(this_cls, self):foo()`  
+  > `self` 可以是实例对象，也可以是类对象
+
+  调用父类构造函数时，可以省略名字，示例：`super(cls, self)()`
   如果 `debug` 库可用，`super()` 可以无需传递参数，和 Python 类似
-  如果明确要调用构造函数，可以省略名字，示例：`super(cls, self)()`
 
 > 示例：单继承
 >
 > ```lua
-> class "MySubClass" : extends "MyClass" {
+> class "MySubCls" : extends "MyClass" {
 >     ---@Override
 >     foo = function(self)
->         super(MySubClass, self):foo() -- call parent's foo
+>         super(MySubCls, self):foo() -- call parent's foo
 >         print("improved foo")
 >     end;
 > }
 >
-> local obj = MySubClass()
-> obj:foo() --> foo from MySubClass
+> local obj = MySubCls:new()
+> obj:foo() --> foo from MySubCls
 >           --| improved foo
 > ```
 
@@ -216,34 +236,62 @@ Getter & Setter 属性：
 
 ### 类型检查
 
-`simpleclass.type(obj)`
+**`type(obj)`**
 
-- 返回对象的类
-- 如果是基本类型，返回 `type(obj)`
-- 由于`_G.type` 已存在，故不自动注入
+  > 不是 Lua 标准库中的 `type`
 
-`isinstance(obj, cls_or_type)`
+使用方式：
 
-- 判断对象是否为指定类或其子类，或接口
-- 也可以用于检查基本类型
-- 与对象方法 `obj:isInstance(clazz)` 等价
+```lua
+local ctype = require("simpleclass").type
+print(ctype(obj), ctype(10))
+```
 
-`issubclass(sub_cls, super_cls)`
+- 返回 SimpleClass 库中对象的类
+- 如果是 Lua 基本类型，与标准库 `type` 行为一致
 
-- 判断子类是否为父类或其祖先类
-- 与类方法 `clazz:isExtends(base)` 等价
-- 注：同一个类会返回 `true`
+**`isinstance(obj, cls)`**
 
-`cls:isImplements(...interface)`
+使用方式：
+
+```lua
+isinstance(MyClass(), MyClass)
+obj:isInstance(SomeClass)
+```
+
+- 判断对象是否为指定类型
+- 类型可以是类、接口、Lua 基本类型
+- 对象可以直接调用 `isInstance` 方法，与 `isinstance` 等价
+
+**`issubclass(cls1, cls2)`**
+
+使用方式：
+
+```lua
+issubclass(MySubCls, MyClass)
+Dog:isExtends(Animal)
+```
+
+- 判断一个类是否继承自另一个类（包括间接继承）
+- 类可以直接调用 `isExtends` 方法，与 `issubclass` 等价
+- 注：**同一个类会返回 `true`**
+
+**`:isImplements(...interface)`**
+
+使用方式：
+
+```lua
+Bird:isImplements(CanFly)
+```
 
 - 判断类是否实现了指定接口，可以多个
-- 没有对应的模块级接口（我认为没有必要）
+- 只能用类方法调用，没有对应的模块级函数
 
-上面几个方法接受或返回的类/接口都是对象本身
+上面几个方法接受或返回的类 / 接口都是对象本身
 
 ### 类型推导
 
-`simpleclass` 提供了适用于 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型推导插件，下面是一个参考的 `.luarc.json` 配置：
+SimpleClass 提供了适用于 [lua-language-server](https://github.com/LuaLS/lua-language-server) 的类型推导插件，下面是一个参考的 `.luarc.json` 配置：
 
 ```json
 {
@@ -253,7 +301,28 @@ Getter & Setter 属性：
 
 复制插件脚本和 `simpleclass.d.lua` 到工作区即可
 
-也提供了可选的补丁脚本，用于增强插件能力，注意补丁会 hook LuaLS 内部行为，可能影响正常功能且跨版本不稳定
+如果通过 LuaRocks 安装，插件文件位于 rock 的配置目录中。先运行下面的命令获取当前版本目录：
+
+```bash
+luarocks show --rock-dir simpleclass
+```
+
+将输出路径记为 `<rock-dir>`，然后配置：
+
+```json
+{
+  "runtime.plugin": "<rock-dir>/conf/simpleclass.luals/simpleclass.plugin.lua",
+  "workspace.library": [
+    "<rock-dir>/conf/simpleclass.luals"
+  ]
+}
+```
+
+> 注意：`runtime.plugin` 是 LuaLS 插件路径，不是 LuaRocks 的 Lua 模块路径；升级 `simpleclass` 后重新执行 `luarocks show --rock-dir simpleclass` 即可获取新路径。
+
+也提供了可选的补丁脚本，用于增强插件能力
+
+> 注意：补丁会 hook LuaLS 内部行为，可能影响正常功能且跨版本不稳定
 
 如果要应用补丁，需要也复制对应的补丁文件，并保持目录结构一致
 
@@ -283,8 +352,10 @@ Getter & Setter 属性：
 
 更多功能等待发现
 
-> Warnning:  
-> 静态推导依赖于 LuaSimpleClass DSL，如果非全局导入，则需要在每个文件中手动 `local` 所用到的模块接口，使得函数名与全局导入时匹配
+> Warning:  
+> 静态推导依赖于 LuaSimpleClass DSL  
+> 
+> 如果非全局导入，则需要在每个文件中手动 `local` 所用到的模块接口，使得函数名与全局导入时匹配
 > ```lua
 > local class, super = sc.class, sc.super -- etc.
 > ```
