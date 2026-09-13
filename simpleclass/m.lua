@@ -2,7 +2,7 @@ local type = type
 _ENV = nil
 
 local class_MT = {
-    __index = function(self, key) return self.__base and self.__base[key] or nil end;
+    __index = function(self, key) if self.__base then return self.__base[key] end end;
     __tostring = function(self) return self.__classname end;
     __call = function(self, ...) return self:new(...) end;
 }
