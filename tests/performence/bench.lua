@@ -131,7 +131,7 @@ end
 
 local function bench(name, f, ref)
     local us, n = measure(f)
-    print(("%-32s %9.3f us/op  %7.1fM ops%s"):format(
+    print(("%-32s %9.6f us/op  %7.1fM ops%s"):format(
         name, us, n / 1e6,
         ref and ('  %6.2fx'):format(us / ref) or ''))
     return us
