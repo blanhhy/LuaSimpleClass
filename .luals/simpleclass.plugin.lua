@@ -1289,7 +1289,7 @@ function OnSetText(uri, text)
                 diffs[#diffs + 1] = {
                     start  = iEnd + 1,
                     finish = iEnd,
-                    text   = '\n' .. table.concat(out, '\n'),
+                    text   = '\n' .. table.concat(out, '\n') .. '\n',
                 }
                 pos = iEnd + 1
             end
