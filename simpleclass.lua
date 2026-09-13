@@ -35,9 +35,7 @@ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <https://unlicense.org> ]]
+OTHER DEALINGS IN THE SOFTWARE. ]]
 local M = {}
 local G = _G
 
@@ -235,8 +233,6 @@ function cc:def(clazz, c2)
     end
 
     if self.name ~= "<anonymous>" then
-        -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
-        -- 解释：G.<name> 不存在时允许注册，或已经存在且是类时也允许注册（覆盖）
         if M.AUTO_GLOBAL and (nil == G[self.name] or sc_ENV[self.name] == G[self.name]) then
             G[self.name] = clazz
         end
@@ -318,7 +314,7 @@ function Alias.getTarget(alias, clazz, base)
 
     if not alias.kwarg then
         local partial
-        local MAX_ARGS = 32 -- 避免某些情况下局部变量和上值数量的限制
+        local MAX_ARGS = 32
         if load and fixed_args.j <= MAX_ARGS then
             local count = fixed_args.j - fixed_args.i + 1
             local stmts = {
@@ -335,7 +331,6 @@ function Alias.getTarget(alias, clazz, base)
             local maker = load(concat(stmts, ''))
             partial = maker and maker(fixed_args, target)
         end
-        -- 参数过大或不明原因编译失败，回退旧版通用包装函数
         partial = partial or function(...)
             local narg = select('#', ...)
             local args = {...}
