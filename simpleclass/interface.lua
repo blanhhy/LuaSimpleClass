@@ -119,7 +119,7 @@ function cc:check_impl(clazz)
         local ok, mname = iface:check_impl(clazz)
         if not ok then return false,
         ("class %s implements %s but does not implement method '%s'.")
-        :format(self.name, iface, mname, iface)
+        :format(self.name, iface, mname)
     end end
     return true
 end

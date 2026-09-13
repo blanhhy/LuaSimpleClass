@@ -31,4 +31,23 @@ expect(instanceClone ~= source, 'instance clone must create a new object')
 expect(instanceClone.__class == source.__class, 'instance clone must preserve the class')
 expect(instanceClone.nested ~= source.nested, 'instance clone must deep-copy nested tables')
 
+-- Cyclic references must terminate and preserve the graph structure.
+class "RuntimeCloneCycle_8f31" {
+    __init = function(self)
+        self.a = {}
+        self.b = {}
+        self.a.next = self.b
+        self.b.next = self.a
+        self.me = self
+    end;
+}
+
+local cyc = RuntimeCloneCycle_8f31:new()
+local cycClone = cyc:clone()
+expect(cycClone ~= cyc, 'clone must terminate on cyclic references')
+expect(cycClone.a ~= cyc.a, 'clone must deep-copy cyclic nodes')
+expect(cycClone.a.next == cycClone.b, 'clone must preserve cycle aliasing')
+expect(cycClone.b.next == cycClone.a, 'clone must preserve reverse cycle')
+expect(cycClone.me == cycClone, 'clone must redirect self-reference to the clone')
+
 return true

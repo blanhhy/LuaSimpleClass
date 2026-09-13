@@ -153,8 +153,8 @@ function Alias:__index(key)
     local key1, val1 = next(self)
     local key2, val2 = next(self, key1)
     if key1 ~= nil and key2 ~= nil then
-        error(("bad alias: got duplicate target '%s'"):
-        format(key), 2)
+        error(("bad alias: alias '%s' already bound to target '%s'; cannot chain '%s'"):
+        format(self.origin, self.target, key), 2)
     end
     if key1 and val1 == "origin" then
         self[key1] = nil

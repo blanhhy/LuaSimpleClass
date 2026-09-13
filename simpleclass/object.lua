@@ -84,21 +84,25 @@ M.issubclass = object.isExtends
 ---@return object
 function object:clone(isDeep)
     isDeep = isDeep == nil and true or isDeep
-    local clone = {}
-    local clazz = rawgetmt(self)
-    for k, v in next, self do
-        if v == self then
-            clone[k] = self
-        elseif k == "__class" and v == clazz then
-            clone[k] = clazz
-        else
-            clone[k] = (isDeep and type(v) == "table")
-                and object.clone(v, true)
-                or  v
+    local seen = {} -- 源表 -> 克隆表，用于环检测与共享引用一致性
+    local function copy(src, clazz)
+        local done = seen[src]
+        if done then return done end
+        local c = {}
+        seen[src] = c
+        for k, v in next, src do
+            if k == "__class" and v == clazz then
+                c[k] = clazz
+            elseif isDeep and type(v) == "table" then
+                c[k] = copy(v, rawgetmt(v))
+            else
+                c[k] = v
+            end
         end
+        rawsetmt(c, clazz)
+        return c
     end
-    rawsetmt(clone, clazz)
-    return clone
+    return copy(self, rawgetmt(self))
 end
 
 return object

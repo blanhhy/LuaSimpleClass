@@ -60,6 +60,14 @@ local Super = {
 
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
+---
+---**Zero-argument form constraint**: `super()` locates the defining class and
+---the receiver via `debug.getlocal`, so it only works when called directly from
+---a colon-call method whose first parameter is the receiver — `self` for instance
+---methods, or the class object for class methods (i.e. `function(self, ...)`).
+---Static methods and calls outside a method have no perceivable context, so they
+---cannot use the zero-argument form (same as Python's `super()`); in those cases
+---use the explicit `super(cls, obj)` form instead.
 ---@generic cls:class, obj:object
 ---@param cls cls
 ---@param obj? obj
