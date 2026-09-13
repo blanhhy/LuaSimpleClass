@@ -17,7 +17,7 @@ require "simpleclass"
 > Guide:  
 > 使用支持参数的第三方导入器是个不错的选择，但你也可以直接：
 > ```lua
-> local sc = require "simpleclass.with" {AUTO_GLOBAL = false}
+> local sc = require "simpleclass.with" {GLOBAL_IMPORT = false}
 > ```
 
 ## 快速开始
