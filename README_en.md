@@ -154,7 +154,7 @@ Anonymous classes: Temporary classes that do not require a name and are not regi
 
 - Single Inheritance: simpleclass supports only single inheritance.
 
-  Classic Syntax: Use the `extends` keyword + a class name string
+  Classic Syntax: Use the `extends` keyword + a class name string  
   Shorthand Syntax: Write the base class name directly, e.g., `class "Cls" : Base {}`
 
 > In shorthand syntax, the base class must immediately follow the class body; if other keywords (such as `implements`) are used, they must precede it.
@@ -195,118 +195,6 @@ Interfaces can be implemented by classes, and it is possible to check whether a 
 - Anonymous interface: Similar to an anonymous class.
 
 > Named interfaces are also located in `simpleclass._ENV` and follow the exact same rules as named classes.
-
-> Example: Interface definition
->
-> ```lua
-> interface "CanFly" {
->     "fly"; -- only method names
-> }
-> ```
-
-- Interface implementation: Use the `implements` (or `impl`) keyword; a class can implement multiple interfaces
-
-> Example: Interface implementation
->
-> ```lua
-> class "Bird" : implements(CanFly) {
->     fly = function(self)
->         print("bird is flying")
->     end;
-> }
->
-> local obj = Bird()
-> obj:fly() --> "bird is flying"
-> ```
-
-### Combining Interfaces
-
-When defining an interface, you can use the `extends` keyword to combine multiple interfaces
-
-> Example: Combining Interfaces
->
-> ```lua
-> interface "CanEat" {
->     "eat";
-> }
->
-> interface "BirdLike" : extends(CanEat, CanFly) {
->     "spawn";
->     "nest";
-> }
-> ```
-
-As shown above, you can define new methods while combining other interfaces.
-
-In fact, unlike when defining classes, the empty interface `{}` can be completely omitted.
-
-### Type Checking
-
-**`type(obj)`**
-
-  > This is not the `type` function from the Lua standard library
-
-Usage:
-
-```lua
-local ctype = require("simpleclass").type
-print(ctype(obj), ctype(10))
-```
-
-- Returns the class of an object from the SimpleClass library
-- For Lua primitive types, behaves identically to the standard library's `type` function
-
-**`isinstance(obj, cls)`**
-
-Usage:
-
-```lua
-isinstance(MyClass(), MyClass)
-obj:isInstance(SomeClass)
-```
-
-- Checks whether an object is of a specified type
-- The type can be a class, an interface, or a Lua primitive type
-- Objects can directly call the `isInstance` method, which is equivalent to `isinstance`
-
-**`issubclass(cls1, cls2)`**
-
-Usage:
-
-```lua
-issubclass(MySubCls, MyClass)
-Dog:isExtends(Animal)
-```
-
-- Checks whether a class inherits from another class (including indirect inheritance)
-- A class can directly call the `isExtends` method, which is equivalent to `issubclass`
-- Note: **Calling this on the same class returns `true`**
-
-**`:isImplements(...interface)`**
-
-Usage:
-
-```lua
-Bird:isImplements(CanFly)
-```
-
-- Checks whether a class implements a specified interface (multiple interfaces are allowed)
-- Can only be called as a class method; there is no corresponding module-level function
-
-The classes and interfaces accepted or returned by the methods above are the objects themselves.
-
-### Interfaces
-
-An interface is a set of method signatures that defines the methods a class must implement.
-
-An interface is not a class and cannot be instantiated.
-
-Interfaces can be implemented by classes, and it is possible to check whether a class has implemented a method. Additionally, there is a relationship similar to inheritance between interfaces, but this does not form an inheritance chain.
-
-- Interface definition: Use `interface`; the syntax is similar to that of a class definition.
-- Anonymous interface: Similar to an anonymous class
-
-> Named interfaces are also located in `simpleclass._ENV` and follow the exact same rules as named classes
 
 > Example: Interface definition
 >
