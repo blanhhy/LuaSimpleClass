@@ -7,6 +7,8 @@ local getinfo  = debug and debug.getinfo
 local getlocal = debug and debug.getlocal
 local getcontext, context
 
+_ENV = nil
+
 if getinfo and getlocal then
     function getcontext()
         context = context or setmetatable({}, {__mode = 'kv'})

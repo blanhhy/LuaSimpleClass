@@ -5,14 +5,15 @@ local object = M.object
 local type, setmetatable, error
     = type, setmetatable, error
 
-local G = _G        ---@class _G
-local Interface = {} ---@class M.interface : interface
+local G = _G ---@class _G
+local I = {} ---@class M.interface : interface
 
-Interface.__index = Interface
+_ENV = nil
+I.__index = I
 
 ---@param ... interface
 ---@return interface
-function Interface:extends(...)
+function I:extends(...)
     if M.I_FEATURE == "lexical" then return self end
     local bases = {...}
     local iface, mname
@@ -32,7 +33,7 @@ function Interface:extends(...)
     return self
 end
 
-function Interface:check_impl(clazz)
+function I:check_impl(clazz)
     if M.I_FEATURE ~= "general" then return true end
     for i = 1, #self do
         if type(clazz[self[i]]) ~= "function" then
@@ -41,7 +42,7 @@ function Interface:check_impl(clazz)
     return true
 end
 
-function Interface:__call(mnames)
+function I:__call(mnames)
     if type(mnames) ~= "table" then
         error("interface cannot instantiate", 2)
     end
@@ -56,7 +57,7 @@ function Interface:__call(mnames)
     return self
 end
 
-function Interface:__tostring()
+function I:__tostring()
     return ("<interface '%s'>")
     :format(self.__iname or '?')
 end
@@ -65,7 +66,7 @@ end
 ---@param name? string|table
 ---@return interface
 function M.interface(name)
-    if M.I_FEATURE == "lexical" then return setmetatable({}, Interface) end
+    if M.I_FEATURE == "lexical" then return setmetatable({}, I) end
     local typ = type(name)
     if typ == "table" then
         local iface = name ---@type interface
@@ -78,18 +79,18 @@ function M.interface(name)
             count = count + 1
         end end
         iface.__iname = "<anonymous>"
-        return setmetatable(iface, Interface)
+        return setmetatable(iface, I)
     elseif typ ~= "string" or name == "" then
         return setmetatable({
         __iname = "<anonymous>"
-        }, Interface)
+        }, I)
     end
     local iface = {__iname = name}
     if M.AUTO_GLOBAL and (nil == G[name] or M._ENV[name] == G[name]) then
         G[name] = iface
     end
     M._ENV[name] = iface
-    return setmetatable(iface, Interface)
+    return setmetatable(iface, I)
 end
 
 cc.ifaces = false
