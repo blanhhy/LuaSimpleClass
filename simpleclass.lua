@@ -188,9 +188,9 @@ function cc:def(clazz, c2)
         local item = clazz[i]
         local tipe = item and type(item)
         local PROP = "@simpleclass.property."
-        if tipe == "table" and item._ALIAS == Alias then
+        if tipe == "table" and item[3] == Alias then
             clazz[i] = nil
-            local origin = item.origin
+            local origin = item[1]
             local target, err = Alias.getTarget(item, clazz, base)
             if target ~= nil then clazz[origin] = target
             else error(err, 2) end
@@ -252,25 +252,16 @@ end
 function Alias:__index(key)
     if self == alias then
         return setmetatable({
-            [key] = "origin"
+            key,   false, false,
+            false, false, false,
         }, Alias)
     end
-    local key1, val1 = next(self)
-    local key2, val2 = next(self, key1)
-    if key1 ~= nil and key2 ~= nil then
+    if self[2] then
         error(("bad alias: alias '%s' already bound to target '%s'; cannot chain '%s'"):
-        format(self.origin, self.target, key), 2)
+        format(self[1], self[2], key), 2)
     end
-    if key1 and val1 == "origin" then
-        self[key1] = nil
-        self.origin = key1
-    end
-    if key2 and val2 == "origin" then
-        self[key2] = nil
-        self.origin = key2
-    end
-    self.target = key
-    self._ALIAS = Alias
+    self[2] = key
+    self[3] = Alias
     return self
 end
 
@@ -282,44 +273,41 @@ function Alias:__call(...)
     local first = static and (...)
     if not static then local _ _, first = ... end
     if nargs ~= offset then
-        self.kwarg = nargs == offset + 1 and type(first) == "table"
-        self.args  = self.kwarg and first or {...}
-        if not self.kwarg then
-            self.args['i'] = offset + 1
-            self.args['j'] = nargs
-        end
-    else
-        self.kwarg = false
-        self.args  = false
-    end
-    self.isStatic = static
+        self[5] = nargs == offset + 1 and type(first) == "table"
+        self[4] = self[5] and first or {...}
+        if not self[5] then
+            self[4]['i'] = offset + 1
+            self[4]['j'] = nargs
+    end end
+    self[6] = static
     return self
 end
 
 function Alias.getTarget(alias, clazz, base)
-    local target = clazz[alias.target]
-    if target == nil then target = base[alias.target] end
+    local target = clazz[alias[2]]
+    if target == nil then target = base[alias[2]] end
     if target == nil then return nil
         , ("bad alias: '%s' not found")
-        : format(alias.target)
+        : format(alias[2])
     end
 
-    local fixed_args = alias.args
-    if not fixed_args then return target end
+    if not alias[4] then return target end
+    local fixed_args = alias[4]
+    local isStatic = alias[6]
 
     if type(target) ~= "function" then return nil
         , ("bad alias: cannot make partial for non-function field '%s'")
-        : format(alias.target)
+        : format(alias[2])
     end
 
-    if not alias.kwarg then
+    if not alias[5] then
         local partial
         local MAX_ARGS = 32
         if load and fixed_args.j <= MAX_ARGS then
             local count = fixed_args.j - fixed_args.i + 1
             local stmts = {
                 [1] = "local fixed, aliased = ...\n",
-                [count + 2] = alias.isStatic
+                [count + 2] = isStatic
                     and "return function(...) return aliased("
                     or  "return function(self, ...) return aliased(self,",
                 [count + count + 3] = "...) end"
@@ -342,7 +330,7 @@ function Alias.getTarget(alias, clazz, base)
         return partial
     end
 
-    return alias.isStatic and function(kwargs, ...)
+    return isStatic and function(kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
         return target(kwargs, ...)
