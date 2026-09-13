@@ -1,3 +1,8 @@
+> Read in:
+>
+> ☑ 简体中文  
+> ☐ [English](README_en.md)
+
 # Lua Simple Class
 
 可能是第一个有着现代语法，但不干扰——反而增强静态检查工具的 Lua 类库
