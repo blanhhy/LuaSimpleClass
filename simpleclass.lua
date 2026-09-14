@@ -251,6 +251,7 @@ end
 
 function Alias:__index(key)
     if self == alias then
+        -- 我是笨蛋，不用字符串键就永远不会重名了
         return setmetatable({
             key,   false, false,
             false, false, false,
@@ -266,7 +267,15 @@ function Alias:__index(key)
 end
 
 function Alias:__call(...)
-    if self == alias then return self end
+    if self == alias then
+        local func = ...
+        local narg = select('#', ...)
+        if narg <= 1 then return ... end
+        local args = {select(2, ...)}
+        args.i = 1
+        args.j = narg - 1
+        return Alias.partial(func, args, false, true)
+    end
     local static = self  ~=  (...)
     local offset = static and 0 or 1
     local nargs = select('#', ...)
@@ -283,24 +292,23 @@ function Alias:__call(...)
     return self
 end
 
-function Alias.getTarget(alias, clazz, base)
-    local target = clazz[alias[2]]
-    if target == nil then target = base[alias[2]] end
+function Alias.getTarget(aliaz, clazz, base)
+    local target = clazz[aliaz[2]]
+    if target == nil then target = base[aliaz[2]] end
     if target == nil then return nil
         , ("bad alias: '%s' not found")
-        : format(alias[2])
+        : format(aliaz[2])
     end
-
-    if not alias[4] then return target end
-    local fixed_args = alias[4]
-    local isStatic = alias[6]
-
+    if not aliaz[4] then return target end
     if type(target) ~= "function" then return nil
         , ("bad alias: cannot make partial for non-function field '%s'")
-        : format(alias[2])
+        : format(aliaz[2])
     end
+    return Alias.partial(target, aliaz[4], aliaz[5], aliaz[6])
+end
 
-    if not alias[5] then
+function Alias.partial(func, fixed_args, isKwarg, isStatic)
+    if not isKwarg then
         local partial
         local MAX_ARGS = 32
         if load and fixed_args.j <= MAX_ARGS then
@@ -317,7 +325,7 @@ function Alias.getTarget(alias, clazz, base)
                 stmts[i + count + 2] = ("arg%d, "):format(i)
             end
             local maker = load(concat(stmts, ''))
-            partial = maker and maker(fixed_args, target)
+            partial = maker and maker(fixed_args, func)
         end
         partial = partial or function(...)
             local narg = select('#', ...)
@@ -325,7 +333,7 @@ function Alias.getTarget(alias, clazz, base)
             local merged = {fixed_args.i == 2 and (...) }
             move(fixed_args, fixed_args.i, fixed_args.j, fixed_args.i, merged)
             move(args, fixed_args.i, narg, fixed_args.j + 1, merged)
-            return target(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
+            return func(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
         end
         return partial
     end
@@ -333,11 +341,11 @@ function Alias.getTarget(alias, clazz, base)
     return isStatic and function(kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return target(kwargs, ...)
+        return func(kwargs, ...)
     end or function(self, kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return target(self, kwargs, ...)
+        return func(self, kwargs, ...)
     end
 end
 
