@@ -217,8 +217,8 @@ end
 function Alias.partial(func, fixed_args, isKwarg, isStatic)
     if not isKwarg then
         local partial
-        local MAX_ARGS = 32 -- 避免某些情况下局部变量和上值数量的限制
-        if load and fixed_args.j <= MAX_ARGS then
+        local MAX_NUPS = 32 -- 避免某些情况下局部变量和上值数量的限制
+        if load and fixed_args.j <= MAX_NUPS then
             local count = fixed_args.j - fixed_args.i + 1
             local stmts = {
                 [1] = "local fixed, aliased = ...\n",
