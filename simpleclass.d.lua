@@ -180,8 +180,9 @@ function sc.type(v) end
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function sc.class(name) end
 
----@param body table
----@return class
+---@generic T:table
+---@param body T
+---@return T
 function sc.class(body) end
 
 ---Define a new interface
