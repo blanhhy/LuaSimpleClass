@@ -391,10 +391,8 @@ local Super = {
         local clazz = proxy.__class
         local field = clazz.__base[key]
         if "function" ~= type(field) then return field end
-        return function(self, ...)
-            self = self == proxy and proxy.self or self
-            return field(self, ...)
-        end
+        local self = proxy.self
+        return function(_,...) return field(self, ...) end
     end,
     __tostring = function(proxy)
         return ("super<%s, %s>"):format(
@@ -572,11 +570,10 @@ function M.super(cls, obj)
         error(("super: bad arguments: %s, %s"):
         format(cls, obj), 2)
     end
-    local proxy = setmetatable({
+    return setmetatable({
         self    = obj,
         __class = cls,
     }, Super)
-    return proxy
 end
 
 M.interface = interface

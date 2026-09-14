@@ -85,11 +85,10 @@ function M.super(cls, obj)
         error(("super: bad arguments: %s, %s"):
         format(cls, obj), 2)
     end
-    local proxy = setmetatable({
+    return setmetatable({
         self    = obj,
         __class = cls,
     }, Super)
-    return proxy
 end
 
 return M.super
