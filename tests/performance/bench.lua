@@ -83,6 +83,9 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
     via_direct = function(self)
         return BenchSuperBase_7b01.visit(self)
     end;
+    via_base = function(self)
+        return BenchSuperSub_7b01.__base.visit(self)
+    end;
 }
 
 -- ===== 原生基线 =====
@@ -205,6 +208,8 @@ end, ref_rw)
 print('\n== super 调用 ==')
 local ref_super = bench('Base.visit(sub) [direct]',
     function() acc = acc + (BenchSuperBase_7b01.visit(sub) == sub and 1 or 0) end)
+bench('sub:via_base() [manual super]',
+    function() acc = acc + (sub:via_base() == sub and 1 or 0) end, ref_super)
 bench('sub:via_super_x() [explicit]',
     function() acc = acc + (sub:via_super_x() == sub and 1 or 0) end, ref_super)
 bench('sub:via_super0() [0-arg]',
