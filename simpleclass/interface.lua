@@ -11,24 +11,29 @@ local I = {} ---@class M.interface : interface
 _ENV = nil
 I.__index = I
 
+local function extend(I1, I2, seen)
+    local field
+    for i = 1, #I2 do
+        field = I2[i]
+        if not seen[field] then
+        seen[field] = true
+        I1[#I1+1] = field
+    end end
+    return I1
+end
+
 ---@param ... interface
 ---@return interface
 function I:extends(...)
     if M.I_FEATURE == "lexical" then return self end
-    local bases = {...}
-    local iface, mname
+    local bases, iface = {...}, nil
     for j = 1, #bases do
         iface = bases[j]
         if type(iface) ~= "table" or not iface.__iname then
             error(("bad interface extends: interface expected, got %s at #%d"):
             format(iface, j), 2)
         end
-        for i = 1, #iface do
-            mname = iface[i]
-            if not self[mname] then
-            self[#self+1] = mname
-            self[mname] = true
-        end end
+        extend(self, iface, self)
     end
     return self
 end
@@ -42,19 +47,12 @@ function I:check_impl(clazz)
     return true
 end
 
-function I:__call(mnames)
-    if type(mnames) ~= "table" then
+function I:__call(body)
+    if type(body) ~= "table" then
         error("interface cannot instantiate", 2)
     end
     if M.I_FEATURE == "lexical" then return self end
-    local mname
-    for i = 1, #mnames do
-        mname = mnames[i]
-        if not self[mname] then
-        self[#self+1] = mname
-        self[mname] = true
-    end end
-    return self
+    return extend(self, body, self)
 end
 
 function I:__tostring()
@@ -69,16 +67,8 @@ function M.interface(name)
     if M.I_FEATURE == "lexical" then return setmetatable({}, I) end
     local typ = type(name)
     if typ == "table" then
-        local iface = name ---@type interface
-        local count = 0
-        for i = 1, #iface do
-            local mname = iface[i]
-            if not iface[mname] then
-            iface[count+1] = mname
-            iface[mname] = true
-            count = count + 1
-        end end
-        iface.__iname = "<anonymous>"
+        local iface = {__iname = "<anonymous>"}
+        extend(iface, name, iface)
         return setmetatable(iface, I)
     elseif typ ~= "string" or name == "" then
         return setmetatable({
