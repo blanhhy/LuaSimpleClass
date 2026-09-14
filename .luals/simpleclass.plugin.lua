@@ -341,7 +341,7 @@ local function parseMethods(body, aliasNames)
         if i > n then break end
 
         local aliasEntry, aliasEnd = parseAliasEntry(body, i, aliasNames or {})
-        if aliasEntry then
+        if aliasEntry and aliasEnd then
             aliases[#aliases + 1] = aliasEntry
             i = aliasEnd
         else

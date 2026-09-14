@@ -74,8 +74,8 @@ local function find_vscode_extension_luals()
     local handle = io.popen(ls_cmd)
     if not handle then return nil end
     local luals_path = nil
-    for dir_name in handle:lines() do
-        dir_name = trim(dir_name)
+    for raw_dir_name in handle:lines() do
+        local dir_name = trim(raw_dir_name)
         if dir_name ~= "" then
             local candidate = vscode_ext .. sep .. dir_name .. sep .. "server" .. sep .. "bin" .. sep .. luals_exe
             if file_exists(candidate) then luals_path = candidate end
