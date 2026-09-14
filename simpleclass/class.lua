@@ -160,7 +160,17 @@ end
 
 ---@param self any[]
 function Alias:__call(...)
-    if self == alias then return self end
+    if self == alias then -- 可以在类体外使用 alias
+        local a, b = ...
+        local narg = select('#', ...)
+        if narg <= 1 then return ... end
+        if narg == 2 and type(b) == "table" then
+        return Alias.partial(a, b, true, true) end
+        local args = {select(2, ...)}
+        args.i = 1
+        args.j = narg - 1
+        return Alias.partial(a, args, false, true)
+    end
     local static = self  ~=  (...) -- 区分 ':' 和 '.' 语法，前者在构造偏函数时须保留 self 槽
     local offset = static and 0 or 1
     local nargs = select('#', ...)
@@ -184,27 +194,30 @@ end
 -- 5: isKwarg
 -- 6: isStatic
 
----@param alias any[]
+---@param aliaz any[]
 ---@return function? target alias target function
----@return string?   errmsg 
-function Alias.getTarget(alias, clazz, base)
-    local target = clazz[alias[2]]
-    if target == nil then target = base[alias[2]] end
+---@return string?   errmsg
+function Alias.getTarget(aliaz, clazz, base)
+    local target = clazz[aliaz[2]]
+    if target == nil then target = base[aliaz[2]] end
     if target == nil then return nil
         , ("bad alias: '%s' not found")
-        : format(alias[2])
+        : format(aliaz[2])
     end
-
-    if not alias[4] then return target end
-    local fixed_args = alias[4]
-    local isStatic = alias[6]
-
+    if not aliaz[4] then return target end
     if type(target) ~= "function" then return nil
         , ("bad alias: cannot make partial for non-function field '%s'")
-        : format(alias[2])
+        : format(aliaz[2])
     end
+    return Alias.partial(target, aliaz[4], aliaz[5], aliaz[6])
+end
 
-    if not alias[5] then
+---@param func function
+---@param fixed_args table
+---@param isKwarg?  boolean
+---@param isStatic? boolean
+function Alias.partial(func, fixed_args, isKwarg, isStatic)
+    if not isKwarg then
         local partial
         local MAX_ARGS = 32 -- 避免某些情况下局部变量和上值数量的限制
         if load and fixed_args.j <= MAX_ARGS then
@@ -221,7 +234,7 @@ function Alias.getTarget(alias, clazz, base)
                 stmts[i + count + 2] = ("arg%d, "):format(i)
             end
             local maker = load(concat(stmts, ''))
-            partial = maker and maker(fixed_args, target)
+            partial = maker and maker(fixed_args, func)
         end
         -- 参数过大或不明原因编译失败，回退旧版通用包装函数
         partial = partial or function(...)
@@ -230,7 +243,7 @@ function Alias.getTarget(alias, clazz, base)
             local merged = {fixed_args.i == 2 and (...) }
             move(fixed_args, fixed_args.i, fixed_args.j, fixed_args.i, merged)
             move(args, fixed_args.i, narg, fixed_args.j + 1, merged)
-            return target(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
+            return func(unpack(merged, 1, narg + fixed_args.j - fixed_args.i + 1))
         end
         return partial
     end
@@ -238,11 +251,11 @@ function Alias.getTarget(alias, clazz, base)
     return isStatic and function(kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return target(kwargs, ...)
+        return func(kwargs, ...)
     end or function(self, kwargs, ...)
         kwargs = kwargs or {}
         for k, v in next, fixed_args do kwargs[k] = v end
-        return target(self, kwargs, ...)
+        return func(self, kwargs, ...)
     end
 end
 
