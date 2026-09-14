@@ -257,9 +257,8 @@ sc._ENV = {object = o}
 ---It’s simple:   
 ---If a method is expected to be called with “:”, then its alias must also use the “:” syntax;  
 ---conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.
----@class simpleclass.alias
----@field [string] alias.origin
----@operator call: function
+---@alias simpleclass.alias table<string, alias.origin>|fun(function, ...):function
+---@type simpleclass.alias
 sc.alias = {}
 
 ---@alias property function
