@@ -35,7 +35,7 @@ local interfaceName = 'RuntimeNameInterface_4a82'
 local interfaceValue = {}
 _G[interfaceName] = interfaceValue
 
-local iface = sc.interface(interfaceName)
+local iface = sc.interface(interfaceName){}
 expect(_G[interfaceName], interfaceValue,
     'interface definition must not replace an external global')
 expect(sc._ENV[interfaceName], iface,
@@ -43,11 +43,11 @@ expect(sc._ENV[interfaceName], iface,
 
 local registeredInterfaceName = 'RuntimeRegisteredInterface_4a82'
 _G[registeredInterfaceName] = nil
-local registeredInterface = sc.interface(registeredInterfaceName)
+local registeredInterface = sc.interface(registeredInterfaceName){}
 expect(_G[registeredInterfaceName], registeredInterface,
     'first interface definition must register globally')
 
-local registeredInterfaceAgain = sc.interface(registeredInterfaceName)
+local registeredInterfaceAgain = sc.interface(registeredInterfaceName){}
 expect(_G[registeredInterfaceName], registeredInterfaceAgain,
     'same-name interface redefinition must update the global registration')
 

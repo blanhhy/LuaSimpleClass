@@ -115,8 +115,8 @@ function cc:def(clazz, c2)
         clazz.__newindex = clazz.__newindex or clazz.__setter
     end
 
-    if self.check_impl then
-        local ok, err = self:check_impl(clazz)
+    if self.iCheck then
+        local ok, err = self:iCheck(clazz)
         if not ok then error(err, 2) end
     end
 

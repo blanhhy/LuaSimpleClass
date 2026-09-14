@@ -65,10 +65,9 @@ function object:isInstance(T)
     if typ ~= "table" or type(T) ~= "table" then
         return T == typ
     end
-    local check = T.check_impl
-    local clazz = self.__class
-    if check then return check(T--[[@as interface]], self) end
-    if clazz then return clazz:isExtends(T--[[@as class]]) end
+    local iR, cls = M._iR, self.__class
+    if iR and iR[T] then return object.isImpl(self, T) end
+    if cls then return cls:isExtends(T--[[@as class]]) end
     return false
 end
 

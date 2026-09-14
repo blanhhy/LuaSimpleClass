@@ -12,9 +12,7 @@ local sc = {}
 ---@class object.class : class<object>
 ---@operator call: object
 
----@class interface<I>
----@field __iname string?
----@operator call: I
+---@class interface : string[]
 
 ---@class super<cls, obj>
 ---@field self obj
@@ -58,6 +56,13 @@ local o = {__classname = "object"}
 
 ---@return object
 function o:new() end
+
+---Check if the class implements the interface  
+---If not, it returns the name of a method missing implements
+---@param iface interface
+---@return boolean ok
+---@return string? meth
+function o:isImpl(iface) end
 
 ---Clone an object (table)
 ---@generic T:table
@@ -128,19 +133,15 @@ function cc:def(tbl) end
 -----------------------------------------------------------------------------------------------------
 
 
----@class interface
-local i
-
----Check if the class implements the interface
----@param clazz class
----@return boolean ok
----@return string? method_name if not ok
-function i:check_impl(clazz) end
+---@alias _InterfaceDefiner<T> fun(lst: string[]): T
+---@class _InterfaceCreator<T>
+local ic = {}
 
 ---Extend the interface with other interfaces
+---@generic T
 ---@param ... interface
----@return interface
-function i:extends(...) end
+---@return _InterfaceCreator<T>
+function ic:extends(...) end
 
 
 -----------------------------------------------------------------------------------------------------
@@ -188,10 +189,10 @@ function sc.class(body) end
 ---Define a new interface
 ---@generic I:string
 ---@param name I.`I`
----@return interface<I>
+---@return _InterfaceCreator<I>|_InterfaceDefiner<I>
 function sc.interface(name) end
 
----@param body? table
+---@param body? string[]
 ---@return interface
 function sc.interface(body) end
 

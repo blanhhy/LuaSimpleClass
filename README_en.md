@@ -242,8 +242,6 @@ When defining an interface, you can use the `extends` keyword to combine multipl
 
 As shown above, you can define new methods while combining other interfaces.
 
-In fact, unlike when defining classes, the empty interface `{}` can be completely omitted.
-
 ### Type Checking
 
 **`type(obj)`**
