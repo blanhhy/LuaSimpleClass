@@ -454,7 +454,7 @@ function I:check_impl(clazz)
     return true
 end
 
-function M.interface(name)
+function interface(name)
     if M.I_FEATURE == "lexical" then return setmetatable({}, I) end
     local typ = type(name)
     if typ == "table" then
