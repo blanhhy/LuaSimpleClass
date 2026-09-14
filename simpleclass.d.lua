@@ -36,11 +36,11 @@ function c:new() end
 ---@return boolean
 function c:isExtends(base) end
 
----Check if the class implements the interface
----@param interface interface
+---Check if the class implements the interfaces
+---@param ... interface
 ---@return boolean  ok
 ---@return integer? arg_index if not ok
-function c:isImplements(interface) end
+function c:isImplements(...) end
 
 ---Convert the object to a string
 ---@return string

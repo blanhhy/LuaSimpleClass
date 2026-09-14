@@ -117,7 +117,7 @@ eagle:eat()   --> Eagle eats bugs
 eagle:fly()   --> Eagle is flying
 eagle:spawn() --> Eagle is spawning
 eagle:nest()  --> Eagle is nesting
-
+print(Eagle:isImplements())
 print(Eagle:isImplements(BirdLike)) --> true
 print(eagle:isInstance(BirdLike))   --> true
 
