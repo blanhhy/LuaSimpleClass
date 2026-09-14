@@ -65,7 +65,7 @@ class "BenchCtorChild_7b01" : extends "BenchCtorSelf_7b01" {
 }
 
 class "BenchSuperBase_7b01" {
-    __init = function(self) self._v = 1 end;
+    __init = function(self) self._v = 19 end;
     visit = function(self) return self end;
 }
 
@@ -77,7 +77,7 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
         return super():visit()
     end;
     init_super = function(self)
-        super(BenchCtorChild_7b01, self)() -- 构造器专线
+        super(BenchSuperSub_7b01, self)() -- 构造器专线
         return self
     end;
     via_direct = function(self)
@@ -210,7 +210,7 @@ bench('sub:via_super_x() [explicit]',
 bench('sub:via_super0() [0-arg]',
     function() acc = acc + (sub:via_super0() == sub and 1 or 0) end, ref_super)
 bench('sub:init_super() [call]',
-    function() acc = acc + (sub:init_super() == sub and 1 or 0) end, ref_super)
+    function() sub:init_super() acc = acc + (sub._v == 19 and 1 or 0) end, ref_super)
 
 print('\n== 偶发 API（绝对值）==')
 bench('Leaf:isExtends(Base) [true]',
