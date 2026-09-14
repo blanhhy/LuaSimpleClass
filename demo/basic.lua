@@ -79,7 +79,7 @@ xpcall(function()
             print("I can eat but not fly.")
         end;
     }
-    -- Output: class Bird_wrong implements <interface 'CanFly'> but does not implement method 'fly'.
+    -- Output: class 'Bird_wrong' implements interface 'CanFly' but does not implement method 'fly'.
 end, print)
 
 -- 正确的定义
