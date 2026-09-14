@@ -161,15 +161,13 @@ end
 ---@param self any[]
 function Alias:__call(...)
     if self == alias then -- 可以在类体外使用 alias
-        local a, b = ...
+        local func = ...
         local narg = select('#', ...)
         if narg <= 1 then return ... end
-        if narg == 2 and type(b) == "table" then
-        return Alias.partial(a, b, true, true) end
         local args = {select(2, ...)}
         args.i = 1
         args.j = narg - 1
-        return Alias.partial(a, args, false, true)
+        return Alias.partial(func, args, false, true)
     end
     local static = self  ~=  (...) -- 区分 ':' 和 '.' 语法，前者在构造偏函数时须保留 self 槽
     local offset = static and 0 or 1
