@@ -251,7 +251,6 @@ end
 
 function Alias:__index(key)
     if self == alias then
-        -- 我是笨蛋，不用字符串键就永远不会重名了
         return setmetatable({
             key,   false, false,
             false, false, false,
