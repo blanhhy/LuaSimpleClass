@@ -170,6 +170,33 @@ local ref_write = bench('plain.v = k', function() plain.v = acc; acc = acc + 1 e
 bench('p._v = k [raw field]', function() p._v = acc; acc = acc + 1 end, ref_write)
 bench('p.value = k [setter]', function() p.value = acc; acc = acc + 1 end, ref_write)
 
+print('\n== 属性读写（交替写读）==')
+local pa1, pa2 = { v = 1, getV = function(self) return self.v end }
+                ,{ v = 2, getV = function(self) return self.v end }
+local pp1, pp2 = BenchProp_7b01(), BenchProp_7b01()
+
+local kf = 0
+local ref_rw = bench('plain.v 写读', function()
+    kf = kf + 1
+    local t = (kf % 2 == 0) and pa1 or pa2
+    t.v = kf; acc = acc + t.v
+end)
+bench('p._v 写读', function()
+    kf = kf + 1
+    local t = (kf % 2 == 0) and pp1 or pp2
+    t._v = kf; acc = acc + t._v
+end, ref_rw)
+bench('p.value 写读', function()
+    kf = kf + 1
+    local t = (kf % 2 == 0) and pp1 or pp2
+    t.value = kf; acc = acc + t.value
+end, ref_rw)
+bench('plain:getV() 写读', function()
+    kf = kf + 1
+    local t = (kf % 2 == 0) and pa1 or pa2
+    t.v = kf; acc = acc + t:getV()
+end, ref_rw)
+
 print('\n== super 调用 ==')
 local ref_super = bench('Base.visit(sub) [direct]',
     function() acc = acc + (BenchSuperBase_7b01.visit(sub) == sub and 1 or 0) end)
