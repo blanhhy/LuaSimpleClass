@@ -1256,7 +1256,7 @@ function OnSetText(uri, text)
                 local instanceFields, metaFields = splitInterfaceMembers(fields)
                 local out = {}
                 -- 第一部分：接口变量标注为 interface 的子类
-                out[#out + 1] = iname .. ' = {__iname="' .. iname .. '"} ---@class I.' .. iname .. ' : interface'
+                out[#out + 1] = iname .. ' = {} ---@class I.' .. iname .. ' : interface'
                 -- 第二部分：虚拟类型，给类多态用，不继承 interface
                 local classLine = '---@class ' .. iname
                 if extendsList and #extendsList > 0 then
