@@ -132,23 +132,28 @@ function object:isInstance(T)
     return false
 end
 
-function object:clone(isDeep)
-    isDeep = isDeep == nil and true or isDeep
-    local seen = {}
-    local function copy(src, clazz)
-        if seen[src] then return seen[src] end
-        local c = {} seen[src] = c
-        for k, v in next, src do
-            if k == "__class" and v == clazz then
-                c[k] = clazz
-            elseif isDeep and type(v) == "table" then
-                c[k] = copy(v, rawgetmt(v))
-            else c[k] = v end
-        end
-        rawsetmt(c, clazz)
-        return c
+local function deep(src, cls, seen)
+    if seen[src] then return seen[src] end
+    local c = {}
+    seen[src] = c
+    for k, v in next, src do
+        c[k] = (k == "__class" and v == cls) and cls
+            or (type(v) == "table") and deep(v, rawgetmt(v), seen)
+            or v
     end
-    return copy(self, rawgetmt(self))
+    rawsetmt(c, cls)
+    return c
+end
+
+function object:clone(isDeep)
+    local clazz = rawgetmt(self)
+    if isDeep == nil or isDeep then
+        return deep(self, clazz, {})
+    end
+    local clone = {}
+    for k, v in next, self do clone[k] = v end
+    rawsetmt(clone, clazz)
+    return clone
 end
 
 setmetatable(object, class_MT)
