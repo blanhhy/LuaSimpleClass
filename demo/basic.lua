@@ -118,8 +118,8 @@ eagle:fly()   --> Eagle is flying
 eagle:spawn() --> Eagle is spawning
 eagle:nest()  --> Eagle is nesting
 
-print(Eagle:isImplements(BirdLike, CanEat, CanFly)) --> true
-print(eagle:isInstance(BirdLike))                   --> true
+print(isimplements(Eagle, BirdLike, CanEat, CanFly)) --> true
+print(isinstance(eagle, BirdLike))                   --> true
 
 --#==========================================
 --# 多态应用

@@ -31,24 +31,6 @@ local c
 ---@return o
 function c:new() end
 
----Check if the class extends the base class
----@param base class
----@return boolean
-function c:isExtends(base) end
-
----Check if the class implements the interface  
----If not, it returns the name of a method missing implements
----@param iface interface
----@return boolean ok
----@return string? meth
-function c:isImpl(iface) end
-
----Check if the class implements the interfaces
----@param ... interface
----@return boolean  ok
----@return integer? arg_index if not ok
-function c:isImplements(...) end
-
 ---Convert the object to a string
 ---@return string
 function c:toString() end
@@ -163,6 +145,12 @@ function sc.type(obj) end
 ---@return type type
 function sc.type(v) end
 
+---Get the field of the object or class, considering the inheritance chain
+---@param this object|class
+---@param super? boolean skip this class itself, default `false`
+---@return any
+function sc.index(this, key, super) end
+
 ---Define a new class  
 ---eg:
 ---```lua
@@ -221,7 +209,28 @@ function sc.isinstance(obj, cls) end
 ---@return boolean
 function sc.isinstance(v, T) end
 
-sc.issubclass = c.isExtends
+---Check if the class extends the base class
+---@param this class
+---@param base class
+---@return boolean
+function sc.issubclass(this, base) end
+
+---Check if the class implements the interface  
+---If not, it returns the name of a method missing implements
+---@param clazz class
+---@param iface interface
+---@return boolean ok
+---@return string? meth
+function sc.isimpl(clazz, iface) end
+
+---Check if the class implements the interfaces  
+---If not, it returns the index of the first interface that is not implemented
+---@param cls class
+---@param ... interface
+---@return boolean  ok
+---@return integer? arg_index if not ok
+function sc.isimplements(cls, ...) end
+
 sc.object = o
 
 ---The environment of the classes and interfaces
@@ -294,13 +303,16 @@ sc.property = {}
 ---@alias simpleclass.FIELD
 ---| "class"
 ---| "super"
+---| "index"
 ---| "alias"
 ---| "interface"
 ---| "type"
 ---| "object"
 ---| "property"
+---| "isimpl"
 ---| "isinstance"
 ---| "issubclass"
+---| "isimplements"
 
 ---Whether to register classes as global variables automatically.  
 ---Default true when import globally, false otherwise. Could be overridden in runtime.
@@ -337,6 +349,7 @@ super = sc.super
 interface = sc.interface
 isinstance = sc.isinstance
 issubclass = sc.issubclass
+isimplements = sc.isimplements
 
 object = sc.object
 property = sc.property

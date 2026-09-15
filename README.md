@@ -263,7 +263,7 @@ print(ctype(obj), ctype(10))
 使用方式：
 
 ```lua
-isinstance(MyClass(), MyClass)
+isinstance(MyCls(), MyCls)
 obj:isInstance(SomeClass)
 ```
 
@@ -276,24 +276,34 @@ obj:isInstance(SomeClass)
 使用方式：
 
 ```lua
-issubclass(MySubCls, MyClass)
-Dog:isExtends(Animal)
+issubclass(Dog, Animal)
 ```
 
 - 判断一个类是否继承自另一个类（包括间接继承）
-- 类可以直接调用 `isExtends` 方法，与 `issubclass` 等价
 - 注：**同一个类会返回** **`true`**
 
-**`:isImplements(...interface)`**
+**`isimplements(cls, ...interface)`**
 
 使用方式：
 
 ```lua
-Bird:isImplements(CanFly)
+isimplements(Bird, CanFly)
 ```
 
 - 判断类是否实现了指定接口，可以多个
-- 只能用类方法调用，没有对应的模块级函数
+- 失败时，会额外返回未实现的接口索引
+
+**`isimpl(cls, i)`**
+
+使用方式：
+
+```lua
+local isimpl = require("simpleclass").isimpl
+isimpl(Person, CanFly) --> false, "fly"
+```
+
+- 判断类是否实现了指定接口，只能传单个
+- 失败时，会额外返回具体的未实现方法名
 
 上面几个方法接受或返回的类 / 接口都是对象本身
 

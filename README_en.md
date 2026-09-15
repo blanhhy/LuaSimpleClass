@@ -276,24 +276,34 @@ obj:isInstance(SomeClass)
 Usage:
 
 ```lua
-issubclass(MySubCls, MyClass)
-Dog:isExtends(Animal)
+issubclass(Dog, Animal)
 ```
 
 - Checks whether a class inherits from another class (including indirect inheritance)
-- A class can directly call the `isExtends` method, which is equivalent to `issubclass`
 - Note: **Calling this on the same class returns `true`**
 
-**`:isImplements(...interface)`**
+**`isimplements(cls, ...interface)`**
 
 Usage:
 
 ```lua
-Bird:isImplements(CanFly)
+isimplements(Bird, CanFly)
 ```
 
 - Checks whether a class implements a specified interface (multiple interfaces are allowed)
-- Can only be called as a class method; there is no corresponding module-level function
+- Returns a boolean value and an index of the first unimplemented interface (if any)
+
+**`isimpl(cls, i)`**
+
+Usage:
+
+```lua
+local isimpl = require("simpleclass").isimpl
+isimpl(Person, CanFly) --> false, "fly"
+```
+
+- Checks whether a class implements a specified interface (single interface only)
+- Returns a boolean value and the name of the first unimplemented method (if any)
 
 The classes and interfaces accepted or returned by the methods above are the objects themselves.
 

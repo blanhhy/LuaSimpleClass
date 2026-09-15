@@ -12,9 +12,9 @@ local Runner = class "RuntimeRunner_8b31" : impl(CanRun) {
     end;
 }
 
-expect(Runner:isImplements(CanRun), true,
+expect(isimplements(Runner, CanRun), true,
     'impl must be an alias of implements')
-expect(Runner():isInstance(CanRun), true,
+expect(isinstance(Runner(), CanRun), true,
     'instances created through impl must implement the interface')
 
 return true

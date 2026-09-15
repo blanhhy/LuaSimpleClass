@@ -20,6 +20,7 @@ local load = loadstring or load
 local unpack = table.unpack or G.unpack
 local concat = table.concat
 local object = require("simpleclass.object")
+local index  = M.index
 
 _ENV = nil
 
@@ -47,14 +48,6 @@ function cc:extends(basename)
     return self
 end
 
---[[
-类独立字段，必须在定义时显示置为非nil值以阻断继承
-__classname：类名，占位"<anonymous>" 
-__base：基类，（仅object内）占位false
-__index：实例方法提供器，占位该类自身
-__property：属性集合，需合并基类，占位false
-]]
-
 ---Define the class body
 ---@generic T
 ---@param clazz table
@@ -69,8 +62,25 @@ function cc:def(clazz, c2)
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
-    -- 如果基类的 __index 是平凡的，子类的 __index 也要是平凡的
-    if clazz.__index == base then clazz.__index = clazz end
+    if base == object then
+        -- 对于 object 的直接派生类，由于 object 结构不变
+        -- 可以直接本地化少量实例方法，而不真正继承
+        -- 采用自身作为平凡 __index
+        clazz.__index    = clazz.__index    or clazz
+        clazz.is         = clazz.is         or object.is
+        clazz.clone      = clazz.clone      or object.clone
+        clazz.getClass   = clazz.getClass   or object.getClass
+        clazz.isInstance = clazz.isInstance or object.isInstance
+    else
+        -- 深继承时，采用 M.index 作为平凡 __index
+        clazz.__index = clazz.__index
+            or (base.__index ~= base and base.__index)
+            or index
+    end
+
+    -- 类不继承，必要方法须自持
+    clazz.new      = clazz.new      or base.new
+    clazz.toString = clazz.toString or base.toString
 
     for i = 1, #clazz do
         local item = clazz[i]
@@ -101,18 +111,17 @@ function cc:def(clazz, c2)
 
     local ctor = clazz.constructor
     local init = clazz.__init or ctor
+    clazz.__base = base
     clazz.__init = init
     clazz.constructor = nil
-
-    clazz.new = clazz.new or base.new
-
-    clazz.__base = base
     clazz.__classname = self.name
-    setmetatable(clazz, M._CMT)
 
     if clazz.__property then
-        clazz.__index = clazz.__index ~= clazz and clazz.__index or clazz.__getter
-        clazz.__newindex = clazz.__newindex or clazz.__setter
+        local oindex = clazz.__index
+        clazz.__newindex = clazz.__newindex or base.__setter or object.__setter
+        clazz.__index = oindex ~= clazz and oindex ~= index
+            and oindex                           -- 非平凡时，尊重当前 override，用户须自行 super
+            or  base.__getter or object.__getter -- 平凡时，转接 getter，尊重基类可能的 override
     end
 
     if self.iCheck then
@@ -129,7 +138,7 @@ function cc:def(clazz, c2)
         M._ENV[self.name] = clazz
     end
 
-    return clazz
+    return setmetatable(clazz, M._CMT)
 end
 
 cc.__call = cc.def
@@ -143,7 +152,6 @@ end
 ---@param self any[]
 function Alias:__index(key)
     if self == alias then
-        -- 我是笨蛋，不用字符串键就永远不会重名了
         return setmetatable({
             key,   false, false,
             false, false, false,

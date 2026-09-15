@@ -6,6 +6,9 @@ local type, next, getmetatable, setmetatable, rawset
 local rawgetmt = debug and debug.getmetatable or getmetatable
 local rawsetmt = debug and debug.setmetatable or setmetatable
 
+local index = M.index
+local issub = M.issubclass
+
 ---@class M.object : object.class, object
 local object = {
     __base = false;
@@ -25,7 +28,7 @@ function object:__getter(key)
     local prop = claz["__property"]
     local gett = prop and prop[key] and claz["get." .. key]
     if gett then return gett(self) end
-    return claz[key]
+    return index(self, key)
 end
 
 function object:__setter(key, v)
@@ -41,20 +44,9 @@ end
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
-    local ctor = self['__init']
+    local ctor = self["__init"] or index(inst, "__init", true)
     if ctor then ctor(inst, ...) end
     return inst
-end
-
----Check if the class extends the base class (class method)
----@param base class
----@return boolean
-function object:isExtends(base)
-    while type(self) == "table" do
-        if self == base then return true end
-        self = self.__base
-    end
-    return false
 end
 
 ---Check if the object is an instance of the class or interface  
@@ -65,9 +57,9 @@ function object:isInstance(T)
     if typ ~= "table" or type(T) ~= "table" then
         return T == typ
     end
-    local iR, cls = M._iR, self.__class
-    if iR and iR[T] then return object.isImpl(self, T) end
-    if cls then return cls:isExtends(T--[[@as class]]) end
+    local iR, ct = M._iR, self.__class
+    if iR and iR[T] then return M.isimpl(self, T) end
+    if ct then return issub(ct, T--[[@as class]]) end
     return false
 end
 
@@ -103,6 +95,5 @@ M._ENV.object = object
 
 M.object = object
 M.isinstance = object.isInstance
-M.issubclass = object.isExtends
 
 return object

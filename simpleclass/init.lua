@@ -83,6 +83,7 @@ if options.GLOBAL_IMPORT then
         "property",
         "isinstance",
         "issubclass",
+        "isimplements",
     }
 end
 

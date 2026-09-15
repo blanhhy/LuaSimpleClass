@@ -92,8 +92,39 @@ function M.interface(name)
     }, ic)
 end
 
+local index = M.index
+
+---@param clazz object.class
+---@param meths string[]
+local function isimpl(clazz, meths)
+    if M.I_FEATURE ~= "general" then return true end
+    local field for i = 1, #meths do
+        field = clazz[meths[i]] or index(clazz, meths[i], true)
+        if type(field) ~= "function" then
+        return false, meths[i]
+    end end
+    return true
+end
+
+M.isimpl = isimpl
 M._iR = iR
-c.ifaces = false
+
+---Check if a class implements the interfaces
+---@param cls object.class
+---@param ... interface
+---@return boolean
+---@return integer? arg_index if false
+function M.isimplements(cls, ...)
+    if M.I_FEATURE ~= "general" then return true end
+    local impl
+    for i = 1, select('#', ...) do
+        impl = select(i,   ...)
+        if not impl or not iR[impl]
+        or not isimpl(cls, impl)
+        then return false, i
+    end end
+    return true
+end
 
 ---Implements the interfaces
 ---@param ... interface
@@ -101,19 +132,6 @@ function c:implements(...)
     if M.I_FEATURE == "lexical" then return self end
     self.ifaces = (...) and {...} or nil
     return self
-end
-
-c.impl = c.implements
-
----@param clazz object.class
----@param meths string[]
-local function isImpl(clazz, meths)
-    if M.I_FEATURE ~= "general" then return true end
-    for i = 1, #meths do
-        if type(clazz[meths[i]]) ~= "function" then
-        return false, meths[i]
-    end end
-    return true
 end
 
 ---@param clazz object.class
@@ -128,7 +146,7 @@ function c:iCheck(clazz)
             error(("bad implements: interface expected, got '%s' at #%d"):
             format(iface, i), 2)
         end
-        local ok, mname = isImpl(clazz, iface)
+        local ok, mname = isimpl(clazz, iface)
         if not ok then return false,
         ("class '%s' implements interface '%s' but does not implement method '%s'.")
         :format(self.name, iR[iface] == true and "<anonymous>" or iR[iface], mname)
@@ -136,21 +154,7 @@ function c:iCheck(clazz)
     return true
 end
 
-o.isImpl = isImpl
-
----@param ... interface
----@return boolean
----@return integer? arg_index if false
-function o:isImplements(...)
-    if M.I_FEATURE ~= "general" then return true end
-    local impl
-    for i = 1, select('#', ...) do
-        impl = select(i,   ...)
-        if not impl or not iR[impl]
-        or not isImpl(self, impl)
-        then return false, i
-    end end
-    return true
-end
+c.impl = c.implements
+c.ifaces = false
 
 return M.interface

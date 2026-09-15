@@ -36,16 +36,24 @@ if getinfo and getlocal then
     end
 end
 
+local index = M.index
+
+---@class (exact) M.super : super<class, object>
+---@field self    object|class
+---@field __class class
+---@operator call:nil
+
+---@param proxy M.super
 local function superinit(proxy, ...)
-    return proxy.__class.__base.__init(proxy.self, ...)
+    return index(proxy.__class, "__init", true)(proxy.self, ...)
 end
 
 local Super = {
     __call  = superinit,
+    ---@param proxy M.super
     __index = function(proxy, key)
         if key == "__init" then return superinit end
-        local clazz = proxy.__class
-        local field = clazz.__base[key]
+        local field = index(proxy.__class, key, true)
         if "function" ~= type(field) then return field end
         local self = proxy.self
         return function(_,...) return field(self, ...) end

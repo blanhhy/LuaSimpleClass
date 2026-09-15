@@ -126,8 +126,8 @@ assert(p.value == 1, 'prop getter')
 p.value = 3
 assert(p.value == 3, 'prop setter')
 assert(rawget(p, 'value') == nil)
-assert(BenchLeaf_7b01:isExtends(BenchBase_7b01))
-assert(not BenchLeaf_7b01:isExtends(BenchSuperBase_7b01))
+assert(issubclass(BenchLeaf_7b01, BenchBase_7b01))
+assert(not issubclass(BenchLeaf_7b01, BenchSuperBase_7b01))
 local sub = BenchSuperSub_7b01()
 assert(sub:via_super_x(7) == 7, 'explicit super')
 assert(sub:via_base(8) == 8, 'manual super')
@@ -351,54 +351,61 @@ section('super 调用')
 -- 注意：它们的派发现已能被 JIT 折叠到 0 成本（见 ~FOLDED），而 super 形式要建代理表+闭包、
 -- 无法折叠，所以本节比值一律不打印，只看绝对值。
 local subA = BenchSuperSub_7b01()
+-- 避免混入查找实例方法本身的开销干扰测试结果
+local via_direct  = BenchSuperSub_7b01["via_direct"]
+local via_base    = BenchSuperSub_7b01["via_base"]
+local via_index   = BenchSuperSub_7b01["via_index"]
+local via_super_x = BenchSuperSub_7b01["via_super_x"]
+local via_super0  = BenchSuperSub_7b01["via_super0"]
+local super_ctor  = BenchSuperSub_7b01["super_ctor"]
 local ks = 0
-local ref_super = bench('sub:via_direct(x) [use Base]', function()
+local ref_super = bench('sub:via_direct(x) [hardcode Base]', function()
     ks = ks + 1
-    acc = acc + subA:via_direct(ks)
+    acc = acc + via_direct(subA, ks)
 end)
 if not index then
 bench('sub:via_base(x) [manual super]', function()
     ks = ks + 1
-    acc = acc + subA:via_base(ks)
+    acc = acc + via_base(subA, ks)
 end, ref_super)
 else
-bench('sub:via_index(x) [sc.index]', function()
+bench('sub:via_index(x) [call index()]', function()
     ks = ks + 1
-    acc = acc + subA:via_index(ks)
+    acc = acc + via_index(subA, ks)
 end, ref_super)
 end
 bench('sub:via_super_x(x) [explicit]', function()
     ks = ks + 1
-    acc = acc + subA:via_super_x(ks)
+    acc = acc + via_super_x(subA, ks)
 end, ref_super)
 bench('sub:via_super0(x) [0-arg]', function()
     ks = ks + 1
-    acc = acc + subA:via_super0(ks)
+    acc = acc + via_super0(subA, ks)
 end, ref_super)
-bench('sub:super_ctor(x) [dedicated]', function()
+bench('sub:super_ctor(x) [init dedicated]', function()
     ks = ks + 1
-    subA:super_ctor(ks)
+    super_ctor(subA, ks)
     acc = acc + subA._v
 end, ref_super)
 
 section('偶发 API（绝对值）')
 local clsPool = { BenchLeaf_7b01, BenchL3_7b01 }
 local kp = 0
-bench('clazz:isExtends(Base) [true]', function()
+bench('issubclass(cls, Base) [true]', function()
     kp = kp + 1
     local c = (kp % 2 == 0) and clsPool[1] or clsPool[2]
-    acc = acc + (c:isExtends(BenchBase_7b01) and kp or 0)
+    acc = acc + (issubclass(c, BenchBase_7b01) and kp or 0)
 end)
-bench('clazz:isExtends(Other) [false]', function()
+bench('issubclass(cls, Other) [false]', function()
     kp = kp + 1
     local c = (kp % 2 == 0) and clsPool[1] or clsPool[2]
-    acc = acc + (c:isExtends(BenchSuperBase_7b01) and 0 or kp)
+    acc = acc + (issubclass(c, BenchSuperBase_7b01) and 0 or kp)
 end)
 bench('obj:clone()', function() holder[1] = leaf:clone() end)
 
 -- 收尾复核：确认被反复读写的对象语义仍然正确（基准不该改变被测对象的行为）
 assert(leaf:leafMethod(1) == 1 and leaf:rootMethod(2) == 2)
-assert(p.value == 3 and BenchLeaf_7b01:isExtends(BenchBase_7b01))
+assert(p.value == 3 and issubclass(BenchLeaf_7b01, BenchBase_7b01))
 
 acc = acc + cal_sink                              -- 让校准链的汇总值可观测，避免被消除
 local c_first, c_last = cals[1], cals[#cals]
