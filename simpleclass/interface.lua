@@ -65,7 +65,7 @@ function ic:__call(body)
     end
     iR[this] = name or true
     M._ENV[name or 0] = name and this or nil
-    if not body then return this end
+    if type(body) ~= "table" or #body == 0 then return this end
     return extend(this, body, self.seen)
 end
 
