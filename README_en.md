@@ -15,7 +15,7 @@ Offered as a lightweight version of [Luaclass](https://github.com/blanhhy/luacla
 
 > **All in One** file is available!!\
 > Can be easily integrated into any Lua project\
-> [simpleclass.lua](simpleclass.lua)
+> [simpleclass.lua](variant/simpleclass.lua)
 
 Compatible with Lua 5.1 and later, including LuaJIT.
 

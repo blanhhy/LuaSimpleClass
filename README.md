@@ -15,7 +15,7 @@
 
 > **All in One** 文件现在可用！！\
 > 可以方便地带到任何 Lua 项目中\
-> [simpleclass.lua](simpleclass.lua)
+> [simpleclass.lua](variant/simpleclass.lua)
 
 兼容 Lua 5.1 及以上版本，含 LuaJIT
 
