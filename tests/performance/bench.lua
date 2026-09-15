@@ -20,7 +20,7 @@ package.path = table.concat({
     package.path,
 }, ';')
 
-local index = require "simpleclass"["__index"]
+local index = require "simpleclass"["index"]
 
 local JIT = rawget(_G, 'jit')
 print('interpreter:', _VERSION, JIT and ('LuaJIT ' .. JIT.version) or 'PUC Lua')
@@ -362,7 +362,7 @@ bench('sub:via_base(x) [manual super]', function()
     acc = acc + subA:via_base(ks)
 end, ref_super)
 else
-bench('sub:via_index(x) [call __index]', function()
+bench('sub:via_index(x) [sc.index]', function()
     ks = ks + 1
     acc = acc + subA:via_index(ks)
 end, ref_super)
