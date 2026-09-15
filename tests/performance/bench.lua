@@ -20,7 +20,7 @@ package.path = table.concat({
     package.path,
 }, ';')
 
-require "simpleclass"
+local index = require "simpleclass"["__index"]
 
 local JIT = rawget(_G, 'jit')
 print('interpreter:', _VERSION, JIT and ('LuaJIT ' .. JIT.version) or 'PUC Lua')
@@ -84,15 +84,18 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
     via_super0 = function(self, x)
         return super():visit(x)
     end;
-    init_super = function(self, x)
+    super_ctor = function(self, x)
         super(BenchSuperSub_7b01, self)(x) -- 构造器专线
         return self
     end;
     via_direct = function(self, x)
-        return BenchSuperBase_7b01.visit(self, x)
+        return BenchSuperBase_7b01["visit"](self, x)
     end;
     via_base = function(self, x)
-        return BenchSuperSub_7b01.__base.visit(self, x)
+        return BenchSuperSub_7b01["__base"].visit(self, x)
+    end;
+    via_index = function(self, x)
+        return index(BenchSuperSub_7b01, "visit", true)(self, x)
     end;
 }
 
@@ -129,8 +132,8 @@ local sub = BenchSuperSub_7b01()
 assert(sub:via_super_x(7) == 7, 'explicit super')
 assert(sub:via_base(8) == 8, 'manual super')
 assert(sub:via_super0(9) == 9, '0-arg super')
-assert(sub:init_super(5) == sub and sub._v == 5, 'super ctor')
-assert(BenchBase_7b01():clone().__classname == 'BenchBase_7b01', 'clone')
+assert(sub:super_ctor(5) == sub and sub._v == 5, 'super ctor')
+assert(BenchBase_7b01():clone():getClass() == BenchBase_7b01, 'clone')
 print('sanity: ok')
 
 -- ===== 基准框架 =====
@@ -170,7 +173,7 @@ local function dwidth(s)
     return w
 end
 
-local NAME_W = 44 -- 最长的测项名
+local NAME_W = 40 -- 最长的测项名
 
 local function pad(s, w)
     local d = w - dwidth(s)
@@ -349,14 +352,21 @@ section('super 调用')
 -- 无法折叠，所以本节比值一律不打印，只看绝对值。
 local subA = BenchSuperSub_7b01()
 local ks = 0
-local ref_super = bench('sub:via_direct(x) [direct call]', function()
+local ref_super = bench('sub:via_direct(x) [use Base]', function()
     ks = ks + 1
     acc = acc + subA:via_direct(ks)
 end)
+if not index then
 bench('sub:via_base(x) [manual super]', function()
     ks = ks + 1
     acc = acc + subA:via_base(ks)
 end, ref_super)
+else
+bench('sub:via_index(x) [call __index]', function()
+    ks = ks + 1
+    acc = acc + subA:via_index(ks)
+end, ref_super)
+end
 bench('sub:via_super_x(x) [explicit]', function()
     ks = ks + 1
     acc = acc + subA:via_super_x(ks)
@@ -365,9 +375,9 @@ bench('sub:via_super0(x) [0-arg]', function()
     ks = ks + 1
     acc = acc + subA:via_super0(ks)
 end, ref_super)
-bench('sub:init_super(x) [super ctor]', function()
+bench('sub:super_ctor(x) [dedicated]', function()
     ks = ks + 1
-    subA:init_super(ks)
+    subA:super_ctor(ks)
     acc = acc + subA._v
 end, ref_super)
 
