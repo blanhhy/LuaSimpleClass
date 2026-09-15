@@ -36,6 +36,13 @@ function c:new() end
 ---@return boolean
 function c:isExtends(base) end
 
+---Check if the class implements the interface  
+---If not, it returns the name of a method missing implements
+---@param iface interface
+---@return boolean ok
+---@return string? meth
+function c:isImpl(iface) end
+
 ---Check if the class implements the interfaces
 ---@param ... interface
 ---@return boolean  ok
@@ -56,13 +63,6 @@ local o = {__classname = "object"}
 
 ---@return object
 function o:new() end
-
----Check if the class implements the interface  
----If not, it returns the name of a method missing implements
----@param iface interface
----@return boolean ok
----@return string? meth
-function o:isImpl(iface) end
 
 ---Clone an object (table)
 ---@generic T:table

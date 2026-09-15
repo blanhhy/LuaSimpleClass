@@ -1381,15 +1381,19 @@ function OnSetText(uri, text)
                         methods = overrideMethods,
                     }
                 end
-                -- 类对象拥有独立的继承链：只继承 Base.class，不继承接口。
-                -- 类方法、静态方法和元方法都挂在这条链上。
-                local classBase = parentName and (parentName .. '.class') or 'class'
-                local classTypeLine = '---@class ' .. className .. '.class : ' .. classBase
-                out[#out + 1] = classTypeLine
-                out[#out + 1] = '---@operator call:' .. className
+                -- 类对象只继承公共 class 能力和本类的元方法视图。
+                -- 元方法单独沿实例类的继承链继承，普通静态成员不继承。
+                local metaTypeLine = '---@class ' .. className .. '.meta'
+                if parentName then
+                    metaTypeLine = metaTypeLine .. ' : ' .. parentName .. '.meta'
+                end
+                out[#out + 1] = metaTypeLine
                 for _, mn in ipairs(metaMembers) do
                     out[#out + 1] = '---@field ' .. mn .. ' function'
                 end
+                local classTypeLine = '---@class ' .. className .. '.class : class, ' .. className .. '.meta'
+                out[#out + 1] = classTypeLine
+                out[#out + 1] = '---@operator call:' .. className
                 out[#out + 1] = className .. ' = {}'
                 -- 实例：X 继承父类实例 parent
                 local classLine = '---@class ' .. className .. ' : ' .. parent
