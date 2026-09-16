@@ -203,6 +203,25 @@ local function parseClassBlock(text, startPos)
         text:sub(braceStart + 1, braceEnd - 1), braceStart, impKwStart, impFin
 end
 
+-- A standalone DSL class has no Lua assignment to retain the generated class
+-- object. Preserve expressions such as `local X = class "X" {}` unchanged.
+local function classResultIsRhs(text, classStart)
+    local lineStart = classStart
+    while lineStart > 1 and text:sub(lineStart - 1, lineStart - 1) ~= '\n' do
+        lineStart = lineStart - 1
+    end
+    local prefix = text:sub(lineStart, classStart - 1):gsub('%s+$', '')
+    if prefix == '' then return false end
+    if prefix:match('[=,(%[%{]%s*$') then return true end
+    if prefix:match('%f[%w_]return%s*$')
+    or prefix:match('%f[%w_]and%s*$')
+    or prefix:match('%f[%w_]or%s*$')
+    or prefix:match('%f[%w_]not%s*$') then
+        return true
+    end
+    return false
+end
+
 local function isWordBoundary(body, pos, n)
     if pos <= 1 or pos > n then return true end
     local c = body:sub(pos, pos)
@@ -1298,6 +1317,13 @@ function OnSetText(uri, text)
             if not className then
                 pos = nextPos + 5
             else
+                if not classResultIsRhs(text, classStart) then
+                    diffs[#diffs + 1] = {
+                        start = classStart,
+                        finish = classStart - 1,
+                        text = className .. ' = ',
+                    }
+                end
                 local methods, fields, declareFields, aliases, declaredProperties = parseMethods(body, aliasNames)
                 local methodMeta = {}
                 local propertyMeta = {}
@@ -1384,6 +1410,7 @@ function OnSetText(uri, text)
                 -- 类对象只继承公共 class 能力和本类的元方法视图。
                 -- 元方法单独沿实例类的继承链继承，普通静态成员不继承。
                 out[#out + 1] = 'if false then'
+                out[#out + 1] = '---@diagnostic disable: unused-local, redefined-local'
                 local metaTypeLine = '---@class ' .. className .. '.meta'
                 if parentName then
                     metaTypeLine = metaTypeLine .. ' : ' .. parentName .. '.meta'
@@ -1683,9 +1710,8 @@ function OnSetText(uri, text)
                         end
                     end
                 end
+                out[#out + 1] = '---@diagnostic enable: unused-local, redefined-local'
                 out[#out + 1] = 'end'
-                out[#out + 1] = className .. ' = ' .. className
-                    .. ' ---@type ' .. className .. '.class'
                 if #declareFields > 0 then
                     -- 原始类体里的 ---@field（其前无 ---@class）会触发 doc-field-no-class。
                     -- 在此（表体开始处）禁用，到生成的类注解块前再启用，仅覆盖这一小段。
