@@ -37,18 +37,7 @@ function M.index(this, key, super)
     local field
     -- 预判实际 OOP 工程中可能出现的最大继承长度（一般 8 层，这里 12 层）
     -- 使 LuaJIT 现在**可以编译**继承方法查找，大幅提升 LuaJIT 下的运行时性能
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
+    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
     -- 更深的链回落成迭代：只是慢，语义完全一致
     while clazz do
         field = clazz[key]
@@ -78,7 +67,7 @@ end
 ---@param base class
 ---@return boolean
 function M.issubclass(this, base)
-    while type(this) == "table" do
+    while this do
         if this == base then return true end
         this = this["__base"]
     end

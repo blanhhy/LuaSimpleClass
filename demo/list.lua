@@ -1,4 +1,4 @@
----@diagnostic disable: deprecated
+---@diagnostic disable: deprecated, lowercase-global
 ---仿 Python 的 list 类
 
 local sc = require "simpleclass"

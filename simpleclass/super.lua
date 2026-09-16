@@ -57,8 +57,6 @@ local Super = {
         if "function" ~= type(field) then return field end
         local self = proxy.self
         return function(_,...) return field(self, ...) end
-        -- 代理方法还允许传入别的接收者这一点，在多继承下可能有点用  
-        -- 在单继承下完全就是不知所谓的功能，没有必要支持
     end,
     __tostring = function(proxy)
         return ("super<%s, %s>"):format(

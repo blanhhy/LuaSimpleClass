@@ -274,6 +274,23 @@ M.property = setmetatable({}, {
     end;
 })
 
+---Define a new class  
+---eg:
+---```lua
+---class "MyClass" : MyBase {
+---    __init = function(self)
+---        super():__init()
+---    end
+---}
+---```
+---or anonymous:
+---```lua
+---local cls = class {}
+---```
+---@generic T:string
+---@param name? `T`.class
+---@return _ClassCreator<T>|_ClassDefiner<T>
+---@overload fun(tbl:table):class
 function M.class(name)
     local typ = type(name)
     if typ == "table" then

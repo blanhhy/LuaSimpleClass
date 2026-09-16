@@ -209,7 +209,7 @@ local function bench(name, f, ref)
             ratio = '  [?]REF=0'
         end
     end
-    print(pad(name, NAME_W) .. ('%9.6f us/op  %7.1fM ops%s%s'):format(
+    print(pad(name, NAME_W) .. ('%7.4f us/op  %7.1fM ops%s%s'):format(
         us, nn / 1e6, ratio, flag))
     return us
 end
@@ -401,7 +401,8 @@ bench('issubclass(cls, Other) [false]', function()
     local c = (kp % 2 == 0) and clsPool[1] or clsPool[2]
     acc = acc + (issubclass(c, BenchSuperBase_7b01) and 0 or kp)
 end)
-bench('obj:clone()', function() holder[1] = leaf:clone() end)
+bench('object.clone [shallow]', function() holder[1] = object.clone(leaf, false) end)
+bench('object.clone [deep]', function() holder[1] = object.clone(leaf, true) end)
 
 -- 收尾复核：确认被反复读写的对象语义仍然正确（基准不该改变被测对象的行为）
 assert(leaf:leafMethod(1) == 1 and leaf:rootMethod(2) == 2)

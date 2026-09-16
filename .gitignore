@@ -2,3 +2,4 @@
 experiments/
 debug*.lua
 test*.lua
+*.log
