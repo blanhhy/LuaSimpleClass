@@ -282,7 +282,7 @@ function M.class(name)
     ---@generic T
     ---@type _ClassCreator<T>
     return setmetatable({
-        name = type(name) == "string" and name ~= '' and
+        name = typ == "string" and name ~= '' and
         name or "<anonymous>"
     }, cc)
 end
