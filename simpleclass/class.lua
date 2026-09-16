@@ -40,7 +40,7 @@ setmetatable(alias, Alias)
 ---@param basename? string
 ---@return _ClassCreator<T>
 function cc:extends(basename)
-    local base = M._ENV[basename]
+    local base = M._ENV[basename] ---@class class
     if not base or not base.__classname then
         error(("bad extends: '%s' not found or not a class"):format(basename), 2)
     end

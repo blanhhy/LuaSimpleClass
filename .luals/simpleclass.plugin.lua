@@ -1383,25 +1383,27 @@ function OnSetText(uri, text)
                 end
                 -- 类对象只继承公共 class 能力和本类的元方法视图。
                 -- 元方法单独沿实例类的继承链继承，普通静态成员不继承。
+                out[#out + 1] = 'if false then'
                 local metaTypeLine = '---@class ' .. className .. '.meta'
                 if parentName then
                     metaTypeLine = metaTypeLine .. ' : ' .. parentName .. '.meta'
                 end
                 out[#out + 1] = metaTypeLine
                 for _, mn in ipairs(metaMembers) do
-                    out[#out + 1] = '---@field ' .. mn .. ' function'
+                    out[#out + 1] = '---@field protected ' .. mn .. ' function'
                 end
                 local classTypeLine = '---@class ' .. className .. '.class : class, ' .. className .. '.meta'
                 out[#out + 1] = classTypeLine
                 out[#out + 1] = '---@operator call:' .. className
-                out[#out + 1] = className .. ' = {}'
+                out[#out + 1] = 'local ' .. className .. ' = {}'
                 -- 实例：X 继承父类实例 parent
                 local classLine = '---@class ' .. className .. ' : ' .. parent
                 if implementsList and #implementsList > 0 then
                     classLine = classLine .. ', ' .. table.concat(implementsList, ', ')
                 end
+                out[#out + 1] = '---@private'
                 out[#out + 1] = classLine
-                out[#out + 1] = '---@field __class ' .. className .. '.class'
+                out[#out + 1] = '---@field private __class ' .. className .. '.class'
                 -- 表表层手写的 ---@field 透传到 ---@class 下的连续注释行，声明未在 __init 赋值的字段
                 for _, df in ipairs(declareFields) do
                     out[#out + 1] = df
@@ -1639,14 +1641,15 @@ function OnSetText(uri, text)
                         local fieldFinish = tonumber(a.fieldFinish)
                             or tonumber(a.finish)
                             or 1
-                        local sourceText = ' ' .. a.origin .. ' = '
+                        local sourceText = '\n---@diagnostic disable-next-line: invisible\n '
+                            .. a.origin .. ' = '
                             .. targetOwner .. '.' .. a.target .. ';'
                         diffs[#diffs + 1] = {
                             start = braceStart + fieldFinish + 1,
                             finish = braceStart + fieldFinish,
                             text = sourceText,
                         }
-                        out[#out + 1] = '---@diagnostic disable-next-line: undefined-field'
+                        out[#out + 1] = '---@diagnostic disable-next-line: invisible, undefined-field'
                         out[#out + 1] = originOwner .. '.' .. a.origin .. ' = '
                             .. targetOwner .. '.' .. a.target
                     elseif targetMethod then
@@ -1680,6 +1683,9 @@ function OnSetText(uri, text)
                         end
                     end
                 end
+                out[#out + 1] = 'end'
+                out[#out + 1] = className .. ' = ' .. className
+                    .. ' ---@type ' .. className .. '.class'
                 if #declareFields > 0 then
                     -- 原始类体里的 ---@field（其前无 ---@class）会触发 doc-field-no-class。
                     -- 在此（表体开始处）禁用，到生成的类注解块前再启用，仅覆盖这一小段。
@@ -1725,16 +1731,46 @@ function OnSetText(uri, text)
                 }
 
                 -- 直接在用到 super 的方法内注入局部 `super`（返回基类实例类型），把 `super(Child, self)` 的
-                -- 接收者锚定为基类实例。位置取方法签名右括号之后、同行末尾，零宽度插入不改变行号。
-                local baseExpr = parentName and (parentName .. '.__proto') or 'object'
+                -- 接收者锚定为基类实例。插入点放在方法签名右括号后的下一行，避免挤占用户的签名行。
                 for _, m in ipairs(methods) do
                     if m.sigEnd and m.body and m.body:find('super%s*%(') then
-                        -- body[i] 对应 text[braceStart+i]；右括号在 body[sigEnd-1]，越过即 braceStart+sigEnd
+                        -- body[i] 对应 text[braceStart+i]；sigEnd 指向右括号之后。
                         local at = braceStart + m.sigEnd
+                        local lineStart = at
+                        local after = text:sub(at, at)
+                        if after == '\r' and text:sub(at + 1, at + 1) == '\n' then
+                            lineStart = at + 2
+                        elseif after == '\n' then
+                            lineStart = at + 1
+                        end
+
+                        local indent = text:match('^[ \t]*', lineStart) or ''
+                        if lineStart == at then
+                            local currentLine = text:sub(1, at):match('[^\n]*$') or ''
+                            indent = (currentLine:match('^[ \t]*') or '') .. '    '
+                        end
+                        local isClassMethod = m.kind == 'class' or m.kind == 'new'
+                        local clsType = className .. '.class'
+                        local selfType = isClassMethod and clsType or className
+                        local returnType
+                        if isClassMethod then
+                            returnType = (parentName or 'object') .. '.class'
+                        else
+                            returnType = parentName or 'object'
+                        end
+                        local stub = {
+                            '---@param cls ' .. clsType,
+                            '---@param self ' .. selfType,
+                            '---@return ' .. returnType,
+                            '---@overload fun():' .. returnType,
+                            '---@diagnostic disable-next-line: redefined-local, unused-local, missing-return',
+                            'local function super(cls, self) end',
+                        }
+                        local prefix = lineStart == at and '\n' or ''
                         diffs[#diffs + 1] = {
-                            start  = at,
-                            finish = at - 1,
-                            text   = ' local function super(_, _)return ' .. baseExpr .. ' end',
+                            start  = lineStart,
+                            finish = lineStart - 1,
+                            text   = prefix .. indent .. table.concat(stub, '\n' .. indent) .. '\n',
                         }
                     end
                 end

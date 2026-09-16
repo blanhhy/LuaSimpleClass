@@ -5,8 +5,8 @@
 local sc = {}
 
 ---@class class<o>
----@field __proto o
----@field __classname string
+---@field protected __proto o
+---@field protected __classname string
 
 ---@class object
 ---@class object.class : class<object>
@@ -41,7 +41,7 @@ function c:toString() end
 
 ---The base class of all classes
 ---@class object.class
-local o = {__classname = "object"}
+local o = {}
 
 ---@return object
 function o:new() end

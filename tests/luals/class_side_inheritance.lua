@@ -1,6 +1,7 @@
 -- Class objects inherit class and meta only; interfaces stay on the instance side.
--- expect: 32:undefined-field
--- expect: 39:undefined-field
+-- expect: 33:undefined-field
+-- expect: 37:invisible
+-- expect: 40:undefined-field
 
 require "simpleclass"
 
