@@ -124,9 +124,9 @@ function cc:def(clazz, c2)
             or  base.__getter or object.__getter -- 平凡时，转接 getter，尊重基类可能的 override
     end
 
-    if self.iCheck then
-        local ok, err = self:iCheck(clazz)
-        if not ok then error(err, 2) end
+    if self.ifaces and self.iCheck then
+        local ok, er = self:iCheck(clazz)
+        if not ok then error(er, 2) end
     end
 
     if self.name ~= "<anonymous>" then

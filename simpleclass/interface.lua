@@ -139,7 +139,6 @@ end
 ---@return string? err error message
 function c:iCheck(clazz)
     if M.I_FEATURE ~= "general" then return true end
-    if not self.ifaces then return true end
     for i = 1, #self.ifaces do
         local iface = self.ifaces[i]
         if not iface or not iR[iface] then
