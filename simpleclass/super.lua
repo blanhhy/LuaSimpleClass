@@ -47,7 +47,7 @@ local index = M.index
 local Super = {
     ---@param proxy M.super
     __call  = function(proxy, self, ...)
-        if self == proxy then return proxy.method(proxy.self, ...) end
+        if proxy.method then return proxy.method(proxy.self, ...) end
         return index(proxy.__class, "__init", true)(proxy.self, self, ...)
     end,
     ---@param proxy M.super
@@ -58,7 +58,12 @@ local Super = {
         return proxy
     end,
     __tostring = function(proxy)
-        return ("super<%s, %s>"):format(
+        return proxy.method
+        and ("bound<%s, %s>"):format(
+            proxy.self,
+            proxy.method
+        )
+        or  ("super<%s, %s>"):format(
             proxy.__class,
             proxy.self
         )
@@ -93,6 +98,7 @@ function M.super(cls, obj)
     return setmetatable({
         self    = obj,
         __class = cls,
+        method  = false
     }, Super)
 end
 

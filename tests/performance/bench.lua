@@ -209,7 +209,7 @@ local function bench(name, f, ref)
             ratio = '  [?]REF=0'
         end
     end
-    print(pad(name, NAME_W) .. ('%7.4f us/op  %7.1fM ops%s%s'):format(
+    print(pad(name, NAME_W) .. ('%7.6f us/op  %7.1fM ops%s%s'):format(
         us, nn / 1e6, ratio, flag))
     return us
 end
