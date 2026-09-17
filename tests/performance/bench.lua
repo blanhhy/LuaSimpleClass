@@ -348,8 +348,8 @@ end, ref_rw)
 
 section('super 调用')
 -- 参照行 via_direct/via_base 同为「实例方法解析 + 直调基类方法体」，二者对等。
--- 注意：它们的派发现已能被 JIT 折叠到 0 成本（见 ~FOLDED），而 super 形式要建代理表+闭包、
--- 无法折叠，所以本节比值一律不打印，只看绝对值。
+-- 注意：有 JIT 时参照行与下面的 super 形式会一起落进 FLOOR，比值不打印，
+-- 而绝对值也已在地板之下、同样不可信。也就是说本节只在无 JIT 的解释器上有分辨力。
 local subA = BenchSuperSub_7b01()
 -- 避免混入查找实例方法本身的开销干扰测试结果
 local via_direct  = BenchSuperSub_7b01["via_direct"]
