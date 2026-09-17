@@ -25,7 +25,7 @@ function Alias:__index(key)
 end
 
 function Alias:__call()
-    if self ~= alias then
+    if self == alias then
         error("bad alias: illegal usage, specify the alias name first.", 2)
     elseif not self[2] then
         error(("bad alias: alias '%s' cannot be declared as a method, no target specified"):
