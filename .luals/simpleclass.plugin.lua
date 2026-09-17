@@ -840,7 +840,8 @@ local function pl_fieldTypes(declareFields, methods)
             if ret then
                 types[method.name] = ret
             else
-                local backing = method.body:match('return%s+self%s*%.%s*([%w_]+)')
+                local backing = method.body:match(
+                    'return%s+self%s*%.%s*([%w_]+)%s*$')
                 if backing and types[backing] then
                     types[method.name] = types[backing]
                 end
