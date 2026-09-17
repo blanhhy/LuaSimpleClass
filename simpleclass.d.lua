@@ -240,7 +240,7 @@ sc._ENV = {object = o}
 ---@alias alias.target function
 ---@alias alias.origin table<string, alias.target>
 
----Create an alias for a method in the class body.
+---Create an alias for an existing field in the class body.
 ------
 ---To create an alias, do like this:
 ---```lua
@@ -251,8 +251,15 @@ sc._ENV = {object = o}
 ---print(Person().move == Person().walk) --> true
 ---```
 ------
----## 「:」vs「.」
----Use the `.` syntax to declare static methods; otherwise, use the `:` syntax.
+---## Syntax
+---`alias.<alias_name><index_op><target_name><call_op>`
+------
+---Where:  
+---| `<alias_name>` is the name of the alias.  
+---| `<index_op>` is `.` for static, or `:` for other.  
+---| `<target_name>` is the name of the target field.  
+---| `<call_op>` should be `()` if the target is a method.  
+------
 ---@alias simpleclass.alias table<string, alias.origin>
 ---@type simpleclass.alias
 sc.alias = {}

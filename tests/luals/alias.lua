@@ -26,7 +26,7 @@ class "AliasStaticTypeCheck_73a1" {
     add = function(left, right)
         return left + right
     end;
-    exported.addAlias.add(),
+    exported.addAlias.add,
 }
 
 local sum = AliasStaticTypeCheck_73a1.addAlias(7, 5)

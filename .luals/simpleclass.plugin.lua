@@ -300,11 +300,35 @@ local PL_OP_FROM_META = {
 }
 
 local function parseAliasEntry(body, start, aliasNames)
-    local prefix, origin, separator, target, open = body:sub(start):match(
+    local suffix = body:sub(start)
+    local prefix, origin, separator, target, open = suffix:match(
         '^([%w_]+)%s*%.%s*([%w_]+)%s*([:.])%s*([%w_]+)%s*%(()')
+    local noCall = false
+    if not prefix then
+        local plainEnd
+        prefix, origin, separator, target, plainEnd = suffix:match(
+            '^([%w_]+)%s*%.%s*([%w_]+)%s*([:.])%s*([%w_]+)%s*()')
+        local tail = plainEnd and suffix:sub(plainEnd) or ''
+        if not prefix or separator ~= '.'
+        or (tail ~= '' and not tail:match('^%s*[,;}]')) then
+            prefix = nil
+        else
+            noCall = true
+        end
+    end
     if not prefix or not aliasNames[prefix] then
-        local moduleName, moduleOrigin, moduleSeparator, moduleTarget, moduleOpen = body:sub(start):match(
+        local moduleName, moduleOrigin, moduleSeparator, moduleTarget, moduleOpen = suffix:match(
             '^([%w_]+)%s*%.%s*alias%s*%.%s*([%w_]+)%s*([:.])%s*([%w_]+)%s*%(()')
+        if not moduleName then
+            local moduleEnd
+            moduleName, moduleOrigin, moduleSeparator, moduleTarget, moduleEnd = suffix:match(
+                '^([%w_]+)%s*%.%s*alias%s*%.%s*([:.])%s*([%w_]+)%s*()')
+            local tail = moduleEnd and suffix:sub(moduleEnd) or ''
+            if moduleName and (moduleSeparator ~= '.'
+                or (tail ~= '' and not tail:match('^%s*[,;}]'))) then
+                moduleName = nil
+            end
+        end
         if not moduleName or not aliasNames[moduleName] then
             return nil
         end
@@ -313,13 +337,20 @@ local function parseAliasEntry(body, start, aliasNames)
         separator = moduleSeparator
         target = moduleTarget
         open = moduleOpen
+        noCall = open == nil
     end
 
-    local close = findMatchingParen(body, start + open - 2)
-    if not close then return nil end
-    local args = body:sub(start + open - 1, close - 1)
-    if args:match('%S') then return nil end
-    local finish = findFieldEnd(body, close + 1)
+    local close
+    local finish
+    if not noCall then
+        close = findMatchingParen(body, start + open - 2)
+        if not close then return nil end
+        local args = body:sub(start + open - 1, close - 1)
+        if args:match('%S') then return nil end
+        finish = findFieldEnd(body, close + 1)
+    else
+        finish = findFieldEnd(body, start)
+    end
     local before = body:sub(1, start - 1)
     local isOverride = before:match('^%s*%-%-%-@override%s*$')
         or before:match('\n%s*%-%-%-@override%s*$')

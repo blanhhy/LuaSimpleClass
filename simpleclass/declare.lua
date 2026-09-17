@@ -15,17 +15,24 @@ setmetatable(alias, Alias)
 function Alias:__index(key)
     if self == alias then
         return setmetatable({key, false, false}, Alias)
-    end
-    if self[2] then
+    elseif self[2] then
         error(("bad alias: alias '%s' already bound to target '%s'; cannot chain '%s'"):
         format(self[1], self[2], key), 2)
     end
     self[2] = key
-    self[3] = Alias
+    self[3] = alias
     return self
 end
 
-function Alias:__call() return self end
+function Alias:__call()
+    if self ~= alias then
+        error("bad alias: illegal usage, specify the alias name first.", 2)
+    elseif not self[2] then
+        error(("bad alias: alias '%s' cannot be declared as a method, no target specified"):
+        format(self[1]), 2)
+    end
+    return self
+end
 
 -- 1: origin
 -- 2: target
@@ -46,7 +53,7 @@ return function(clazz, base, maxn)
         local item = clazz[i]
         local tipe = item and type(item)
         local PROP = "@simpleclass.property."
-        if tipe == "table" and item[3] == Alias then
+        if tipe == "table" and item[3] == alias then
             clazz[i] = nil
             local origin = item[1]
             local target = item[2]
