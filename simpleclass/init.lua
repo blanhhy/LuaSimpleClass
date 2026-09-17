@@ -24,7 +24,6 @@ if type(margs) == "table" then
 end
 
 local M   = require "simpleclass.m" ---@class M
-            require "simpleclass.object"
             require "simpleclass.class"
             require "simpleclass.super"
 
