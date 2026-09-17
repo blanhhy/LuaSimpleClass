@@ -1,7 +1,7 @@
 local M = require "simpleclass.m" ---@class M
 
-local type, next, getmetatable, setmetatable, rawset
-    = type, next, getmetatable, setmetatable, rawset
+local type, next, getmetatable, setmetatable, rawset, error
+    = type, next, getmetatable, setmetatable, rawset, error
 
 local rawgetmt = debug and debug.getmetatable or getmetatable
 local rawsetmt = debug and debug.setmetatable or setmetatable
@@ -24,10 +24,14 @@ object.__index = object
 _ENV = nil
 
 function object:__getter(key)
-    local claz = self.__class
-    local prop = claz["__property"]
-    local gett = prop and prop[key] and claz["get." .. key]
-    if gett then return gett(self) end
+    local clazz = self.__class
+    local prope = clazz["__property"]
+    if prope and prope[key] then
+        local getkey = "get." .. key
+        local getter = clazz[getkey]
+        or M.index(clazz, getkey, true)
+        if getter then return getter(self) end
+    end
     return index(self, key)
 end
 
@@ -37,8 +41,11 @@ function object:__setter(key, v)
     if not prope or not prope[key] then
         return rawset(self, key, v)
     end
-    local sett = clazz["set." .. key]
-    if sett then return sett(self, v) end
+    local setkey = "set." .. key
+    local setter = clazz[setkey]
+    or M.index(clazz, setkey, true)
+    if setter then return setter(self, v) end
+    error("cannot set property."..key..", no setter defined.")
 end
 
 ---@return object
