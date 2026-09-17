@@ -41,22 +41,21 @@ local index = M.index
 ---@class (exact) M.super : super<class, object>
 ---@field self    object|class
 ---@field __class class
----@operator call:nil
-
----@param proxy M.super
-local function superinit(proxy, ...)
-    return index(proxy.__class, "__init", true)(proxy.self, ...)
-end
+---@field method? function
+---@operator call:...
 
 local Super = {
-    __call  = superinit,
+    ---@param proxy M.super
+    __call  = function(proxy, self, ...)
+        if self == proxy then return proxy.method(proxy.self, ...) end
+        return index(proxy.__class, "__init", true)(proxy.self, self, ...)
+    end,
     ---@param proxy M.super
     __index = function(proxy, key)
-        if key == "__init" then return superinit end
         local field = index(proxy.__class, key, true)
         if "function" ~= type(field) then return field end
-        local self = proxy.self
-        return function(_,...) return field(self, ...) end
+        proxy.method = field
+        return proxy
     end,
     __tostring = function(proxy)
         return ("super<%s, %s>"):format(
