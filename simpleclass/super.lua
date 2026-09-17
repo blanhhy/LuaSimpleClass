@@ -47,7 +47,7 @@ local index = M.index
 local Super = {
     ---@param proxy M.super
     __call  = function(proxy, self, ...)
-        if proxy.method then return proxy.method(proxy.self, ...) end
+        if proxy == self then return proxy.method(proxy.self, ...) end
         return index(proxy.__class, "__init", true)(proxy.self, self, ...)
     end,
     ---@param proxy M.super
