@@ -8,7 +8,6 @@ class "AliasTypeCheck_73a1" {
         return value
     end;
     exported.shortEcho:echo(),
-    exported.fixedEcho:echo("fixed"),
 }
 
 local instance = AliasTypeCheck_73a1:new()
@@ -16,7 +15,7 @@ local text = instance:shortEcho("ok")
 ---@type string
 local valid = text
 
--- expect: 20:param-type-mismatch
+-- expect: 19:param-type-mismatch
 local invalid = instance:shortEcho(123)
 
 class "AliasStaticTypeCheck_73a1" {
@@ -27,17 +26,17 @@ class "AliasStaticTypeCheck_73a1" {
     add = function(left, right)
         return left + right
     end;
-    exported.addFive.add(5),
+    exported.addAlias.add(),
 }
 
-local sum = AliasStaticTypeCheck_73a1.addFive(7)
+local sum = AliasStaticTypeCheck_73a1.addAlias(7, 5)
 ---@type integer
 local validSum = sum
 
--- expect: 38:param-type-mismatch
-local invalidSum = AliasStaticTypeCheck_73a1.addFive("7")
+-- expect: 37:param-type-mismatch
+local invalidSum = AliasStaticTypeCheck_73a1.addAlias("7", 5)
 
--- expect: 42:undefined-field
+-- expect: 41:undefined-field
 class "AliasMissingTarget_73a1" {
     exported.missing:doesNotExist(), -- 不存在的方法，会报诊断
 }

@@ -240,7 +240,7 @@ sc._ENV = {object = o}
 ---@alias alias.target function
 ---@alias alias.origin table<string, alias.target>
 
----Create an alias or a partial function for a method.
+---Create an alias for a method in the class body.
 ------
 ---To create an alias, do like this:
 ---```lua
@@ -251,24 +251,9 @@ sc._ENV = {object = o}
 ---print(Person().move == Person().walk) --> true
 ---```
 ------
----To create a partial function, pass some arguments to the alias:  
----```lua
----class "Calculator" {
----    add = function(a, b) return a + b end;
----    alias.add1 .add(1);
----}
----print(Calculator.add1(2)) --> 3
----```
----> A positional partial can also be created outside a class body:
----> ```lua
----> partial = alias(func, ...)
----> ```
-------
 ---## 「:」vs「.」
----It’s simple:   
----If a method is expected to be called with “:”, then its alias must also use the “:” syntax;  
----conversely, if it’s expected to be called with “.”, then its alias should use the “.” syntax.
----@alias simpleclass.alias table<string, alias.origin>|fun(function, ...):function
+---Use the `.` syntax to declare static methods; otherwise, use the `:` syntax.
+---@alias simpleclass.alias table<string, alias.origin>
 ---@type simpleclass.alias
 sc.alias = {}
 
