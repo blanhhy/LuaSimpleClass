@@ -61,7 +61,7 @@ class "BenchProp_7b01" {
     propMethod = function(self, x) return x end;
 }
 
--- 有构造器的类（主流场景）
+-- 有构造器的类
 class "BenchCtorSelf_7b01" {
     __init = function(self, x)
         self.x = x
@@ -155,8 +155,7 @@ local function measure(f)
     return dt * 1e6 / ran, ran, dt
 end
 
--- 测量地板：低于此值的行说明 JIT 已把该行的工作（含派发）整体折叠掉，
--- 它只能证明「这条路可以零成本」，拿它当参照算出的比值毫无意义。
+-- 测量地板：低于此值的行说明 JIT 已把该行的工作（含派发）整体折叠掉
 local FLOOR = 0.001 -- us/op
 
 -- 终端显示宽度：CJK 等 3 字节以上的 UTF-8 序列占 2 列。
@@ -180,8 +179,7 @@ local function pad(s, w)
     return d > 0 and (s .. (' '):rep(d)) or s
 end
 
--- 每项跑两次取小值。~FOLDED 表示已到地板，~FAST 表示计时段太短，
--- ~UNSTABLE 表示两次偏差 >30%（trace 形状漂移）。
+-- 每项跑两次取小值。FOLDED 表示已到地板，FAST 表示计时段太短，UNSTABLE 表示两次偏差 >30%。
 local function bench(name, f, ref)
     local us1, n1, dt1 = measure(f)
     local us2, n2, dt2 = measure(f)
@@ -192,16 +190,17 @@ local function bench(name, f, ref)
     if us < FLOOR then
         flag = '  [√]FOLDED'
     elseif dt < 0.05 then
-        flag = '  [√]FAST'
+        flag = '  [!]FAST'
     elseif us > 0 and math.abs(us1 - us2) / us > 0.3 then
         flag = '  [!]UNSTABLE'
     end
     local ratio = ''
     if ref then
         if ref < FLOOR and us >= FLOOR then
-            -- 参照行已被折叠(≈0 成本)而本行没有：比值只表示「相对零成本」，没有意义
+            -- 参照行已被折叠而本行没有，无法相比
             ratio = '  [!]CANT FOLD'
         elseif ref < FLOOR then
+            -- 都被折叠，比值总在1左右，打印意义不大
             ratio = ''
         elseif ref > 0 then
             ratio = ('  %6.2fx'):format(us / ref)
@@ -261,14 +260,10 @@ end
 bench('rawNew(cls) [no ctor]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
 bench('BenchBase()', function() holder[1] = BenchBase_7b01() end, ref_new)
 bench('BenchLeaf() [depth5]', function() holder[1] = BenchLeaf_7b01() end, ref_new)
--- 有构造器的类（主流场景）
 bench('BenchCtorSelf(1) [own ctor]', function() holder[1] = BenchCtorSelf_7b01(1) end, ref_new)
 bench('BenchCtorChild(2) [inh ctor]', function() holder[1] = BenchCtorChild_7b01(2) end, ref_new)
 
 section('实例方法调用')
--- 参照行用「同一函数 dot 直调」：派发被 JIT 完全消除，代表零派发成本。
--- 直接派生类（depth1）的实例解析只有一次原生表查找，成本与直调持平；
--- 深继承类被迫走迭代函数，且与深度无关（都是一次函数进入 + 一条链走查）。
 local baseI, l1I = BenchBase_7b01(), BenchL1_7b01()
 local kc = 0
 local ref_call = bench('Leaf.leafMethod(t, x) [raw func]', function()
@@ -347,11 +342,8 @@ bench('p.value [getter] <r>', function()
 end, ref_rw)
 
 section('super 调用')
--- 参照行 via_direct/via_base 同为「实例方法解析 + 直调基类方法体」，二者对等。
--- 注意：有 JIT 时参照行与下面的 super 形式会一起落进 FLOOR，比值不打印，
--- 而绝对值也已在地板之下、同样不可信。也就是说本节只在无 JIT 的解释器上有分辨力。
 local subA = BenchSuperSub_7b01()
--- 避免混入查找实例方法本身的开销干扰测试结果
+-- 避免混入查找实例方法本身的开销干扰测试关注点
 local via_direct  = BenchSuperSub_7b01["via_direct"]
 local via_base    = BenchSuperSub_7b01["via_base"]
 local via_index   = BenchSuperSub_7b01["via_index"]
