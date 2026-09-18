@@ -9,16 +9,16 @@ source = {
 }
 
 description = {
-    summary = "Modern & lightweight Lua OOP library, without fighting static analyzers",
+    summary = "Modern & lightweight Lua OOP lib, without fighting static analyzers",
     detailed = [[
-LuaSimpleClass is a modern-style, purely Lua-based OOP library with concise syntax and deep compatibility with the static analysis features of `lua-language-server`.
+Lua SimpleClass is a modern-style, purely Lua-based OOP library with concise syntax and deep compatibility with the static analysis features of lua-language-server (sumneko.lua).
 
-- Concise DSL syntax: class “Cls” : extends “Base” : impl(Iface) { ... }
-- Automatically generates static type annotations; when used with simpleclass.d.lua and the LuaLS plugin, it provides full type inference
-- Supports single inheritance, interfaces, getter and setter properties, `super` calls, type checking, and more
-- Pure Lua implementation, compatible with Lua 5.1+ and LuaJIT, with zero runtime dependencies
+* Concise DSL syntax - Like `class "Cls" : Base { ... }`
+* Lightweight runtime - Less than 500 lines of core code, doing nothing superfluous
+* LSP friendly - Automatically generate static type annotations, get rid of hand-written “---@class”
+* Zero dependencies - Pure Lua implementation, compatible with Lua 5.1+ and LuaJIT
 
-After installation, if you need static analysis support, please refer to the “类型推导” section in the README.
+After installation, if you need static analysis support, please refer to the “Type Inference” section in the README.
 ]],
     homepage = "https://github.com/blanhhy/LuaSimpleClass",
     license = "Unlicense",
@@ -36,6 +36,7 @@ build = {
         ["simpleclass.init"]      = "simpleclass/init.lua",
         ["simpleclass.m"]         = "simpleclass/m.lua",
         ["simpleclass.object"]    = "simpleclass/object.lua",
+        ["simpleclass.declare"]   = "simpleclass/declare.lua",
         ["simpleclass.class"]     = "simpleclass/class.lua",
         ["simpleclass.super"]     = "simpleclass/super.lua",
         ["simpleclass.interface"] = "simpleclass/interface.lua",
