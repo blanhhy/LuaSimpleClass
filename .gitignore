@@ -1,5 +1,8 @@
 .tmp/
 lua_modules/
+
 debug*.lua
 test*.lua
 *.log
+
+*.src.rock
