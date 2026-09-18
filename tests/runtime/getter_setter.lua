@@ -105,4 +105,80 @@ expect(inherited._value, 10,
 expect(inherited.extra, "child",
     'a child must retain its own declared property')
 
+local customGetterCalls = 0
+local customSetterCalls = 0
+class "RuntimeCustomPropertyBase_4a82" {
+    __init = function(self)
+        rawset(self, '_value', 1)
+    end;
+    __index = function(self, key)
+        if key == 'value' then
+            customGetterCalls = customGetterCalls + 1
+            return rawget(self, '_value') + 100
+        end
+        return rawget(self, key)
+    end;
+    __newindex = function(self, key, value)
+        if key == 'value' then
+            customSetterCalls = customSetterCalls + 1
+            return rawset(self, '_value', value * 2)
+        end
+        return rawset(self, key, value)
+    end;
+    property.value;
+}
+
+class "RuntimeCustomPropertyChild_4a82" : extends "RuntimeCustomPropertyBase_4a82" {}
+
+local customBase = RuntimeCustomPropertyBase_4a82:new()
+expect(customBase.value, 101,
+    'a base custom getter must handle its own instance')
+customBase.value = 3
+expect(customBase.value, 106,
+    'a base custom setter must handle its own instance')
+
+local customChild = RuntimeCustomPropertyChild_4a82:new()
+expect(customChild.value, 101,
+    'a child must inherit the base custom getter')
+customChild.value = 4
+expect(customChild.value, 108,
+    'a child must inherit the base custom setter')
+assert(customGetterCalls == 4 and customSetterCalls == 2,
+    'custom property dispatch should use the inherited base hooks')
+
+local unusedGetterCalls = 0
+local unusedSetterCalls = 0
+class "RuntimeUnappliedAccessorBase_4a82" {
+    __getter = function(self, key)
+        unusedGetterCalls = unusedGetterCalls + 1
+        return 'base getter: ' .. key
+    end;
+    __setter = function(self, key, value)
+        unusedSetterCalls = unusedSetterCalls + 1
+        rawset(self, key, value)
+    end;
+}
+
+class "RuntimeUnappliedAccessorChild_4a82" : extends "RuntimeUnappliedAccessorBase_4a82" {
+    __getter = function()
+        unusedGetterCalls = unusedGetterCalls + 1
+        return 'child getter'
+    end;
+    __setter = function(self, key, value)
+        unusedSetterCalls = unusedSetterCalls + 1
+        rawset(self, key, value)
+    end;
+    property.value;
+}
+
+local unapplied = RuntimeUnappliedAccessorChild_4a82:new()
+assert(unapplied.value == nil,
+    'a base __getter must not become a child accessor by name lookup')
+local setterOk, setterError = pcall(function()
+    unapplied.value = 1
+end)
+assert(not setterOk and tostring(setterError):match('cannot set property%.value, no setter defined'))
+assert(unusedGetterCalls == 0 and unusedSetterCalls == 0,
+    'unbound base __getter/__setter must not enter the property inheritance chain')
+
 return true

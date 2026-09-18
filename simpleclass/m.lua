@@ -13,7 +13,7 @@ local mm_names = {
     "__add", "__sub", "__mul", "__div", "__mod", "__pow", "__idiv", "__unm",
     "__band", "__bor", "__bxor", "__bnot", "__shl", "__shr", "__eq", "__lt",
     "__le", "__concat", "__len", "__tostring", "__pairs", "__gc", "__close",
-    "__newindex", "__call", -- index 特殊处理
+    "__newindex", "__call", "__ipairs" -- index 特殊处理
 }
 
 ---@class M : simpleclass

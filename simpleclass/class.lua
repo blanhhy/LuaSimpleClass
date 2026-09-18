@@ -30,6 +30,16 @@ function cc:extends(basename)
     return self
 end
 
+-- P1: 自身已定义
+-- P2: 基类已定义
+-- P3: 未定义→平凡（自身或 M.index）
+
+local function check_index(clazz, base)
+    if clazz.__index then return 1, clazz.__index end
+    if not base.__index or base.__index == base or base.__index == index then return 3, index end
+    return 2, base.__index
+end
+
 ---Define the class body
 ---@generic T
 ---@param clazz table
@@ -37,6 +47,7 @@ end
 function cc:def(clazz, c2)
     if self == clazz then clazz = c2 end
     local base = self.base
+    local indexdef, __index = check_index(clazz, base)
 
     -- 继承元方法（元方法只能由raw字段触发）
     for i = 1, #M._MMS do
@@ -55,9 +66,7 @@ function cc:def(clazz, c2)
         clazz.isInstance = clazz.isInstance or object.isInstance
     else
         -- 深继承时，采用 M.index 作为平凡 __index
-        clazz.__index = clazz.__index
-            or (base.__index ~= base and base.__index)
-            or index
+        clazz.__index = __index
     end
 
     -- 类不继承，必要方法须自持
@@ -82,11 +91,9 @@ function cc:def(clazz, c2)
     clazz.__classname = self.name
 
     if clazz.__property then
-        local oindex = clazz.__index
-        clazz.__newindex = clazz.__newindex or base.__setter or object.__setter
-        clazz.__index = oindex ~= clazz and oindex ~= index
-            and oindex                           -- 非平凡时，尊重当前 override，用户须自行 super
-            or  base.__getter or object.__getter -- 平凡时，转接 getter，尊重基类可能的 override
+        -- 自定义 index&newindex 优先，未定义时框架自动实现 getter&setter 访问逻辑
+        clazz.__newindex = clazz.__newindex or object.__setter
+        clazz.__index = indexdef == 3 and object.__getter or clazz.__index
     end
 
     if self.ifaces and self.iCheck then
