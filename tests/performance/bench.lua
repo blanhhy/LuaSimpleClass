@@ -370,14 +370,14 @@ bench('sub:via_super_x(x) [explicit]', function()
     ks = ks + 1
     acc = acc + via_super_x(subA, ks)
 end, ref_super)
-bench('sub:via_super0(x) [0-arg]', function()
-    ks = ks + 1
-    acc = acc + via_super0(subA, ks)
-end, ref_super)
 bench('sub:super_ctor(x) [init dedicated]', function()
     ks = ks + 1
     super_ctor(subA, ks)
     acc = acc + subA._v
+end, ref_super)
+bench('sub:via_super0(x) [0-arg]', function()
+    ks = ks + 1
+    acc = acc + via_super0(subA, ks)
 end, ref_super)
 
 section('偶发 API（绝对值）')

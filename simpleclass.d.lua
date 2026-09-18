@@ -15,9 +15,8 @@ local sc = {}
 ---@class interface : string[]
 
 ---@class super<cls, obj>
----@field self obj
----@field __class cls
 ---@field [string] unknown
+---@operator call:nil
 
 
 -----------------------------------------------------------------------------------------------------

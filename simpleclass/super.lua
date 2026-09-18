@@ -39,36 +39,34 @@ end
 local index = M.index
 
 ---@class (exact) M.super : super<class, object>
----@field self    object|class
----@field __class class
----@field method? function
----@operator call:...
+---@field [1] object|class
+---@field [2] class
+---@field [3] function?
 
 local Super = {
+    __mode  = "v", -- 不应影响被代理对象和方法的生命周期
     ---@param proxy M.super
     __call  = function(proxy, self, ...)
-        if proxy == self then return proxy.method(proxy.self, ...) end
-        return index(proxy.__class, "__init", true)(proxy.self, self, ...)
+        if proxy == self then return proxy[3](proxy[2], ...) end
+        return index(proxy[1], "__init", true)(proxy[2], self, ...)
     end,
     ---@param proxy M.super
     __index = function(proxy, key)
-        local field = index(proxy.__class, key, true)
+        local field = index(proxy[1], key, true)
         if "function" ~= type(field) then return field end
-        proxy.method = field
+        proxy[3] = field
         return proxy
     end,
-    __tostring = function(proxy)
-        return proxy.method
-        and ("bound<%s, %s>"):format(
-            proxy.self,
-            proxy.method
-        )
-        or  ("super<%s, %s>"):format(
-            proxy.__class,
-            proxy.self
-        )
+    __tostring = function(p)
+        return p[3]
+        and ("bound<%s, %s>"):format(p[2], p[3])
+        or  ("super<%s, %s>"):format(p[1], p[2])
     end
 }
+
+-- 1: cls
+-- 2: obj
+-- 3: method
 
 ---To call superclass methods  
 ---eg: `super(cls, self):__init()`
@@ -81,17 +79,11 @@ function M.super(cls, obj)
         cls, obj = getcontext()
     end
     if not obj then obj = cls end
-    if type(cls)        ~= "table"
-    or type(cls.__base) ~= "table"
-    or not  cls.__base.__classname then
-        error(("super: bad arguments: %s, %s"):
-        format(cls, obj), 2)
+    if type(cls) ~= "table" or not cls.__classname then
+        error(("super: bad arguments: %s, %s"):format(cls, obj), 2)
     end
-    return setmetatable({
-        self    = obj,
-        __class = cls,
-        method  = false
-    }, Super)
+    return setmetatable({cls, obj, false}, Super)
 end
+
 
 return M.super
