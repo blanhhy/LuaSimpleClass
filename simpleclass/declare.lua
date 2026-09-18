@@ -14,7 +14,7 @@ setmetatable(alias, Alias)
 ---@param self any[]
 function Alias:__index(key)
     if self == alias then
-        return setmetatable({key, false, false}, Alias)
+        return setmetatable({key, false, false, false}, Alias)
     elseif self[2] then
         error(("bad alias: alias '%s' already bound to target '%s'; cannot chain '%s'"):
         format(self[1], self[2], key), 2)
@@ -24,19 +24,21 @@ function Alias:__index(key)
     return self
 end
 
-function Alias:__call()
+function Alias:__call(this)
     if self == alias then
         error("bad alias: illegal usage, specify the alias name first.", 2)
     elseif not self[2] then
         error(("bad alias: alias '%s' cannot be declared as a method, no target specified"):
         format(self[1]), 2)
     end
+    self[4] = self == this
     return self
 end
 
 -- 1: origin
 -- 2: target
 -- 3: _Magic
+-- 4: inherit?
 
 M.alias = alias
 M.property = setmetatable({}, {
@@ -58,7 +60,7 @@ return function(clazz, base, maxn)
             local origin = item[1]
             local target = item[2]
             local field = clazz[target]
-            if field == nil then field = M.index(base, target) end
+            if field == nil and item[4] then field = M.index(base, target) end
             if field == nil then return
                 error(("bad alias: '%s' not found"):
                 format(item[2]), 2)
