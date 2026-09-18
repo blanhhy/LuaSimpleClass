@@ -37,3 +37,18 @@ end
 -- Outputs:
 -- Human walk
 -- Plane fly
+
+-- 也可以用于继承来的实例方法
+
+class "Vehicle" : impl(Movable){
+    move = function(self)
+        print(("%s is moving"):
+        format(self:getClass()))
+    end
+}
+
+class "Car" : Vehicle {
+    alias.run:move();
+}
+
+Car():run() -- Car is moving

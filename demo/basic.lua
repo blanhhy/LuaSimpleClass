@@ -48,32 +48,14 @@ print(isinstance(s1, "table")) --> true
 print(ctype(s1)) --> Student
 
 --#==========================================
---# 深层继承
---#==========================================
-
-class "CollageStu" : Student {
-    -- 继承的简洁写法，':' + 基类
-    __init = function(self, name, age, grade)
-        -- 在实例方法里，可以省略 super 的参数
-        -- 如果是构造函数，还可以省略名字
-        super()(name, age, grade)
-    end;
-}
-
--- 实例化的简洁写法；但 LS 对此无签名提示与检查支持
-local c1 = CollageStu("Alice", 22, "junior")
-c1:sayHello()
--- Output: Hello, my name is Alice and I am a junior year old student.
-
---#==========================================
 --# 接口使用
 --#==========================================
+
 interface "CanEat" {"eat"}
 interface "CanFly" {"fly"}
 
 -- 错误的定义
 xpcall(function()
-    -- 如果在用配套 LS 插件的话，静态就会报错。这里错误示范，临时禁用诊断
     ---@diagnostic disable-next-line: unknown-diag-code
     ---@diagnostic disable-next-line: missing-implements
     class "Bird_wrong" : implements(CanEat, CanFly) {
@@ -126,6 +108,7 @@ print(isinstance(eagle, BirdLike))                   --> true
 --#==========================================
 --# 多态应用
 --#==========================================
+
 -- 接口的多态
 ---@param flyable CanFly
 local function makeFly(flyable)
