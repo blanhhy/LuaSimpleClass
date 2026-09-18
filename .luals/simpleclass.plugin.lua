@@ -131,11 +131,12 @@ local function parseClassBlock(text, startPos)
     while restStart <= n and text:sub(restStart, restStart):match('%s') do
         restStart = restStart + 1
     end
-    if restStart > n or text:sub(restStart, restStart) ~= '"' then
+    local classQuote = text:sub(restStart, restStart)
+    if restStart > n or (classQuote ~= '"' and classQuote ~= "'") then
         return nil
     end
     local nameStart = restStart + 1
-    local nameEnd = text:find('"', nameStart, true)
+    local nameEnd = text:find(classQuote, nameStart, true)
     if not nameEnd then return nil end
     local className = text:sub(nameStart, nameEnd - 1)
     pos = nameEnd + 1
@@ -147,10 +148,10 @@ local function parseClassBlock(text, startPos)
     while true do
         pos = skipCommentsAndWhitespace(text, pos) or pos
 
-        local extStart, extEnd = text:find('^:%s*extends?%s*"', pos)
+        local extStart, extEnd, extQuote = text:find("^:%s*extends?%s*([\"'])", pos)
         if extStart then
             local pnameStart = extEnd + 1
-            local pnameEnd = text:find('"', pnameStart, true)
+            local pnameEnd = text:find(extQuote, pnameStart, true)
             if not pnameEnd then return nil end
             parentName = text:sub(pnameStart, pnameEnd - 1)
             pos = pnameEnd + 1
@@ -652,7 +653,8 @@ local function findDslKeyword(text, from, keyword)
             end
             if not before:match('[%w_.]')
                 and restStart <= n
-                and text:sub(restStart, restStart) == '"' then
+                and (text:sub(restStart, restStart) == '"'
+                    or text:sub(restStart, restStart) == "'") then
                 return i
             end
             i = i + #keyword
@@ -754,11 +756,12 @@ local function parseInterfaceBlock(text, startPos)
     while restStart <= n and text:sub(restStart, restStart):match('%s') do
         restStart = restStart + 1
     end
-    if restStart > n or text:sub(restStart, restStart) ~= '"' then
+    local interfaceQuote = text:sub(restStart, restStart)
+    if restStart > n or (interfaceQuote ~= '"' and interfaceQuote ~= "'") then
         return nil
     end
     local nameStart = restStart + 1
-    local nameEnd = text:find('"', nameStart, true)
+    local nameEnd = text:find(interfaceQuote, nameStart, true)
     if not nameEnd then return nil end
     local iname = text:sub(nameStart, nameEnd - 1)
     pos = nameEnd + 1
