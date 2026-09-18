@@ -826,6 +826,36 @@ local function pl_paramNames(params)
     return names
 end
 
+-- Emit a callable type for the constructor without its receiver parameter.
+local function pl_constructorAlias(className, method)
+    local params = method and stripFirstParam(method.params) or ''
+    local names = pl_paramNames(params)
+    local documented = {}
+    local optional = {}
+    for _, line in ipairs(method and method.docs or {}) do
+        local name, typ = line:match(
+            '^%-%-%-@param%s+([%w_]+)%?%s+(.+)$')
+        local optionalParam = name ~= nil
+        if not name then
+            name, typ = line:match(
+                '^%-%-%-@param%s+([%w_]+)%s+(.+)$')
+        end
+        if name and typ then
+            documented[name] = typ:gsub('%s+$', '')
+            optional[name] = optionalParam
+        end
+    end
+
+    local inferred = method and method.inferred or {}
+    local parts = {}
+    for _, name in ipairs(names) do
+        local typ = documented[name] or inferred[name] or 'any'
+        parts[#parts + 1] = name .. (optional[name] and '?' or '') .. ': ' .. typ
+    end
+    return '---@alias ' .. className .. '.constructor fun('
+        .. table.concat(parts, ', ') .. '): ' .. className
+end
+
 -- 从某方法的 docs 注解中返回 `@return <type>`，无则 nil
 local function pl_methodReturn(docs)
     for _, dl in ipairs(docs or {}) do
@@ -1522,6 +1552,7 @@ function OnSetText(uri, text)
                         out[#out + 1] = '---@return ' .. className
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
+                    out[#out + 1] = pl_constructorAlias(className, newMethod)
                 elseif initMethod then
                     local paramStr = stripFirstParam(initMethod.params)
                     for _, docLine in ipairs(initMethod.docs) do
@@ -1534,6 +1565,7 @@ function OnSetText(uri, text)
                         out[#out + 1] = '---@return ' .. className
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
+                    out[#out + 1] = pl_constructorAlias(className, initMethod)
                 else
                     local paramStr = newSource and stripFirstParam(newSource.params) or ''
                     if inheritedNewSource and newSource then
@@ -1554,6 +1586,7 @@ function OnSetText(uri, text)
                     end
                     out[#out + 1] = '---@return ' .. className
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
+                    out[#out + 1] = pl_constructorAlias(className, newSource)
                 end
 
                 -- object:getClass() returns the concrete class object at runtime.
