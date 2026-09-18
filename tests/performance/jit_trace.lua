@@ -1,11 +1,4 @@
--- LuaJIT trace 可追踪性探针
---
--- 运行：luajit tests/performance/jit_trace.lua
---
--- 目的：观测「给定调用形状会不会打断 JIT 的 trace」，而不是从耗时反推。
--- 耗时在 JIT 下会把这类调用整体内联折叠、落进测量地板，看不出任何差别
--- （见 bench.lua 里成片的 ~FOLDED 与 ~CANT FOLD）；
--- 而 trace 的 start / abort 事件是直接可数的事实。
+-- 观测「给定调用形状会不会打断 JIT 的 trace」
 --
 -- 读数约定：
 --   · aborts = 0 为健康；偶发 1 次属正常运行波动，只看「0 / 个位数 / 大量」这个量级，
@@ -33,8 +26,6 @@ if not (JIT and JIT.attach) then
     print('无 JIT，本探针不适用。')
     os.exit(0)
 end
-
--- ===== 终端显示宽度：CJK 占 2 列，直接 %-Ns 按字节补齐会把数字顶偏 =====
 
 local function dwidth(s)
     local w, i, n = 0, 1, #s
@@ -100,8 +91,6 @@ class "JitTraceSub_9c31" : extends "JitTraceBase_9c31" {
     end;
 }
 
--- 属性单独一类：getter / setter 是类静态字段，不随继承传递，
--- 放在基类上再拿子类实例访问会取到 nil。
 class "JitTraceProp_9c31" {
     __init = function(self, v)
         self._v = v or 18
