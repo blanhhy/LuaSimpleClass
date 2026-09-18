@@ -1056,6 +1056,10 @@ local function pl_collectSuperCalls(body, name)
     while i <= #body do
         -- super(Cls, self):name(args)
         local found, finish = body:find('super%s*%(%s*[%w_]+%s*,%s*self%s*%)%s*:%s*' .. name .. '%s*%(', i)
+        if not found then
+            -- super():name(args)
+            found, finish = body:find('super%s*%(%s*%)%s*:%s*' .. name .. '%s*%(', i)
+        end
         if found and pl_isCodePosition(body, found) then
             local close = findMatchingParen(body, finish)
             if close then
@@ -1092,6 +1096,29 @@ local function pl_collectSuperCalls(body, name)
     return calls
 end
 
+-- Constructor-only shorthand: `super()(args...)` forwards to the parent
+-- constructor without naming `__init` explicitly.
+local function pl_collectConstructorSuperCalls(body)
+    local calls = {}
+    local i = 1
+    while i <= #body do
+        local found, finish = body:find('super%s*%(%s*%)%s*%(', i)
+        if not found then break end
+        if pl_isCodePosition(body, found) then
+            local close = findMatchingParen(body, finish)
+            if close then
+                calls[#calls + 1] = pl_splitCallArgs(body, finish + 1, close - 1)
+                i = close + 1
+            else
+                i = finish + 1
+            end
+        else
+            i = finish + 1
+        end
+    end
+    return calls
+end
+
 -- 若子类方法 body 调用了父类同名方法并按位置转发参数，则继承父类参数已知类型。
 local function pl_superParamTypes(method, classmeta, allmeta)
     if not classmeta or not classmeta.parent then return {} end
@@ -1108,6 +1135,11 @@ local function pl_superParamTypes(method, classmeta, allmeta)
     end
 
     local calls = pl_collectSuperCalls(method.body or '', method.name)
+    if method.kind == 'init' then
+        for _, args in ipairs(pl_collectConstructorSuperCalls(method.body or '')) do
+            calls[#calls + 1] = args
+        end
+    end
     if #calls == 0 then return extra end
 
     local visit, curClass = 0, classmeta
@@ -1778,11 +1810,12 @@ function OnSetText(uri, text)
                         local isClassMethod = m.kind == 'class' or m.kind == 'new'
                         local clsType = className .. '.class'
                         local selfType = isClassMethod and clsType or className
+                        local baseType = parentName or 'object'
                         local returnType
                         if isClassMethod then
-                            returnType = (parentName or 'object') .. '.class'
+                            returnType = baseType .. '.class'
                         else
-                            returnType = parentName or 'object'
+                            returnType = baseType .. '|' .. baseType .. '.constructor'
                         end
                         local stub = {
                             '---@param cls ' .. clsType,
