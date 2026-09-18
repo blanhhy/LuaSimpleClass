@@ -10,6 +10,7 @@ local ok_guide,  guide  = prequire 'parser.guide'
 local ok_luadoc, luadoc = prequire 'parser.luadoc'
 local ok_define, define = prequire 'proto.define'
 local ok_diag,   diag   = prequire 'proto.diagnostic'
+local ok_config, config = prequire 'config'
 
 -- 需要应用的补丁
 local ENABLE_PATCHES = {
@@ -2244,6 +2245,12 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
         end
     end
 
+    local function isBuiltinDisabled(uri, name)
+        if not ok_config or not config.get then return false end
+        local ok, builtin = pcall(config.get, uri, 'Lua.runtime.builtin')
+        return ok and type(builtin) == 'table' and builtin[name] == 'disable'
+    end
+
     -- 由 OnSetText 生成 X.__own 类（extends 只含父类、不含接口），
     -- 在类型解析后的周期诊断中检查每个 implements 接口的类是否实现了接口要求的全部成员。
     registerDiagnostic('missing-implements', 'Error', 'Any', function (uri, callback)
@@ -2424,6 +2431,33 @@ if ok_files and ok_define and ok_diag and ok_vm and ok_guide then
                 }
             end
         end)
+    end)
+
+    -- Zero-argument super() uses debug.getinfo/getlocal at runtime.  LuaLS
+    -- already knows when that builtin library is disabled for this workspace.
+    registerDiagnostic('simpleclass-zero-arg-super', 'Error', 'Any', function (uri, callback)
+        if not isBuiltinDisabled(uri, 'debug') then return end
+        local state = files.getState(uri)
+        local text = state and (state.originText or files.getOriginText(uri))
+        if not state or type(text) ~= 'string' then return end
+
+        local pos = 1
+        while pos <= #text do
+            local start, finish = text:find('super%s*%(%s*%)', pos)
+            if not start or not finish then break end
+            if pl_isCodePosition(text, start) then
+                local rangeStart, rangeFinish = diagRangeFromOriginal(
+                    state, start, finish)
+                if rangeStart and rangeFinish then
+                    callback {
+                        start = rangeStart,
+                        finish = rangeFinish,
+                        message = 'zero-argument super requires the debug library, which is disabled',
+                    }
+                end
+            end
+            pos = finish + 1
+        end
     end)
 
     diagflush()
