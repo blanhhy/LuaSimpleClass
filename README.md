@@ -28,7 +28,7 @@ luarocks install simpleclass
 或从源码构建到当前 rocks 树（如 `luarocks init` 生成的 `lua_modules/`）：
 
 ```bash
-luarocks make --tree=lua_modules simpleclass-1.0.1-1.rockspec
+luarocks make --tree=lua_modules simpleclass-1.0.2-1.rockspec
 ```
 
 ## 快速开始

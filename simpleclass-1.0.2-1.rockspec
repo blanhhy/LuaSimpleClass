@@ -1,11 +1,11 @@
 rockspec_format = "3.0"
 
 package = "simpleclass"
-version = "1.0.1-1"
+version = "1.0.2-1"
 
 source = {
     url = "git+https://github.com/blanhhy/LuaSimpleClass",
-    tag = "v1.0.1",
+    tag = "v1.0.2",
 }
 
 description = {
