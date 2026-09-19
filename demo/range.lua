@@ -8,8 +8,12 @@ local floor = math.floor
 local type, select, error
     = type, select, error
 
+-- 通过同时给类对象标注 .class 和 .constructor 类型
+-- 可以实现 cls() 语法也像 cls:new() 一样拥有签名检查
+
 -- 仿 Python 的 range 类
-class "range" {
+---@type range.constructor|range.class
+local range = class "range" {
     ---@field private   _i          number
     ---@field private   _LEN        number
     ---@field protected START       number
@@ -102,8 +106,6 @@ class "range" {
 }
 
 if ... then return range end
-
-range = range ---@type range.constructor|range.class
 
 for i in range(1, 10, 2) do
     print(i)
