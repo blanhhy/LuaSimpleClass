@@ -45,6 +45,8 @@ local o = {}
 ---@return object
 function o:new() end
 
+---@alias object.constructor fun(): object
+
 ---Clone an object (table)
 ---@generic T:table
 ---@param obj T
@@ -230,6 +232,7 @@ function sc.isimpl(clazz, iface) end
 ---@return integer? arg_index if not ok
 function sc.isimplements(cls, ...) end
 
+---@type object.class|object.constructor
 sc.object = o
 
 ---The environment of the classes and interfaces
