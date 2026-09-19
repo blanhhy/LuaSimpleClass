@@ -2671,13 +2671,10 @@ if _pt_dir and ok_vm and ok_guide then
     ---Apply a patch. This is a no-op if the patch is already applied.  
     -- Patch must exist in `patches` directory.
     ---@param name string
-    ---@return boolean ok
-    ---@return string? err if failed.
     function apply_patch(name)
         if type(name) ~= 'string' or name == '' then
+            print(("Invalid patch name '%s'"):format(name))
             return false
-            , ("Invalid patch name '%s'")
-            : format(name)
         end
 
         local state = vm.__simpleclass_patcher_state
@@ -2686,16 +2683,13 @@ if _pt_dir and ok_vm and ok_guide then
             vm.__simpleclass_patcher_state = state
         end
 
-        if state[name] then
-            return true
-        end
+        if state[name] then return true end
 
         local patch, err1 = loadfile(_pt_dir .. name .. '.lua', "bt", _ENV)
         if not patch then
             state[name] = false
+            print(("Failed to load patch '%s': %s."):format(name, err1))
             return false
-            , ("Failed to load patch '%s': %s")
-            : format(name, err1)
         end
 
         state[name] = {}
@@ -2703,9 +2697,8 @@ if _pt_dir and ok_vm and ok_guide then
 
         if not do_ok or not pt_ok then
             state[name] = false
+            print(("Failed to apply patch '%s': %s."):format(name, pt_ok or err2))
             return false
-            , ("Failed to apply patch '%s': %s")
-            : format(name, pt_ok or err2)
         end
         return true
     end
