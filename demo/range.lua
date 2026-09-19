@@ -10,6 +10,8 @@ local type, select, error
 
 -- 通过同时给类对象标注 .class 和 .constructor 类型
 -- 可以实现 cls() 语法也像 cls:new() 一样拥有签名检查
+-- 但是也会导致声明为 class 的参数拒收它
+-- 因此只应对真正当作函数使用的类这样做
 
 -- 仿 Python 的 range 类
 ---@type range.constructor|range.class
