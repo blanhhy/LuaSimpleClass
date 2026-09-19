@@ -1,15 +1,11 @@
--- 泛型 for 控制变量的 call 运算符兜底
---
 -- LuaLS 的泛型 for 推导（compiler.lua 的 compileForVars）把
 -- `for k, v in f, s, c do` 建模为 `local k, v = f(s, c)`，只通过
 -- getReturn → call.return 向迭代器索要“函数返回值”，其分派只认
 -- function / doc.type.function。
 --
--- 普通调用表达式在结果未定型时会回退到 vm.runOperator('call', ...)
--- （compiler.lua 的 case 'call'），泛型 for 却没有这一步。于是当迭代器的
--- “可调用性”来自 __call 元方法（类型对象是 class/table 而非 function，
--- 典型如 SimpleClass 的 range：alias.__call.next() 生成的 @operator call）时，
--- 控制变量会退化为 unknown。
+-- 普通调用表达式在结果未定型时会回退到 vm.runOperator('call', ...)，
+-- 泛型 for 却没有这一步。于是除函数外的一切 callable 对象作为迭代器时，
+-- 控制变量都会退化为 unknown。
 --
 -- 本补丁包装 vm.compileNode：若被编译的是泛型 for 的控制变量，且默认推导
 -- 未定型，则取 explist 第一个表达式做一次 call 运算符分派来补齐类型，
@@ -19,8 +15,7 @@
 -- 内建 unknown 合并进“按被调用者缓存”的 call.return 节点
 -- （callee._callReturns[1]）。该节点被后续 case 'call' 复用时，unknown 属于
 -- global/type，会使 isTyped() 误判为“已定型”，从而跳过运算符兜底，把调用
--- 整体短路成 unknown（裸类 `class "X" {}` 即如此；带 `---@type X.constructor`
--- 注解的类因 getReturn 非空而幸免）。此处对这种被污染的缓存做一次清理后重编。
+-- 整体短路成 unknown。此处对这种被污染的缓存做一次清理后重编。
 
 local M, state = ... ---@cast M LLSPatch
 local vm = M.vm

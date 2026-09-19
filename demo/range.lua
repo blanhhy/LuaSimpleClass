@@ -121,4 +121,4 @@ end
 
 local r = range(1, 10, 2)
 print(r)  --> range(1, 10, 2)
-print(#r) --> 5
+print(#r) --> 5                 # Lua 5.2+
