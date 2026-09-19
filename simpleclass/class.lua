@@ -15,6 +15,10 @@ _ENV = nil
 local cc = {
     name = "<anonymous>";
     base = object;
+    impl = false;
+    iCheck = false;
+    ifaces = false;
+    implements = false;
 }
 
 ---Single inheritance keyword

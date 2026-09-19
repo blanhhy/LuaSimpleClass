@@ -191,6 +191,10 @@ end
 local cc = {
     name = "<anonymous>";
     base = object;
+    impl = false;
+    iCheck = false;
+    ifaces = false;
+    implements = false;
 }
 
 function cc:extends(basename)
@@ -342,7 +346,6 @@ local Super = {
 
 local interface, isimpl, isimplements, _iR
 if options.INTERFACE_INCLUDED then
-
 local ic = {}
 local iR = {}
 setmetatable(iR, {__mode="kv"})
@@ -449,7 +452,6 @@ function cc:iCheck(clazz)
 end
 
 cc.impl = cc.implements
-cc.ifaces = false
 _iR = iR
 end --# options.INTERFACE_INCLUDED
 
@@ -480,11 +482,9 @@ end
 
 function M.class(name)
     local typ = type(name)
-    if typ == "table" then
-        return cc:def(name)
-    end
+    if typ == "table" then return cc:def(name) end
     return setmetatable({
-        name = type(name) == "string" and name ~= '' and
+        name = typ == "string" and name ~= "" and
         name or "<anonymous>"
     }, cc)
 end

@@ -1,3 +1,4 @@
+---@diagnostic disable: assign-type-mismatch
 local M = require "simpleclass.m" ---@class M
 local c = M.creator               ---@class M.creator
 local o = M.object                ---@class M.object
@@ -134,6 +135,8 @@ function c:implements(...)
     return self
 end
 
+c.impl = c.implements
+
 ---@param clazz object.class
 ---@return boolean ok
 ---@return string? err error message
@@ -152,8 +155,5 @@ function c:iCheck(clazz)
     end end
     return true
 end
-
-c.impl = c.implements
-c.ifaces = false
 
 return M.interface
