@@ -1,6 +1,4 @@
 ---@diagnostic disable: deprecated, lowercase-global
----仿 Python 的 list 类
-
 local sc = require "simpleclass"
 local ctype = sc.type
 
@@ -21,6 +19,7 @@ elseif _VERSION >= "Lua 5.5" then
     table_new = table.create
 end
 
+---仿 Python 的 list 类
 class "list" {
     -- 静态属性
 
@@ -503,13 +502,15 @@ class "list" {
     sort   = table.sort;
 }
 
+list = list ---@type list.constructor|list.class
+
 -- 不在当前文件运行，只返回类
 if ... then return list end
 
 -- 下面是演示
 
 -- 创建一个list实例
-local originalNumbers = list:new(34, 6577, 8, 1, 85, 5635, 3)
+local originalNumbers = list(34, 6577, 8, 1, 85, 5635, 3)
 print("创建数组: originalNumbers = " .. tostring(originalNumbers))
 print()
 
@@ -641,7 +642,7 @@ local repeatedArray = smallArray1 * 2
 print("   {1,2,3} * 2 = " .. tostring(repeatedArray))
 
 -- 重复可以用 * 符号, 也可以用 rep 方法
--- 是为了模仿 python 风格, * 会调用 rep 方法
+-- 为了模仿 python 风格, * 会调用 rep 方法
 
 local smallArray2 = list(4, 5, 6)
 local concatenatedArray = smallArray1 .. smallArray2
@@ -655,7 +656,7 @@ print()
 -- 最大值和最小值
 print("统计操作:")
 local randomArray = list()
-for i = 1, 20 do
+for _ = 1, 20 do
     randomArray:append(math.random(1, 16))
 end
 print("   randomArray: " .. tostring(randomArray))
@@ -666,7 +667,7 @@ local countResult = randomArray:count(targetValue)
 print("   count(" .. targetValue .. "): 出现 " .. countResult .. " 次")
 print()
 
--- 最值方法使用 lua 的大于小于符号, 保证有元方法的对象能正常比较
+-- 最值方法使用 lua 的大于小于符号, 以保证运算符重载的对象能参与比较
 -- 使用最值方法需要确保数组内的元素都互相可比
 
 -- 数组比较
@@ -686,7 +687,7 @@ print("   arrA插入6后: " .. tostring(arrA))
 print("   arrA > arrB? " .. tostring(arrA > arrB)) -- 比较的是第一个不等元素
 print()
 
--- 不等号会先比较长度, 长度不同则比较第一个不等元素
+-- 不等号会先比较长度, 长度相同则比较第一个不等元素
 
 xpcall(function()
 
@@ -707,7 +708,7 @@ end)
 -- 还有其他的方法比如 pop弹出, copy 复制, 等等, 都比较简单
 -- 复制数组也可以直接用构造函数实现
 -- arr2 = list(arr1)
--- 也可以直接用 object 的 clone
+-- 也可以用 object 通用的 clone
 -- arr2 = arr1:clone()
 
 -- 以及 ipairs 和 unpack 方法, 就是 lua 原来的 ipairs 和 unpack 函数
