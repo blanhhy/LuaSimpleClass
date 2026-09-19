@@ -1,3 +1,4 @@
+---@diagnostic disable: lowercase-global
 local sc = require "simpleclass"
 
 local ctype = sc.type
@@ -8,7 +9,6 @@ local type, select, error
     = type, select, error
 
 -- 仿 Python 的 range 类
----@diagnostic disable-next-line: lowercase-global
 class "range" {
     ---@field private   _i          number
     ---@field private   _LEN        number
@@ -18,6 +18,8 @@ class "range" {
     ---@field protected IS_INCREASE boolean
 
     ---@param ... number
+    ---@overload fun(self:range, stop:integer)
+    ---@overload fun(self:range, start:integer, stop:integer, step?:integer)
     __init = function(self, ...)
         local n, i, j, s = select("#", ...)
         if n == 0 then error("bad argument to range, value expected.", 3) end
@@ -79,7 +81,8 @@ class "range" {
         return ("range(%d, %d, %d)"):format(self.START, self.STOP, self.STEP)
     end;
 
-    next = function (self)
+    ---@return number?
+    next = function(self)
         local current = self._i
         if self.IS_INCREASE == (current > self.STOP) then -- 同或
             return nil
@@ -99,6 +102,8 @@ class "range" {
 }
 
 if ... then return range end
+
+range = range ---@type range.constructor|range.class
 
 for i in range(1, 10, 2) do
     print(i)

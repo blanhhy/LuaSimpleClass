@@ -289,6 +289,32 @@ local function getFirstParamName(params)
     return params:match('^%s*([%w_]+)')
 end
 
+local function pl_leadingDocs(body, start)
+    local docs = {}
+    local ci = start - 1
+    while ci >= 1 do
+        while ci >= 1 and (body:sub(ci, ci) == ' ' or body:sub(ci, ci) == '\t') do
+            ci = ci - 1
+        end
+        if ci >= 1 and body:sub(ci, ci) == '\n' then
+            ci = ci - 1
+            local lineEnd = ci
+            while ci >= 1 and body:sub(ci, ci) ~= '\n' do
+                ci = ci - 1
+            end
+            local line = body:sub(ci + 1, lineEnd):gsub('^%s+', '')
+            if line:match('^%-%-%-') then
+                table.insert(docs, 1, line)
+            else
+                break
+            end
+        else
+            break
+        end
+    end
+    return docs
+end
+
 -- All Lua metamethods are listed here. An empty value means that LuaLS has
 -- no matching @operator spelling, but the method is still a meta method.
 local PL_OP_FROM_META = {
@@ -354,6 +380,7 @@ local function parseAliasEntry(body, start, aliasNames)
         finish = findFieldEnd(body, start)
     end
     local before = body:sub(1, start - 1)
+    local docs = pl_leadingDocs(body, start)
     local isOverride = before:match('^%s*%-%-%-@override%s*$')
         or before:match('\n%s*%-%-%-@override%s*$')
     return {
@@ -364,6 +391,7 @@ local function parseAliasEntry(body, start, aliasNames)
         finish = close,
         fieldFinish = finish,
         isOverride = isOverride ~= nil,
+        docs = docs,
     }, finish
 end
 
@@ -827,19 +855,91 @@ local function pl_paramNames(params)
     return names
 end
 
+local function pl_overloadParts(line)
+    local funStart = line:find('fun%s*%(')
+    if not funStart then return nil end
+    local open = line:find('%(', funStart)
+    local close = open and findMatchingParen(line, open)
+    if not close then return nil end
+    local params = line:sub(open + 1, close - 1)
+    local ret = line:sub(close + 1):match('^%s*:%s*(.-)%s*$')
+    return params, ret
+end
+
+local function pl_splitFirstOverloadParam(params)
+    local depth = 0
+    local quote
+    for i = 1, #params do
+        local c = params:sub(i, i)
+        if quote then
+            if c == quote and params:sub(i - 1, i - 1) ~= '\\' then
+                quote = nil
+            end
+        elseif c == '"' or c == "'" then
+            quote = c
+        elseif c == '(' or c == '{' or c == '[' then
+            depth = depth + 1
+        elseif c == ')' or c == '}' or c == ']' then
+            depth = depth - 1
+        elseif c == ',' and depth == 0 then
+            return params:sub(1, i - 1), params:sub(i + 1):gsub('^%s+', '')
+        end
+    end
+    return params, ''
+end
+
+-- Add or normalize the receiver in a user-written @overload signature.
+local function pl_normalizeOverloadLine(line, receiverName, receiverType, overloadReturnType)
+    if not receiverType then return line end
+    local params, ret = pl_overloadParts(line)
+    if not params then return line end
+
+    local first, rest = pl_splitFirstOverloadParam(params)
+    local firstName = first:match('^%s*([%w_]+)')
+    if firstName == 'self' or firstName == 'cls' then
+        first = firstName .. ': ' .. receiverType
+    else
+        first = receiverName .. ': ' .. receiverType
+        rest = params
+    end
+    local normalized = first
+    if rest ~= '' then normalized = normalized .. ', ' .. rest end
+    local funStart = line:find('fun%s*%(')
+    local open = line:find('%(', funStart)
+    local close = findMatchingParen(line, open)
+    local prefix = line:sub(1, open)
+    ret = overloadReturnType or ret
+    return prefix .. normalized .. ')' .. (ret and ': ' .. ret or '')
+end
+
+local function pl_methodDocs(method, receiverType, skipReturn, overloadReturnType)
+    local docs = {}
+    local receiverName = getFirstParamName(method.params) or 'self'
+    for _, line in ipairs(method.docs or {}) do
+        if not (skipReturn and line:match('^%-%-%-@return%s')) then
+            if line:match('^%-%-%-@overload%s') then
+                line = pl_normalizeOverloadLine(
+                    line, receiverName, receiverType, overloadReturnType)
+            end
+            docs[#docs + 1] = line
+        end
+    end
+    return docs
+end
+
 -- Emit a callable type for the constructor without its receiver parameter.
-local function pl_constructorAlias(className, method)
+local function pl_constructorAlias(className, method, receiverType)
     local params = method and stripFirstParam(method.params) or ''
     local names = pl_paramNames(params)
     local documented = {}
     local optional = {}
     for _, line in ipairs(method and method.docs or {}) do
         local name, typ = line:match(
-            '^%-%-%-@param%s+([%w_]+)%?%s+(.+)$')
+            '^%-%-%-@param%s+([%w_%.]+)%?%s+(.+)$')
         local optionalParam = name ~= nil
         if not name then
             name, typ = line:match(
-                '^%-%-%-@param%s+([%w_]+)%s+(.+)$')
+                '^%-%-%-@param%s+([%w_%.]+)%s+(.+)$')
         end
         if name and typ then
             documented[name] = typ:gsub('%s+$', '')
@@ -848,13 +948,48 @@ local function pl_constructorAlias(className, method)
     end
 
     local inferred = method and method.inferred or {}
-    local parts = {}
-    for _, name in ipairs(names) do
-        local typ = documented[name] or inferred[name] or 'any'
-        parts[#parts + 1] = name .. (optional[name] and '?' or '') .. ': ' .. typ
+    local baseParams
+    if params:match('^%s*%.%.%.%s*$') then
+        local typ = documented['...'] or inferred['...'] or 'any'
+        baseParams = '...: ' .. typ
+    else
+        local parts = {}
+        for _, name in ipairs(names) do
+            local typ = documented[name] or inferred[name] or 'any'
+            parts[#parts + 1] = name .. (optional[name] and '?' or '') .. ': ' .. typ
+        end
+        baseParams = table.concat(parts, ', ')
     end
-    return '---@alias ' .. className .. '.constructor fun('
-        .. table.concat(parts, ', ') .. '): ' .. className
+
+    local overloads = {}
+    local receiverName = getFirstParamName(method and method.params or '') or 'self'
+    for _, line in ipairs(method and method.docs or {}) do
+        if line:match('^%-%-%-@overload%s') then
+            local normalized = pl_normalizeOverloadLine(
+                line, receiverName, receiverType or className .. '.class')
+            local overloadParams = pl_overloadParts(normalized)
+            if overloadParams then
+                local first, rest = pl_splitFirstOverloadParam(overloadParams)
+                local firstName = first:match('^%s*([%w_]+)')
+                if firstName == 'self' or firstName == 'cls' then
+                    overloadParams = rest
+                end
+                overloads[#overloads + 1] = '---| fun('
+                    .. overloadParams .. '): ' .. className
+            end
+        end
+    end
+
+    if #overloads == 0 then
+        return '---@alias ' .. className .. '.constructor fun('
+            .. baseParams .. '): ' .. className
+    end
+    local out = {
+        '---@alias ' .. className .. '.constructor',
+        '---| fun(' .. baseParams .. '): ' .. className,
+    }
+    for _, line in ipairs(overloads) do out[#out + 1] = line end
+    return table.concat(out, '\n')
 end
 
 -- 从某方法的 docs 注解中返回 `@return <type>`，无则 nil
@@ -879,6 +1014,31 @@ local function pl_operatorOperand(docs, params)
         if not typeOf[names[i]] then return nil end
     end
     return typeOf[names[2]]
+end
+
+local function pl_emitOperator(out, operatorName, docs, params)
+    local userOperator
+    for _, line in ipairs(docs or {}) do
+        userOperator = line:match('^%-%-%-@operator%s+(.+)')
+        if userOperator then
+            out[#out + 1] = '---@operator ' .. userOperator
+            return
+        end
+    end
+    if not operatorName or operatorName == '' then return end
+    local ret = pl_methodReturn(docs)
+    if not ret then return end
+    if operatorName == 'len' or #pl_paramNames(params or '') < 2 then
+        out[#out + 1] = '---@operator ' .. operatorName .. ': ' .. ret
+    else
+        local operand = pl_operatorOperand(docs, params)
+        if operand then
+            out[#out + 1] = ('---@operator %s(%s): %s')
+                :format(operatorName, operand, ret)
+        else
+            out[#out + 1] = '---@operator ' .. operatorName .. ': ' .. ret
+        end
+    end
 end
 
 -- 从类体字段声明和 getter 返回值建立属性类型索引。
@@ -1250,6 +1410,20 @@ local function pl_aliasMethodInfo(alias, target, classname)
     return info
 end
 
+-- Alias stubs must not assume that the DSL class name is a visible global.
+-- Keep the class object local to the generated expression instead.
+local function pl_aliasTargetExpression(owner, target, suppressUndefined)
+    local className = owner:gsub('%.__proto$', '')
+    local member = owner == className and target or '__proto.' .. target
+    local diagnostic = suppressUndefined and 'undefined-field' or nil
+    return '(function()\n'
+        .. '    ---@class ' .. className .. '.class\n'
+        .. '    local ' .. className .. '\n'
+        .. (diagnostic and '    ---@diagnostic disable-next-line: ' .. diagnostic .. '\n' or '')
+        .. '    return ' .. className .. '.' .. member .. '\n'
+        .. 'end)()'
+end
+
 local function pl_hasGetClassOverride(classmeta, allmeta)
     local seen = {}
     while classmeta and not seen[classmeta] do
@@ -1499,32 +1673,25 @@ function OnSetText(uri, text)
                 end
                 -- 元方法 → @operator 标注（元方法带 @return 才生成；参数全标注则附操作数类型）
                 for _, m in ipairs(methods) do
-                    local opName = m.operatorName
-                    if opName and opName ~= '' then
-                        -- 用户已在元方法上方手写 ---@operator → 原样透传，跳过自动重构
-                        local hadUserOp = false
-                        for _, dl in ipairs(m.docs or {}) do
-                            local userOp = dl:match('^%-%-%-@operator%s+(.+)')
-                            if userOp then
-                                out[#out + 1] = '---@operator ' .. userOp
-                                hadUserOp = true
+                    pl_emitOperator(out, m.operatorName, m.docs, m.params)
+                end
+                for _, a in ipairs(aliases) do
+                    local aliasInfo = aliasInfoMeta[a.origin]
+                    if aliasInfo and aliasInfo.kind == 'meta' then
+                        local targetMethod = methodMeta[a.target]
+                        local docs = a.docs
+                        local hasUserOperator = false
+                        for _, line in ipairs(docs or {}) do
+                            if line:match('^%-%-%-@operator%s+') then
+                                hasUserOperator = true
+                                break
                             end
                         end
-                        if not hadUserOp then
-                            local ret = pl_methodReturn(m.docs)
-                            if ret then
-                                if opName == 'len' or #pl_paramNames(m.params) < 2 then
-                                    out[#out + 1] = '---@operator ' .. opName .. ': ' .. ret
-                                else
-                                    local operand = pl_operatorOperand(m.docs, m.params)
-                                    if operand then
-                                        out[#out + 1] = ('---@operator %s(%s): %s'):format(opName, operand, ret)
-                                    else
-                                        out[#out + 1] = '---@operator ' .. opName .. ': ' .. ret
-                                    end
-                                end
-                            end
+                        if not hasUserOperator and targetMethod then
+                            docs = targetMethod.docs
                         end
+                        pl_emitOperator(out, aliasInfo.operatorName, docs,
+                            targetMethod and targetMethod.params or '')
                     end
                 end
                 out[#out + 1] = className .. '.__proto = {}'
@@ -1575,7 +1742,8 @@ function OnSetText(uri, text)
 
                 if newMethod then
                     local paramStr = stripFirstParam(newMethod.params)
-                    for _, docLine in ipairs(newMethod.docs) do
+                    for _, docLine in ipairs(pl_methodDocs(
+                        newMethod, className .. '.class', nil, className)) do
                         out[#out + 1] = docLine
                     end
                     for _, docLine in ipairs(pl_inferredParamDocs(newMethod, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
@@ -1585,10 +1753,12 @@ function OnSetText(uri, text)
                         out[#out + 1] = '---@return ' .. className
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
-                    out[#out + 1] = pl_constructorAlias(className, newMethod)
+                    out[#out + 1] = pl_constructorAlias(
+                        className, newMethod, className .. '.class')
                 elseif initMethod then
                     local paramStr = stripFirstParam(initMethod.params)
-                    for _, docLine in ipairs(initMethod.docs) do
+                    for _, docLine in ipairs(pl_methodDocs(
+                        initMethod, className .. '.class', nil, className)) do
                         out[#out + 1] = docLine
                     end
                     for _, docLine in ipairs(pl_inferredParamDocs(initMethod, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
@@ -1598,17 +1768,17 @@ function OnSetText(uri, text)
                         out[#out + 1] = '---@return ' .. className
                     end
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
-                    out[#out + 1] = pl_constructorAlias(className, initMethod)
+                    out[#out + 1] = pl_constructorAlias(
+                        className, initMethod, className .. '.class')
                 else
                     local paramStr = newSource and stripFirstParam(newSource.params) or ''
                     if inheritedNewSource and newSource then
-                        local sourceDocs = newSource.docs or {}
+                        local sourceDocs = pl_methodDocs(
+                            newSource, className .. '.class', true, className)
                         local sourceParams = newSource.params or ''
                         local sourceInferred = newSource.inferred or {}
                         for _, docLine in ipairs(sourceDocs) do
-                            if not docLine:match('^%-%-%-@return%s') then
-                                out[#out + 1] = docLine
-                            end
+                            out[#out + 1] = docLine
                         end
                         for _, name in ipairs(pl_paramNames(sourceParams)) do
                             local typ = sourceInferred[name]
@@ -1619,7 +1789,8 @@ function OnSetText(uri, text)
                     end
                     out[#out + 1] = '---@return ' .. className
                     out[#out + 1] = 'function ' .. className .. ':new(' .. paramStr .. ')return self.__proto end'
-                    out[#out + 1] = pl_constructorAlias(className, newSource)
+                    out[#out + 1] = pl_constructorAlias(
+                        className, newSource, className .. '.class')
                 end
 
                 -- object:getClass() returns the concrete class object at runtime.
@@ -1685,7 +1856,8 @@ function OnSetText(uri, text)
                     elseif m.isProperty then
                     else
                         local receiverType = info.receiverType
-                        for _, docLine in ipairs(m.docs) do
+                        for _, docLine in ipairs(pl_methodDocs(
+                            m, info.receiverType)) do
                             out[#out + 1] = docLine
                         end
                         for _, docLine in ipairs(pl_inferredParamDocs(m, classmeta.fieldTypes, classmeta, __sc_classmeta[uri])) do
@@ -1731,15 +1903,15 @@ function OnSetText(uri, text)
                     local fieldFinish = tonumber(a.fieldFinish)
                         or tonumber(a.finish)
                         or 1
-                    local sourceText = '\n---@diagnostic disable-next-line: invisible\n '
+                    local sourceText = '\n '
                         .. a.origin .. ' = '
-                        .. targetOwner .. '.' .. a.target .. ';'
+                        .. pl_aliasTargetExpression(targetOwner, a.target) .. ';'
                     diffs[#diffs + 1] = {
                         start = braceStart + fieldFinish + 1,
                         finish = braceStart + fieldFinish,
                         text = sourceText,
                     }
-                    out[#out + 1] = '---@diagnostic disable-next-line: invisible, undefined-field'
+                    out[#out + 1] = '---@diagnostic disable-next-line: undefined-field'
                     out[#out + 1] = originOwner .. '.' .. a.origin .. ' = '
                         .. targetOwner .. '.' .. a.target
                 end
