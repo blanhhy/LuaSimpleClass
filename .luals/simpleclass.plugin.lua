@@ -15,6 +15,7 @@ local ok_config, config = prequire 'config'
 -- 需要应用的补丁
 local ENABLE_PATCHES = {
     'overload_dispatch';
+    'for_call_operator';
 }
 
 -- 插件级状态，跨阶段、跨文件记录工作区信息
