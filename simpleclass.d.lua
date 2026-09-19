@@ -232,7 +232,7 @@ function sc.isimpl(clazz, iface) end
 ---@return integer? arg_index if not ok
 function sc.isimplements(cls, ...) end
 
----@type object.class|object.constructor
+---@type object.class
 sc.object = o
 
 ---The environment of the classes and interfaces
