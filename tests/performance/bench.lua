@@ -405,7 +405,7 @@ local ref_super = bench('sub:via_direct(x) [hardcode Base]', function()
     acc = acc + via_direct(subA, ks)
 end)
 if not index then
-bench('sub:via_base(x) [manual super]', function()
+bench('sub:via_base(x) [relative __base]', function()
     ks = ks + 1
     acc = acc + via_base(subA, ks)
 end, ref_super)
@@ -423,7 +423,7 @@ bench('sub:super_ctor(x) [init dedicated]', function()
     ks = ks + 1
     acc = acc + super_ctor(subA, ks)
 end, ref_super)
-bench('sub:via_super0(x) [0-arg]', function()
+bench('sub:via_super0(x) [0-arg] [debug lib]', function()
     ks = ks + 1
     acc = acc + via_super0(subA, ks)
 end, ref_super)
