@@ -96,14 +96,12 @@ function M.interface(name)
     }, ic)
 end
 
-local index = M.index
-
 ---@param clazz object.class
 ---@param meths string[]
 local function isimpl(clazz, meths)
     if M.I_FEATURE ~= "general" then return true end
     local field for i = 1, #meths do
-        field = clazz[meths[i]] or index(clazz, meths[i], true)
+        field = clazz[meths[i]]
         if type(field) ~= "function" then
         return false, meths[i]
     end end

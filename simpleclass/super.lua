@@ -36,8 +36,6 @@ if getinfo and getlocal then
     end
 end
 
-local index = M.index
-
 ---@class (exact) M.super : super<class, object>
 ---@field [1] object|class
 ---@field [2] class
@@ -48,11 +46,11 @@ local Super = {
     ---@param proxy M.super
     __call  = function(proxy, self, ...)
         if proxy == self then return proxy[3](proxy[2], ...) end
-        return index(proxy[1], "__init", true)(proxy[2], self, ...)
+        return proxy[1]["__base"]["__init"](proxy[2], self, ...)
     end,
     ---@param proxy M.super
     __index = function(proxy, key)
-        local field = index(proxy[1], key, true)
+        local field = proxy[1]["__base"][key]
         if "function" ~= type(field) then return field end
         proxy[3] = field -- 直接复用 super 对象作为 method 语义，避免 FNEW
         return proxy

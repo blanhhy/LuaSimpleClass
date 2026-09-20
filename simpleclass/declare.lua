@@ -60,7 +60,7 @@ return function(clazz, base, maxn)
             local origin = item[1]
             local target = item[2]
             local field = clazz[target]
-            if field == nil and item[4] then field = M.index(base, target) end
+            if field == nil and item[4] then field = base[target] end
             if field == nil then return
                 error(("bad alias: '%s' not found"):
                 format(item[2]), 2)

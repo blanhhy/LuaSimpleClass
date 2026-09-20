@@ -7,7 +7,6 @@ local type, setmetatable, error, next
 
 local interpret = require("simpleclass.declare")
 local object    = require("simpleclass.object")
-local index     = M.index
 
 _ENV = nil
 
@@ -34,16 +33,6 @@ function cc:extends(basename)
     return self
 end
 
--- P1: 自身已定义
--- P2: 基类已定义
--- P3: 未定义→平凡（自身或 M.index）
-
-local function check_index(clazz, base)
-    if clazz.__index then return 1, clazz.__index end
-    if not base.__index or base.__index == base or base.__index == index then return 3, index end
-    return 2, base.__index
-end
-
 ---Define the class body
 ---@generic T
 ---@param clazz table
@@ -51,7 +40,6 @@ end
 function cc:def(clazz, c2)
     if self == clazz then clazz = c2 end
     local base = self.base
-    local indexdef, __index = check_index(clazz, base)
 
     -- 继承元方法（元方法只能由raw字段触发）
     for i = 1, #M._MMS do
@@ -59,23 +47,21 @@ function cc:def(clazz, c2)
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
-    if base == object then
+    local isTrivial = base == clazz.__index -- 平凡 __index 的类
+    local isDirectD = base == object        -- object 直接派生类
+    if isTrivial then clazz.__index = clazz end
+
+    if isDirectD then
         -- 对于 object 的直接派生类，由于 object 结构不变
-        -- 可以直接本地化少量实例方法，而不真正继承
-        -- 采用自身作为平凡 __index
-        clazz.__index    = clazz.__index    or clazz
+        -- 可以直接本地化少量实例方法，加速访问，而不真正继承
+        -- 同时不设置 __index（已无意义），应用默认 CMT 即可
         clazz.is         = clazz.is         or object.is
+        clazz.new        = clazz.new        or base.new
         clazz.clone      = clazz.clone      or object.clone
+        clazz.toString   = clazz.toString   or base.toString
         clazz.getClass   = clazz.getClass   or object.getClass
         clazz.isInstance = clazz.isInstance or object.isInstance
-    else
-        -- 深继承时，采用 M.index 作为平凡 __index
-        clazz.__index = __index
     end
-
-    -- 类不继承，必要方法须自持
-    clazz.new      = clazz.new      or base.new
-    clazz.toString = clazz.toString or base.toString
 
     local narr = #clazz
     if narr > 0 then interpret(clazz, base, narr) end
@@ -98,7 +84,7 @@ function cc:def(clazz, c2)
         -- 仅在有属性时启用属性访问逻辑，避免影响无关类的性能
         -- 永远自定义 index&newindex 访问器优先，未定义时框架自动实现 getter&setter
         clazz.__newindex = clazz.__newindex or object.__setter
-        clazz.__index = indexdef == 3 and object.__getter or clazz.__index
+        clazz.__index = isTrivial and object.__getter or clazz.__index
     end
 
     if self.ifaces and self.iCheck then
@@ -115,7 +101,13 @@ function cc:def(clazz, c2)
         M._ENV[self.name] = clazz
     end
 
-    return setmetatable(clazz, M._CMT)
+    local cmt = isDirectD and M._CMT or {
+        __index = base;
+        __call = M._CMT.__call;
+        __tostring = M._CMT.__tostring;
+    }
+    clazz.__cmt = cmt
+    return setmetatable(clazz, cmt)
 end
 
 cc.__call = cc.def

@@ -6,7 +6,6 @@ local type, next, getmetatable, setmetatable, rawset, error
 local rawgetmt = debug and debug.getmetatable or getmetatable
 local rawsetmt = debug and debug.setmetatable or setmetatable
 
-local index = M.index
 local issub = M.issubclass
 
 ---@class M.object : object.class, object
@@ -27,12 +26,10 @@ function object:__getter(key)
     local clazz = self.__class
     local prope = clazz["__property"]
     if prope and prope[key] then
-        local getkey = "get." .. key
-        local getter = clazz[getkey]
-        or M.index(clazz, getkey, true)
+        local getter = clazz["get." .. key]
         if getter then return getter(self) end
     end
-    return index(self, key)
+    return clazz[key]
 end
 
 function object:__setter(key, v)
@@ -41,9 +38,7 @@ function object:__setter(key, v)
     if not prope or not prope[key] then
         return rawset(self, key, v)
     end
-    local setkey = "set." .. key
-    local setter = clazz[setkey]
-    or M.index(clazz, setkey, true)
+    local setter = clazz["set." .. key]
     if setter then return setter(self, v) end
     error("cannot set property."..key..", no setter defined.")
 end
@@ -51,7 +46,7 @@ end
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
-    local ctor = self["__init"] or index(inst, "__init", true)
+    local ctor = self["__init"]
     if ctor then ctor(inst, ...) end
     return inst
 end
@@ -97,10 +92,11 @@ function object:clone(isDeep)
     return clone
 end
 
+object.__cmt = M._CMT
 setmetatable(object, M._CMT)
-M._ENV.object = object
 
 M.object = object
+M._ENV.object = object
 M.isinstance = object.isInstance
 
 return object
