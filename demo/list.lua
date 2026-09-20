@@ -187,7 +187,7 @@ class "list" {
     clear = function(self)
         local cls = self.__class
         if table_clr then
-            table_clr(self, self.length) -- 保留元表
+            table_clr(self) -- 保留元表
             self.__class = cls -- 重绑class
             self.length = 0 -- 重置length
             return self
