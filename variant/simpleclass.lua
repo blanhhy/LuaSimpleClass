@@ -59,23 +59,9 @@ local mm_names = {
 local class_MT = {
     __tostring = function(self) return self.__classname end;
     __call = function(self, ...) return self:new(...) end;
-    __metatable = "class";
 }
 
 local sc_ENV = {}
-
-local function index(this, key, super)
-    if not this or key == nil then return end
-    local clazz = this.__class or this
-    local field
-    if super then clazz = clazz["__base"] end
-    if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"] if not clazz then return end field = clazz[key] if field ~= nil then return field end clazz = clazz["__base"]
-    while clazz do
-        field = clazz[key]
-        if field ~= nil then return field end
-        clazz = clazz["__base"]
-    end
-end
 
 local function issub(this, base)
     while this do
@@ -94,39 +80,16 @@ local object = {
     is = G.rawequal;
 }
 
-function object:__getter(key)
-    local clazz = self.__class
-    local prope = clazz["__property"]
-    if prope and prope[key] then
-        local getkey = "get." .. key
-        local getter = clazz[getkey] or index(clazz, getkey, true)
-        if getter then return getter(self) end
-    end
-    return index(self, key)
-end
-
-function object:__setter(key, v)
-    local clazz = self.__class
-    local prope = clazz["__property"]
-    if not prope or not prope[key] then return rawset(self, key, v) end
-    local setkey = "set." .. key
-    local setter = clazz[setkey] or index(clazz, setkey, true)
-    if setter then return setter(self, v) end
-    error("cannot set property."..key..", no setter defined.")
-end
-
 function object:new(...)
     local inst = setmetatable({__class = self}, self)
-    local ctor = self["__init"] or index(inst, "__init", true)
+    local ctor = self["__init"]
     if ctor then ctor(inst, ...) end
     return inst
 end
 
 function object:isInstance(T)
-    local typ = type(self)
-    if typ ~= "table" or type(T) ~= "table" then
-        return T == typ
-    end
+    local t = type(self)
+    if t ~= "table" or type(T) ~= "table" then return T == t end
     local iR, ct = M._iR, self.__class
     if iR and iR[T] then return M.isimpl(self, T) end
     if ct then return issub(ct, T--[[@as class]]) end
@@ -140,8 +103,7 @@ local function deep(src, cls, seen)
     for k, v in next, src do
         c[k] = (k == "__class" and v == cls) and cls
             or (type(v) == "table") and deep(v, rawgetmt(v), seen)
-            or v
-    end
+            or v end
     rawsetmt(c, cls)
     return c
 end
@@ -170,20 +132,15 @@ function Alias:__index(key)
         return setmetatable({key, false, false, false}, Alias)
     elseif self[2] then
         error(("bad alias: alias '%s' already bound to target '%s'; cannot chain '%s'"):
-        format(self[1], self[2], key), 2)
-    end
+        format(self[1], self[2], key), 2) end
     self[2] = key
     self[3] = alias
     return self
 end
 
 function Alias:__call(this)
-    if self == alias then
-        error("bad alias: illegal usage, specify the alias name first.", 2)
-    elseif not self[2] then
-        error(("bad alias: alias '%s' cannot be declared as a method, no target specified"):
-        format(self[1]), 2)
-    end
+    if   self == alias then error("bad alias: illegal usage, specify the alias name first.", 2)
+    elseif not self[2] then error("bad alias: alias '"..self[1].."' cannot be declared as a method, no target specified", 2) end
     self[4] = self == this
     return self
 end
@@ -197,73 +154,91 @@ local cc = {
     implements = false;
 }
 
-function cc:extends(basename)
-    local base = sc_ENV[basename]
-    if not base or not base.__classname then
-        error(("bad extends: '%s' not found or not a class"):format(basename), 2)
-    end
+function cc:extends(name)
+    local base = sc_ENV[name]
+    if not base or not base.__classname then error("bad extends: '"..name.."' not found or not a class", 2) end
     self.base = base
     return self
 end
 
-local function check_index(clazz, base)
-    if clazz.__index then return 1, clazz.__index end
-    if not base.__index or base.__index == base or base.__index == index then return 3, index end
-    return 2, base.__index
+local function getitem(self, key)
+    local claz = self.__class
+    local getr = claz.__property[key]
+    if not getr then return claz[key] end
+    if getr ~= true then return getr(self) end
+end
+
+local function setitem(self, k, v)
+    local claz = self.__class
+    local prop = claz["__property"]
+    if not prop[k] then return rawset(self, k, v) end
+    local setr = claz[k]
+    if setr then return setr(self, v) end
+    error("cannot set property."..k..", no setter defined.")
 end
 
 function cc:def(clazz, c2)
     if self == clazz then clazz = c2 end
     local base = self.base
-    local indexdef, __index = check_index(clazz, base)
+    clazz.new = clazz.new or base.new
 
     for i = 1, #mm_names do
         local mm = mm_names[i]
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
 
-    if base == object then
-        clazz.__index    = clazz.__index    or clazz
+    local isTrivial = base == clazz.__index
+    local isDirectD = base == object
+    if isTrivial then clazz.__index = clazz end
+
+    if isDirectD then
         clazz.is         = clazz.is         or object.is
         clazz.clone      = clazz.clone      or object.clone
         clazz.getClass   = clazz.getClass   or object.getClass
         clazz.isInstance = clazz.isInstance or object.isInstance
-    else clazz.__index = __index end
-
-    clazz.new      = clazz.new      or base.new
-    clazz.toString = clazz.toString or base.toString
+    end
 
     for i = 1, #clazz do
         local item = clazz[i]
         local tipe = item and type(item)
         local PROP = "@simpleclass.property."
+        local prop = clazz.__property
         if tipe == "table" and item[3] == alias then
             clazz[i] = nil
             local origin = item[1]
             local target = item[2]
             local field = clazz[target]
-            if field == nil and item[4] then field = index(base, target) end
-            if field == nil then return
-                error(("bad alias: '%s' not found"):
-                format(item[2]), 2)
-            end
+            if field == nil and item[4] then field = base[target] end
+            if field == nil then error("bad alias: '"..item[2].."' not found") end
             clazz[origin] = field
         elseif tipe == "string" and item:sub(1, #PROP) == PROP then
             local key = item:sub(#PROP + 1)
             if key and key ~= "" then
+                if clazz[key] ~= nil then error("bad class definition: '" .. key .. "' cannot be both a static field and a property.", 3) end
                 clazz[i] = nil
-                clazz.__property = clazz.__property or {}
-                clazz.__property[key] = true
+                local getk, setk = "get."..key, "set."..key
+                local getp, setp = clazz[getk], clazz[setk]
+                clazz[getk], clazz[setk] = nil, nil
+                prop       = prop or {}
+                prop [key] = getp or true
+                clazz[key] = setp or false
             end
         end
+        clazz.__property = prop
     end
 
-    local pp1 = clazz.__property
-    local pp2 = base["__property"]
-    if pp1 and pp2 then
-        for k, v in next, pp2 do pp1[k] = v end
+    local this_c, base_c = clazz, base
+    local base_p = base_c["__property"]
+    local this_p = this_c["__property"] or (base_p and {})
+    this_c["__property"] = this_p
+    if this_p then
+        if base_p then for k in next, base_p do if not this_p[k] then
+        this_p[k] = base_p[k]
+        this_c[k] = base_c[k]
+        end end end
+        this_c.__newindex = this_c.__newindex or setitem
+        this_c.__index = isTrivial and getitem or this_c.__index
     end
-    clazz.__property = pp1 or pp2
 
     local ctor = clazz.constructor
     local init = clazz.__init or ctor
@@ -272,10 +247,17 @@ function cc:def(clazz, c2)
     clazz.constructor = nil
     clazz.__classname = self.name
 
-    if clazz.__property then
-        clazz.__newindex = clazz.__newindex or object.__setter
-        clazz.__index = indexdef == 3 and object.__getter or clazz.__index
+    local this_cmt = class_MT
+    if not isDirectD then
+        local bc = base["__cmt"]
+        this_cmt = bc and bc.next or {
+            __call = this_cmt.__call;
+            __tostring = this_cmt.__tostring;
+            __index = base;
+        }
+        if bc then bc.next = this_cmt end
     end
+    setmetatable(clazz, this_cmt)
 
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)
@@ -288,7 +270,7 @@ function cc:def(clazz, c2)
         end
         sc_ENV[self.name] = clazz
     end
-    return setmetatable(clazz, class_MT)
+    return clazz
 end
 
 cc.__call = cc.def
@@ -327,12 +309,13 @@ if getinfo and getlocal then
 end
 
 local Super = {
+    __mode  = "v",
     __call  = function(proxy, self, ...)
         if proxy == self then return proxy[3](proxy[2], ...) end
-        return index(proxy[1], "__init", true)(proxy[2], self, ...)
+        return proxy[1]["__base"]["__init"](proxy[2], self, ...)
     end,
     __index = function(proxy, key)
-        local field = index(proxy[1], key, true)
+        local field = proxy[1]["__base"][key]
         if "function" ~= type(field) then return field end
         proxy[3] = field
         return proxy
@@ -370,10 +353,8 @@ local function extends(self, ...)
         if not base or not iR[base] then
             error(("bad interface extends: interface expected, got %s at #%d"):
             format(base, i), 2)
-        end
-        extend(this, base, seens)
-    end
-    return self
+        end extend(this, base, seens)
+    end return self
 end
 
 function ic:__call(body)
@@ -410,7 +391,7 @@ end
 function isimpl(clazz, meths)
     if M.I_FEATURE ~= "general" then return true end
     local field for i = 1, #meths do
-        field = clazz[meths[i]] or index(clazz, meths[i], true)
+        field = clazz[meths[i]]
         if type(field) ~= "function" then
         return false, meths[i]
     end end
@@ -468,7 +449,6 @@ M.property = setmetatable({}, {
     end;
 })
 
-M.index = index
 M.object = object
 M.isimpl = isimpl
 M.issubclass = issub
@@ -481,10 +461,10 @@ function M.type(v)
 end
 
 function M.class(name)
-    local typ = type(name)
-    if typ == "table" then return cc:def(name) end
+    local t = type(name)
+    if t == "table" then return cc:def(name) end
     return setmetatable({
-        name = typ == "string" and name ~= "" and
+        name = t == "string" and name ~= "" and
         name or "<anonymous>"
     }, cc)
 end
