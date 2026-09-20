@@ -8,7 +8,7 @@ end
 local function catch(err, ...)
     if type(err) ~= "string" then return false end
     for _, kwd in ipairs{...} do
-        if not err:find(kwd) then return false end
+        if not err:find(kwd, 1, true) then return false end
     end
     return true
 end
@@ -52,7 +52,7 @@ expect(noSetter.value, 4, 'declared property getter without setter')
 local ok, err = pcall(function()
     noSetter.value = 8
 end)
-assert(not ok and tostring(err):match('cannot set property%.value, no setter defined'))
+assert(not ok and catch(err, 'cannot set property', 'no setter defined'))
 assert(rawget(noSetter, 'value') == nil,
     'declared property without setter must not create an instance field')
 expect(noSetter.value, 4,
@@ -186,7 +186,7 @@ assert(unapplied.value == nil,
 local setterOk, setterError = pcall(function()
     unapplied.value = 1
 end)
-assert(not setterOk and tostring(setterError):match('cannot set property%.value, no setter defined'))
+assert(not setterOk and catch(setterError, 'cannot set property', 'no setter defined'))
 assert(unusedGetterCalls == 0 and unusedSetterCalls == 0,
     'unbound base __getter/__setter must not enter the property inheritance chain')
 

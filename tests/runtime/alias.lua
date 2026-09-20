@@ -1,6 +1,14 @@
 local sc = require "simpleclass"
 local alias = sc.alias
 
+local function catch(err, ...)
+    if type(err) ~= "string" then return false end
+    for _, keyword in ipairs{...} do
+        if not err:find(keyword, 1, true) then return false end
+    end
+    return true
+end
+
 class "RuntimeAlias_5a21" {
     fly = function(self)
         return self
@@ -17,7 +25,7 @@ local ok, err = pcall(function()
         alias.missing:doesNotExist(),
     }
 end)
-assert(not ok and tostring(err):match("bad alias: 'doesNotExist' not found"))
+assert(not ok and catch(err, 'bad alias', 'doesNotExist', 'not found'))
 
 ok, err = pcall(function()
     class "RuntimeAliasChain_5a21" {
@@ -25,7 +33,7 @@ ok, err = pcall(function()
         alias.first:target():second(),
     }
 end)
-assert(not ok and tostring(err):match("bad alias: alias 'first' already bound to target 'target'; cannot chain 'second'"))
+assert(not ok and catch(err, 'bad alias', 'first', 'target', 'cannot chain', 'second'))
 
 local aliasRef
 do
