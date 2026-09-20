@@ -54,7 +54,7 @@ local Super = {
     __index = function(proxy, key)
         local field = index(proxy[1], key, true)
         if "function" ~= type(field) then return field end
-        proxy[3] = field
+        proxy[3] = field -- 直接复用 super 对象作为 method 语义，避免 FNEW
         return proxy
     end,
     __tostring = function(p)

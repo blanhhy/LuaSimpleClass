@@ -95,7 +95,8 @@ function cc:def(clazz, c2)
     clazz.__classname = self.name
 
     if clazz.__property then
-        -- 自定义 index&newindex 优先，未定义时框架自动实现 getter&setter 访问逻辑
+        -- 仅在有属性时启用属性访问逻辑，避免影响无关类的性能
+        -- 永远自定义 index&newindex 访问器优先，未定义时框架自动实现 getter&setter
         clazz.__newindex = clazz.__newindex or object.__setter
         clazz.__index = indexdef == 3 and object.__getter or clazz.__index
     end

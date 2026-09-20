@@ -13,6 +13,9 @@ local ic = {}
 local iR = {} ---@type table<interface, string|true>
 setmetatable(iR, {__mode="kv"})
 
+-- 接口在运行时应为纯数组，无哈希部分，以避免内存膨胀与性能问题
+-- 定义期必要的信息经由创建器临时维护，定义后由 iR 记录最小信息
+
 ---@alias set<T> {[T]:true}
 
 ---@class M.icreator : _InterfaceCreator
