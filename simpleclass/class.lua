@@ -59,6 +59,7 @@ function cc:def(clazz, c2)
         clazz.is         = clazz.is         or object.is
         clazz.clone      = clazz.clone      or object.clone
         clazz.getClass   = clazz.getClass   or object.getClass
+        clazz.toString   = clazz.toString   or object.toString
         clazz.isInstance = clazz.isInstance or object.isInstance
     end
 

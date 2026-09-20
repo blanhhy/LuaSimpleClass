@@ -111,8 +111,7 @@ end
 function object:clone(isDeep)
     local clazz = rawgetmt(self)
     if isDeep == nil or isDeep then
-        return deep(self, clazz, {})
-    end
+    return deep(self, clazz, {})end
     local clone = {}
     for k, v in next, self do clone[k] = v end
     rawsetmt(clone, clazz)
@@ -195,6 +194,7 @@ function cc:def(clazz, c2)
         clazz.is         = clazz.is         or object.is
         clazz.clone      = clazz.clone      or object.clone
         clazz.getClass   = clazz.getClass   or object.getClass
+        clazz.toString   = clazz.toString   or object.toString
         clazz.isInstance = clazz.isInstance or object.isInstance
     end
 
