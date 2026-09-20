@@ -2,9 +2,10 @@
 local M = require "simpleclass.m" ---@class M
 local G = _G                      ---@class _G
 
-local type, setmetatable, error, next
-    = type, setmetatable, error, next
+local type, setmetatable, error
+    = type, setmetatable, error
 
+local mergeprop = require("simpleclass.property")
 local interpret = require("simpleclass.declare")
 local object    = require("simpleclass.object")
 
@@ -64,15 +65,8 @@ function cc:def(clazz, c2)
     -- 始终本地化继承 new 以加快实例化速度
     clazz.new = clazz.new or base.new
 
-    local narr = #clazz
-    if narr > 0 then interpret(clazz, base, narr) end
-
-    local pp1 = clazz.__property
-    local pp2 = base["__property"]
-    if pp1 and pp2 then
-        for k, v in next, pp2 do pp1[k] = v end
-    end
-    clazz.__property = pp1 or pp2
+    interpret(clazz, base, #clazz)
+    mergeprop(clazz, base, isTrivial)
 
     local ctor = clazz.constructor
     local init = clazz.__init or ctor
@@ -80,13 +74,6 @@ function cc:def(clazz, c2)
     clazz.__init = init
     clazz.constructor = nil
     clazz.__classname = self.name
-
-    if clazz.__property then
-        -- 仅在有属性时启用属性访问逻辑，避免影响无关类的性能
-        -- 永远自定义 index&newindex 访问器优先，未定义时框架自动实现 getter&setter
-        clazz.__newindex = clazz.__newindex or object.__setter
-        clazz.__index = isTrivial and object.__getter or clazz.__index
-    end
 
     local this_cmt = M._CMT
     if not isDirectD then
@@ -113,7 +100,6 @@ function cc:def(clazz, c2)
         end
         M._ENV[self.name] = clazz
     end
-
     return clazz
 end
 

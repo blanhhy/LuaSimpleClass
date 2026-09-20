@@ -5,6 +5,14 @@ local function expect(actual, expected, message)
         :format(message, tostring(expected), tostring(actual)))
 end
 
+local function catch(err, ...)
+    if type(err) ~= "string" then return false end
+    for _, kwd in ipairs{...} do
+        if not err:find(kwd) then return false end
+    end
+    return true
+end
+
 class "RuntimeProperty_4a82" {
     __init = function(self)
         self._value = 1
@@ -50,6 +58,7 @@ assert(rawget(noSetter, 'value') == nil,
 expect(noSetter.value, 4,
     'failed assignment without setter must not change the property value')
 
+local _, err1 = pcall(function()
 class "RuntimeStaticProperty_4a82" {
     property.value;
     value = 42;
@@ -57,10 +66,10 @@ class "RuntimeStaticProperty_4a82" {
         return "inst"
     end;
 }
+end)
 
-local staticField = RuntimeStaticProperty_4a82:new()
-expect(staticField.value, "inst",
-    'a same-name static field must not take priority over the instance property')
+expect(catch(err1, "bad class definition", "static field", "property"), true,
+    'a field cannot be both static field and a property')
 
 class "RuntimeSetterOnlyProperty_4a82" {
     property.value;

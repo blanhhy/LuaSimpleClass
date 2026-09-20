@@ -22,27 +22,6 @@ local object = {
 object.__index = object
 _ENV = nil
 
-function object:__getter(key)
-    local clazz = self.__class
-    local prope = clazz["__property"]
-    if prope and prope[key] then
-        local getter = clazz["get." .. key]
-        if getter then return getter(self) end
-    end
-    return clazz[key]
-end
-
-function object:__setter(key, v)
-    local clazz = self.__class
-    local prope = clazz["__property"]
-    if not prope or not prope[key] then
-        return rawset(self, key, v)
-    end
-    local setter = clazz["set." .. key]
-    if setter then return setter(self, v) end
-    error("cannot set property."..key..", no setter defined.")
-end
-
 ---@return object
 function object:new(...)
     local inst = setmetatable({__class = self}, self)

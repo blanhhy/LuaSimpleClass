@@ -25,12 +25,8 @@ function Alias:__index(key)
 end
 
 function Alias:__call(this)
-    if self == alias then
-        error("bad alias: illegal usage, specify the alias name first.", 2)
-    elseif not self[2] then
-        error(("bad alias: alias '%s' cannot be declared as a method, no target specified"):
-        format(self[1]), 2)
-    end
+    if   self == alias then error("bad alias: illegal usage, specify the alias name first.", 2)
+    elseif not self[2] then error("bad alias: alias '"..self[1].."' cannot be declared as a method, no target specified", 2) end
     self[4] = self == this
     return self
 end
@@ -55,24 +51,28 @@ return function(clazz, base, maxn)
         local item = clazz[i]
         local tipe = item and type(item)
         local PROP = "@simpleclass.property."
+        local prop = clazz.__property
         if tipe == "table" and item[3] == alias then
             clazz[i] = nil
             local origin = item[1]
             local target = item[2]
             local field = clazz[target]
             if field == nil and item[4] then field = base[target] end
-            if field == nil then return
-                error(("bad alias: '%s' not found"):
-                format(item[2]), 2)
-            end
+            if field == nil then error("bad alias: '"..item[2].."' not found") end
             clazz[origin] = field
         elseif tipe == "string" and item:sub(1, #PROP) == PROP then
             local key = item:sub(#PROP + 1)
             if key and key ~= "" then
+                if clazz[key] ~= nil then error("bad class definition: '" .. key .. "' cannot be both a static field and a property.", 3) end
                 clazz[i] = nil
-                clazz.__property = clazz.__property or {}
-                clazz.__property[key] = true
+                local getk, setk = "get."..key, "set."..key
+                local getp, setp = clazz[getk], clazz[setk]
+                clazz[getk], clazz[setk] = nil, nil
+                prop       = prop or {}
+                prop [key] = getp or true
+                clazz[key] = setp or false
             end
         end
+        clazz.__property = prop
     end
 end
