@@ -88,6 +88,18 @@ function cc:def(clazz, c2)
         clazz.__index = isTrivial and object.__getter or clazz.__index
     end
 
+    local this_cmt = M._CMT
+    if not isDirectD then
+        local bc = base["__cmt"]
+        this_cmt = bc and bc.next or {
+            __call = this_cmt.__call;
+            __tostring = this_cmt.__tostring;
+            __index = base;
+        }
+        if bc then bc.next = this_cmt end
+    end
+    setmetatable(clazz, this_cmt)
+
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)
         if not ok then error(er, 2) end
@@ -102,15 +114,7 @@ function cc:def(clazz, c2)
         M._ENV[self.name] = clazz
     end
 
-    if isDirectD then return setmetatable(clazz, M._CMT) end
-    local base_cmt = base["__cmt"]
-    local this_cmt = base_cmt and base_cmt.next_cmt or {
-        __index = base;
-        __call = M._CMT.__call;
-        __tostring = M._CMT.__tostring;
-    } -- 由于只有 __index 字段差异，所以同基类只定制一次 CMT
-    if base_cmt then base_cmt.next_cmt = this_cmt end
-    return setmetatable(clazz, this_cmt)
+    return clazz
 end
 
 cc.__call = cc.def
