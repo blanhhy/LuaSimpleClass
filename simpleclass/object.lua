@@ -92,11 +92,8 @@ function object:clone(isDeep)
     return clone
 end
 
-object.__cmt = M._CMT
-setmetatable(object, M._CMT)
-
 M.object = object
 M._ENV.object = object
 M.isinstance = object.isInstance
 
-return object
+return setmetatable(object, M._CMT)

@@ -56,12 +56,13 @@ function cc:def(clazz, c2)
         -- 可以直接本地化少量实例方法，加速访问，而不真正继承
         -- 同时不设置 __index（已无意义），应用默认 CMT 即可
         clazz.is         = clazz.is         or object.is
-        clazz.new        = clazz.new        or base.new
         clazz.clone      = clazz.clone      or object.clone
-        clazz.toString   = clazz.toString   or base.toString
         clazz.getClass   = clazz.getClass   or object.getClass
         clazz.isInstance = clazz.isInstance or object.isInstance
     end
+
+    -- 始终本地化继承 new 以加快实例化速度
+    clazz.new = clazz.new or base.new
 
     local narr = #clazz
     if narr > 0 then interpret(clazz, base, narr) end
@@ -101,13 +102,15 @@ function cc:def(clazz, c2)
         M._ENV[self.name] = clazz
     end
 
-    local cmt = isDirectD and M._CMT or {
+    if isDirectD then return setmetatable(clazz, M._CMT) end
+    local base_cmt = base["__cmt"]
+    local this_cmt = base_cmt and base_cmt.next_cmt or {
         __index = base;
         __call = M._CMT.__call;
         __tostring = M._CMT.__tostring;
-    }
-    clazz.__cmt = cmt
-    return setmetatable(clazz, cmt)
+    } -- 由于只有 __index 字段差异，所以同基类只定制一次 CMT
+    if base_cmt then base_cmt.next_cmt = this_cmt end
+    return setmetatable(clazz, this_cmt)
 end
 
 cc.__call = cc.def
