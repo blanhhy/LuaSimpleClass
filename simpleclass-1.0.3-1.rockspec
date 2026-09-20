@@ -1,11 +1,11 @@
 rockspec_format = "3.0"
 
 package = "simpleclass"
-version = "1.0.2-1"
+version = "1.0.3-1"
 
 source = {
     url = "git+https://github.com/blanhhy/LuaSimpleClass",
-    tag = "v1.0.2",
+    tag = "v1.0.3",
 }
 
 description = {
@@ -37,6 +37,7 @@ build = {
         ["simpleclass.m"]         = "simpleclass/m.lua",
         ["simpleclass.object"]    = "simpleclass/object.lua",
         ["simpleclass.declare"]   = "simpleclass/declare.lua",
+        ["simpleclass.declare"]   = "simpleclass/property.lua",
         ["simpleclass.class"]     = "simpleclass/class.lua",
         ["simpleclass.super"]     = "simpleclass/super.lua",
         ["simpleclass.interface"] = "simpleclass/interface.lua",
@@ -48,6 +49,7 @@ build = {
             ["simpleclass.luals/simpleclass.d.lua"]             = "simpleclass.d.lua",
             ["simpleclass.luals/simpleclass.plugin.lua"]        = ".luals/simpleclass.plugin.lua",
             ["simpleclass.luals/patches/overload_dispatch.lua"] = ".luals/patches/overload_dispatch.lua",
+            ["simpleclass.luals/patches/for_call_operator.lua"] = ".luals/patches/for_call_operator.lua",
         },
     },
 }
