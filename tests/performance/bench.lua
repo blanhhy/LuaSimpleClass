@@ -108,10 +108,25 @@ local plainB = { v = 2, getV = plainGetV }
 local PM = { m = function(self, x) return x end }
 local mUP = PM.m
 
-local function plainInit()
-    local t = {}
-    t.v = 1
+local plainClass = {}
+local plainMeta = {}
+
+-- Keep allocation/metatable setup separate from constructor field writes.
+local function plainNew()
+    return setmetatable({ __class = plainClass }, plainMeta)
+end
+
+local function plainInitFields(t, x)
+    t.x = x
     return t
+end
+
+local function plainMake(x)
+    return plainInitFields(plainNew(), x)
+end
+
+local function rawNew(cls)
+    return setmetatable({ __class = cls }, cls)
 end
 
 -- ===== 健全性检查 =====
@@ -250,18 +265,53 @@ local function section(title)
     print(('\n== %s ==  [cal %.6f us/op]'):format(title, c))
 end
 
-section('实例创建')
-local ref_new = bench('{}', function() holder[1] = {} end)
-bench('plainInit()', function() holder[1] = plainInit() end, ref_new)
-
-local function rawNew(cls)
-    return setmetatable({ __class = cls }, cls)
-end
-bench('rawNew(cls) [no ctor]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
-bench('BenchBase:new()', function() holder[1] = BenchBase_7b01:new() end, ref_new)
+section('空实例创建：new（表<-元表）')
+local ref_new = bench('{} [no mt]', function() holder[1] = {} end)
+bench('plainNew() [tbl<-mt]', function() holder[1] = plainNew() end, ref_new)
+bench('rawNew(cls) [inst<-cls]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
+bench('BenchBase:new() [depth1]', function() holder[1] = BenchBase_7b01:new() end, ref_new)
 bench('BenchLeaf:new() [depth5]', function() holder[1] = BenchLeaf_7b01:new() end, ref_new)
-bench('BenchCtorSelf:new(1) [own ctor]', function() holder[1] = BenchCtorSelf_7b01:new(1) end, ref_new)
-bench('BenchCtorChild:new(2) [inh ctor]', function() holder[1] = BenchCtorChild_7b01:new(2) end, ref_new)
+
+section('仅初始化：init/ctor [1field]')
+local initPool = {}
+for i = 1, 16 do initPool[i] = {} end
+local initPos = 0
+local initK = 0
+local ctorSelf = BenchCtorSelf_7b01.__init
+local function nextInitTarget()
+    initPos = initPos % #initPool + 1
+    return initPool[initPos]
+end
+local ref_init = bench('plainInitFields(t, x)', function()
+    initK = initK + 1
+    local t = nextInitTarget()
+    plainInitFields(t, initK)
+    acc = acc + t.x
+end)
+bench('BenchCtorSelf.__init(t, x)', function()
+    initK = initK + 1
+    local t = nextInitTarget()
+    ctorSelf(t, initK)
+    acc = acc + t.x
+end, ref_init)
+
+section('完整实例创建（new + init）')
+local createK = 0
+local ref_full = bench('plainMake(x) [factory func]', function()
+    createK = createK + 1
+    holder[1] = plainMake(createK)
+end)
+bench('BenchCtorSelf:new(x) [own init]', function()
+    createK = createK + 1
+    holder[1] = BenchCtorSelf_7b01:new(createK)
+end, ref_full)
+bench('BenchCtorChild:new(x) [inh init]', function()
+    createK = createK + 1
+    holder[1] = BenchCtorChild_7b01:new(createK)
+end, ref_full)
+bench('BenchProp:new() [set raw prop]', function()
+    holder[1] = BenchProp_7b01:new()
+end, ref_full)
 
 section('实例方法调用')
 local baseI, l1I = BenchBase_7b01(), BenchL1_7b01()
