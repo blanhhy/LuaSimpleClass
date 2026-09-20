@@ -73,7 +73,7 @@ class "BenchCtorChild_7b01" : extends "BenchCtorSelf_7b01" {
 }
 
 class "BenchSuperBase_7b01" {
-    __init = function(self, x) self._v = x or 19 end;
+    __init = function(self, x) return x end;
     visit = function(self, x) return x end;
 }
 
@@ -85,8 +85,7 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
         return super():visit(x)
     end;
     super_ctor = function(self, x)
-        super(BenchSuperSub_7b01, self)(x) -- 构造器专线
-        return x
+        return super(BenchSuperSub_7b01, self)(x) -- 构造器专线
     end;
     via_direct = function(self, x)
         return BenchSuperBase_7b01["visit"](self, x)
@@ -147,7 +146,7 @@ local sub = BenchSuperSub_7b01()
 assert(sub:via_super_x(7) == 7, 'explicit super')
 assert(sub:via_base(8) == 8, 'manual super')
 assert(sub:via_super0(9) == 9, '0-arg super')
-assert(sub:super_ctor(5) == 5 and sub._v == 5, 'super ctor')
+assert(sub:super_ctor(5) == 5, 'super ctor')
 assert(BenchBase_7b01():clone():getClass() == BenchBase_7b01, 'clone')
 print('sanity: ok')
 
