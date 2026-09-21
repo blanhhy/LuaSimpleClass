@@ -1,3 +1,4 @@
+-- <lua> run test [<args>]
 -- Run the runtime and LuaLS regression suites.
 --
 -- Usage:

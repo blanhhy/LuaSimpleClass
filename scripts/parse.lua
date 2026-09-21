@@ -1,3 +1,4 @@
+-- <lua> run parse [<args>]
 -- 输出 simpleclass DSL 解析后的结果
 
 local plugin = {

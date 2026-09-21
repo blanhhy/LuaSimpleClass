@@ -1,6 +1,8 @@
+-- Run scripts in workspace.
+-- 
 -- Usage:
---   - show scripts: lua run
---   - run a script: lua run <script_name> [<args>]
+--   - **show scripts**: <lua> run
+--   - **run a script**: <lua> run <script_name> [<args>]
 
 local cwd = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or '.'
 local sep = package.config:sub(1, 1)

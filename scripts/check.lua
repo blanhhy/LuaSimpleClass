@@ -1,3 +1,4 @@
+-- <lua> run check
 -- 获取 lua-language-server 在实际工作区的检查结果
 
 local function trim(s)
