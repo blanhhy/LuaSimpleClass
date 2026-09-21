@@ -30,6 +30,12 @@ local function list_scripts(dir)
     return scripts
 end
 
+local function shell_quote(value)
+    value = tostring(value)
+    if win then return '"' .. value:gsub('"', '""') .. '"' end
+    return "'" .. value:gsub("'", "'\\''") .. "'"
+end
+
 if #arg == 0 then
     local scripts = list_scripts(ujoin(cwd, "scripts"))
     if #scripts == 0 then os.exit(1) end
@@ -40,19 +46,27 @@ if #arg == 0 then
 end
 
 local scriptname = arg[1] or ''
-local scriptpath = '"'..ujoin(cwd, "scripts", scriptname..".lua")..'"'
-local h = io.popen((win and "dir /b " or "ls ")..scriptpath)
+local scriptpath = ujoin(cwd, "scripts", scriptname..".lua")
+local scriptFile = io.open(scriptpath, 'r')
 
-if not h then
+if not scriptFile then
     io.write(io.stderr, "lua error Missing script: \""..scriptname.."\"\n")
     io.write(io.stderr, "lua error\n")
     io.write(io.stderr, "lua error To see a list of scripts, run:\n")
     io.write(io.stderr, "lua error   lua run\n")
     os.exit(1)
 end
+scriptFile:close()
 
-h:close()
-
-arg[1] = scriptpath
-local _, _, code = os.execute("lua "..table.concat(arg, " "))
+local command = 'lua ' .. shell_quote(scriptpath)
+for i = 2, #arg do command = command .. ' ' .. shell_quote(arg[i]) end
+local a, b, c = os.execute(command)
+local code
+if type(a) == 'number' then
+    code = a
+elseif a then
+    code = c or 0
+else
+    code = c or b or 1
+end
 os.exit(code)

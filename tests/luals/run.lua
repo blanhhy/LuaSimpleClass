@@ -24,9 +24,15 @@ local function getcwd()
     return (r ~= '' and r) or '.'
 end
 
-local CWD = getcwd():gsub('[/\\]+$', '')
-local PROJECT_DIR = CWD
-local TEST_DIR = ujoin(CWD, 'tests', 'luals')
+local source = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or 'tests/luals/'
+local sourceProject = source:match('^(.*)[/\\]tests[/\\]luals[/\\]*$')
+local PROJECT_DIR
+if sourceProject and (sourceProject:match('^%a:[/\\]') or sourceProject:match('^[/\\]')) then
+    PROJECT_DIR = sourceProject
+else
+    PROJECT_DIR = getcwd():gsub('[/\\]+$', '')
+end
+local TEST_DIR = ujoin(PROJECT_DIR, 'tests', 'luals')
 local PLUGIN_PATH = ujoin(PROJECT_DIR, '.luals', 'simpleclass.plugin.lua')
 
 -- ---------- 工具 ----------
