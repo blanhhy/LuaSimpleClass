@@ -195,43 +195,6 @@ local function parse_simple_value(val_str)
     return val_str
 end
 
-local function parse_array_from_text(text, open_bracket_pos)
-    local close_pos = find_matching_brace(text, open_bracket_pos)
-    if not close_pos then return nil end
-    local inner = text:sub(open_bracket_pos + 1, close_pos - 1)
-    local values = {}
-    for elem in inner:gmatch('"([^"]*)"') do
-        values[#values + 1] = elem
-    end
-    if #values == 0 then
-        for elem in inner:gmatch('([^,]+)') do
-            local trimmed = trim(elem)
-            if trimmed ~= "" then
-                local v = parse_simple_value(trimmed)
-                if v ~= nil then values[#values + 1] = v end
-            end
-        end
-    end
-    return values, close_pos
-end
-
-local function parse_object_from_text(text, open_brace_pos)
-    local close_pos = find_matching_brace(text, open_brace_pos)
-    if not close_pos then return nil end
-    local inner = text:sub(open_brace_pos + 1, close_pos - 1)
-    local obj = {}
-    for k, v in inner:gmatch('"([^"]+)"%s*:%s*"([^"]*)"') do
-        obj[k] = v
-    end
-    for k, v in inner:gmatch('"([^"]+)"%s*:%s*(true|false)') do
-        obj[k] = (v == "true")
-    end
-    for k, v in inner:gmatch('"([^"]+)"%s*:%s*(-?%d+%.?%d*)') do
-        obj[k] = tonumber(v)
-    end
-    return obj, close_pos
-end
-
 -- 递归解析 pos 处的一个 JSON 值，返回 value, nextPos（nextPos 指向该值之后）。
 -- 支持字符串/数字/布尔/数组/嵌套对象，正确处理字符串转义与注释不在此层处理。
 local function parse_value_at(text, pos)
