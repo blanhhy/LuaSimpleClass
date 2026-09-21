@@ -37,14 +37,13 @@ build = {
         ["simpleclass.m"]         = "simpleclass/m.lua",
         ["simpleclass.object"]    = "simpleclass/object.lua",
         ["simpleclass.declare"]   = "simpleclass/declare.lua",
-        ["simpleclass.property"]   = "simpleclass/property.lua",
+        ["simpleclass.property"]  = "simpleclass/property.lua",
         ["simpleclass.class"]     = "simpleclass/class.lua",
         ["simpleclass.super"]     = "simpleclass/super.lua",
         ["simpleclass.interface"] = "simpleclass/interface.lua",
         ["simpleclass.with"]      = "simpleclass/with.lua",
     },
     install = {
-        -- LuaLS 类型推导支持文件，安装到 rocks 树的 conf/simpleclass.luals 目录
         conf = {
             ["simpleclass.luals/simpleclass.d.lua"]             = "simpleclass.d.lua",
             ["simpleclass.luals/simpleclass.plugin.lua"]        = ".luals/simpleclass.plugin.lua",
