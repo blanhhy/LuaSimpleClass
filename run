@@ -40,7 +40,7 @@ if #arg == 0 then
 end
 
 local scriptname = arg[1] or ''
-local scriptpath = ujoin(cwd, "scripts", scriptname..".lua")
+local scriptpath = '"'..ujoin(cwd, "scripts", scriptname..".lua")..'"'
 local h = io.popen((win and "dir /b " or "ls ")..scriptpath)
 
 if not h then
