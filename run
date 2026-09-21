@@ -36,6 +36,28 @@ local function shell_quote(value)
     return "'" .. value:gsub("'", "'\\''") .. "'"
 end
 
+local function find_lua_command()
+    local LUA = os.getenv('LUA')
+    if LUA and LUA ~= '' then return LUA end
+
+    -- Lua stores the interpreter and its options at negative arg indexes.
+    -- The exact index differs between Lua versions and invocation forms.
+    for i = -1, -10, -1 do
+        local value = arg[i]
+        if type(value) == 'string' then
+            local name = value:gsub('^.*[/\\]', ''):lower()
+            if name:match('^lua') or name:match('^luajit') then
+                return value
+            end
+        end
+    end
+
+    if pcall(require, 'jit') then return 'luajit' end
+    local major, minor = (_VERSION or ''):match('Lua%s+(%d+)%.(%d+)')
+    if major and minor then return 'lua' .. major .. minor end
+    return 'lua'
+end
+
 if #arg == 0 then
     local scripts = list_scripts(ujoin(cwd, "scripts"))
     if #scripts == 0 then os.exit(1) end
@@ -58,7 +80,8 @@ if not scriptFile then
 end
 scriptFile:close()
 
-local command = 'lua ' .. shell_quote(scriptpath)
+local command = (win and 'call ' or '')
+    .. shell_quote(find_lua_command()) .. ' ' .. shell_quote(scriptpath)
 for i = 2, #arg do command = command .. ' ' .. shell_quote(arg[i]) end
 local a, b, c = os.execute(command)
 local code
