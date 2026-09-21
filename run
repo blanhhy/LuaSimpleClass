@@ -1,0 +1,58 @@
+-- Usage:
+--   - show scripts: lua run
+--   - run a script: lua run <script_name> [<args>]
+
+local cwd = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or '.'
+local sep = package.config:sub(1, 1)
+local win = sep == "\\"
+
+local function ujoin(...)
+    local n = select('#', ...)
+    local u = {...}
+    for i = 1, n do if not u[i] then
+        u[i] = ''
+    end end
+    return table.concat(u, sep, 1, n)
+end
+
+local function list_scripts(dir)
+    local scripts = {}
+    local command = (win and 'dir /b "%s"' or 'ls "%s"'):format(dir)
+    local phandle = io.popen(command, 'r')
+    if not phandle then return scripts end
+    for name in (phandle:read('*a') or ''):gmatch('[^\r\n]+') do
+        if name:match('(.+)%.lua$') then
+            table.insert(scripts, name:sub(1, -5))
+        end
+    end
+    phandle:close()
+    table.sort(scripts)
+    return scripts
+end
+
+if #arg == 0 then
+    local scripts = list_scripts(ujoin(cwd, "scripts"))
+    if #scripts == 0 then os.exit(1) end
+    local cwd_short = cwd:match((("&([^&]+)$"):gsub("&", sep))) or 'workspace'
+    print("Scripts available in "..cwd_short.." via `lua run`:")
+    for _, v in ipairs(scripts) do print("-  "..v) end
+    os.exit(0)
+end
+
+local scriptname = arg[1] or ''
+local scriptpath = ujoin(cwd, "scripts", scriptname..".lua")
+local h = io.popen((win and "dir /b " or "ls ")..scriptpath)
+
+if not h then
+    io.write(io.stderr, "lua error Missing script: \""..scriptname.."\"\n")
+    io.write(io.stderr, "lua error\n")
+    io.write(io.stderr, "lua error To see a list of scripts, run:\n")
+    io.write(io.stderr, "lua error   lua run\n")
+    os.exit(1)
+end
+
+h:close()
+
+arg[1] = scriptpath
+local _, _, code = os.execute("lua "..table.concat(arg, " "))
+os.exit(code)
