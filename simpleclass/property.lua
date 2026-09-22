@@ -22,10 +22,10 @@ return function(this_c, base_c, isTrivial)
     local this_p = this_c["__property"] or (base_p and {})
     this_c["__property"] = this_p
     if not this_p then return end
-    if base_p then for k in next, base_p do if not this_p[k] then
-        this_p[k] = base_p[k]
-        this_c[k] = base_c[k]
-    end end end
+    if base_p then for k in next, base_p do
+        this_p[k] = this_p[k] or base_p[k]
+        this_c[k] = this_c[k] or base_c[k]
+    end end
     this_c.__newindex = this_c.__newindex or setitem
     this_c.__index = isTrivial and getitem or this_c.__index
 end
