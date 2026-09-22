@@ -1,13 +1,16 @@
 -- simpleclass 实例运行期性能基准（对比原生 table 基线）
 -- 运行：lua tests/performance/bench.lua 或 luajit tests/performance/bench.lua
 --
--- 测量约定（三条都是为了不让 JIT 把要测的东西优化掉）：
+-- 测量约定：
 --   1) 每个被测函数都接受一个变化的实参 x 并把 x 返回/汇入 acc，
 --      否则循环体退化成常量累加，JIT 会把它强度削减成 acc = acc + n，测到折叠残渣；
 --   2) 接收者保持固定：固定接收者才是常态调用形状，交替接收者会把调用点变成多态，
 --      测出的是多态惩罚而不是派发成本；
 --   3) 属性写读采用「写 A 读 B 再交换」：写后立刻读同一张表会被 store→load 转发抹掉，
---      那样根本测不到写入。写读不同表则两者都必须真执行，与 simpleclass 路径可比。
+--      那样根本测不到写入。写读不同表则两者都必须真执行，与 simpleclass 路径可比；
+--   4) 比值 ref 必须与被测项结构与实际功能对齐：
+--      拿 {} (单表) 做分母，被测项共享的「表+元表」固定成本会以加法叠加，
+--      所有比率坍缩成同一个 ~2x 平凡常数，这只证明了2倍分配量硬开销，毫无参考意义
 
 local source = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or 'tests/'
 local sep = package.config:sub(1, 1)
@@ -97,12 +100,15 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
 
 -- ===== 原生基线 =====
 
-local function plainGetV(self, x) return self.v + x end
-local plainA = { v = 1, getV = plainGetV }
-local plainB = { v = 2, getV = plainGetV }
+local function plainMeth(self, x) return x end
+local function plainGetV(self) return self.v end
+local function plainSetV(self, v) self.v = v end
+local plainA = { meth = plainMeth }
+local plainB = { getV = plainGetV, setV = plainSetV, v = 1 }
+local plainC = { getV = plainGetV, setV = plainSetV, v = 2 }
 
-local PM = { m = function(self, x) return x end }
-local mUP = PM.m
+local PM = { m = plainMeth }
+local mUP = plainMeth
 
 local plainClass = {}
 local plainMeta = {}
@@ -214,7 +220,8 @@ local function bench(name, f, ref)
             -- 都被折叠，比值总在1左右，打印意义不大
             ratio = ''
         elseif ref > 0 then
-            ratio = ('  %6.2fx'):format(us / ref)
+            local r = us / ref
+            ratio = (r < 10 and '  %.2fx' or '  %.1fx'):format(r)
         else
             ratio = '  [?]REF=0'
         end
@@ -262,8 +269,8 @@ local function section(title)
 end
 
 section('空实例创建：new（表<-元表）')
-local ref_new = bench('{} [no mt]', function() holder[1] = {} end)
-bench('plainNew() [tbl<-mt]', function() holder[1] = plainNew() end, ref_new)
+bench('{} [no mt]', function() holder[1] = {} end)
+local ref_new = bench('plainNew() [tbl<-mt]', function() holder[1] = plainNew() end)
 bench('rawNew(cls) [inst<-cls]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
 bench('BenchBase:new() [depth1]', function() holder[1] = BenchBase_7b01:new() end, ref_new)
 bench('BenchLeaf:new() [depth5]', function() holder[1] = BenchLeaf_7b01:new() end, ref_new)
@@ -305,7 +312,7 @@ bench('BenchCtorChild:new(x) [inh init]', function()
     createK = createK + 1
     holder[1] = BenchCtorChild_7b01:new(createK)
 end, ref_full)
-bench('BenchProp:new() [set raw prop]', function()
+bench('BenchProp:new() [cls with prop]', function()
     holder[1] = BenchProp_7b01:new()
 end, ref_full)
 
@@ -326,7 +333,7 @@ bench('mUP(t, x) [upvalue]', function()
 end, ref_call)
 bench('t:getV(x) [tbl meth]', function()
     kc = kc + 1
-    acc = acc + plainA:getV(kc)
+    acc = acc + plainA:meth(kc)
 end, ref_call)
 bench('base:rootMethod(x) [depth1]', function()
     kc = kc + 1
@@ -349,43 +356,37 @@ bench('p:propMethod(x) [cls with prop]', function()
     acc = acc + p:propMethod(kc)
 end, ref_call)
 
-section('属性读写')
+section('Getter&Setter')
 local kf = 0
-local rwA, rwB = plainA, plainB
-local ref_rw = bench('plain.v [tbl field] <rw>', function()
-    kf = kf + 1
-    rwA.v = kf
-    acc = acc + rwB.v
-    rwA, rwB = rwB, rwA
-end)
-local gA, gB = plainA, plainB
-bench('plain:getV(0) [classic] <r>', function()
+local gA, gB = plainB, plainC
+local ref_getv = bench('plain:getV() [classic] <r>', function()
     kf = kf + 1
     gA.v = kf
-    acc = acc + gB:getV(0)
+    acc = acc + gB:getV()
     gA, gB = gB, gA
-end, ref_rw)
-local fA, fB = BenchProp_7b01(), BenchProp_7b01()
-bench('p._v [raw field] <rw>', function()
-    kf = kf + 1
-    fA._v = kf
-    acc = acc + fB._v
-    fA, fB = fB, fA
-end, ref_rw)
-local hA, hB = BenchProp_7b01(), BenchProp_7b01()
-bench('p.value [getter+setter] <rw>', function()
-    kf = kf + 1
-    hA.value = kf
-    acc = acc + hB.value
-    hA, hB = hB, hA
-end, ref_rw)
+end)
 local iA, iB = BenchProp_7b01(), BenchProp_7b01()
 bench('p.value [getter] <r>', function()
     kf = kf + 1
     iA._v = kf
     acc = acc + iB.value
     iA, iB = iB, iA
-end, ref_rw)
+end, ref_getv)
+local jA, jB = plainB, plainC
+local ref_setget = bench('plain:setV()+getV() [classic] <rw>', function()
+    kf = kf + 1
+    jA:setV(kf)
+    acc = acc + jB:getV()
+    jA, jB = jB, jA
+end)
+local hA, hB = BenchProp_7b01(), BenchProp_7b01()
+bench('p.value [getter+setter] <rw>', function()
+    kf = kf + 1
+    hA.value = kf
+    acc = acc + hB.value
+    hA, hB = hB, hA
+end, ref_setget)
+
 
 section('super 调用')
 local subA = BenchSuperSub_7b01()
@@ -412,7 +413,7 @@ bench('sub:super_ctor(x) [init dedicated]', function()
     ks = ks + 1
     acc = acc + super_ctor(subA, ks)
 end, ref_super)
-bench('sub:via_super0(x) [0-arg] [debug lib]', function()
+bench('sub:via_super0(x) [0-arg] [debug req]', function()
     ks = ks + 1
     acc = acc + via_super0(subA, ks)
 end, ref_super)
