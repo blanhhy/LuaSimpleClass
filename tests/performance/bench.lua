@@ -212,18 +212,20 @@ local function bench(name, f, ref)
         flag = '  [!]UNSTABLE'
     end
     local ratio = ''
-    if ref then
+    if ref == "ref" and us >= FLOOR then
+        ratio = '  @BASE '
+    end
+    if ref ~= "ref" and ref then
         if ref < FLOOR and us >= FLOOR then
             -- 参照行已被折叠而本行没有，无法相比
-            ratio = '  [!]CANT FOLD'
+            flag  = '  [!]CANT FOLD'
         elseif ref < FLOOR then
             -- 都被折叠，比值总在1左右，打印意义不大
-            ratio = ''
         elseif ref > 0 then
             local r = us / ref
             ratio = (r < 10 and '  %.2fx' or '  %.1fx'):format(r)
         else
-            ratio = '  [?]REF=0'
+            flag  = '  [?]REF=0'
         end
     end
     print(pad(name, NAME_W) .. ('%7.6f us/op  %7.1fM ops%s%s'):format(
@@ -270,7 +272,7 @@ end
 
 section('空实例创建：new（表<-元表）')
 bench('{} [no mt]', function() holder[1] = {} end)
-local ref_new = bench('plainNew() [tbl<-mt]', function() holder[1] = plainNew() end)
+local ref_new = bench('plainNew() [tbl<-mt]', function() holder[1] = plainNew() end, "ref")
 bench('rawNew(cls) [inst<-cls]', function() holder[1] = rawNew(BenchLeaf_7b01) end, ref_new)
 bench('BenchBase:new() [depth1]', function() holder[1] = BenchBase_7b01:new() end, ref_new)
 bench('BenchLeaf:new() [depth5]', function() holder[1] = BenchLeaf_7b01:new() end, ref_new)
@@ -290,7 +292,7 @@ local ref_init = bench('plainInitFields(t, x)', function()
     local t = nextInitTarget()
     plainInitFields(t, initK)
     acc = acc + t.x
-end)
+end, "ref")
 bench('BenchCtorSelf.__init(t, x)', function()
     initK = initK + 1
     local t = nextInitTarget()
@@ -303,7 +305,7 @@ local createK = 0
 local ref_full = bench('plainMake(x) [factory func]', function()
     createK = createK + 1
     holder[1] = plainMake(createK)
-end)
+end, "ref")
 bench('BenchCtorSelf:new(x) [own init]', function()
     createK = createK + 1
     holder[1] = BenchCtorSelf_7b01:new(createK)
@@ -322,7 +324,7 @@ local kc = 0
 local ref_call = bench('Leaf.leafMethod(t, x) [raw func]', function()
     kc = kc + 1
     acc = acc + BenchLeaf_7b01["leafMethod"](leaf, kc)
-end)
+end, "ref")
 bench('PM.m(t, x) [plain tbl]', function()
     kc = kc + 1
     acc = acc + PM.m(plainA, kc)
@@ -364,7 +366,7 @@ local ref_getv = bench('plain:getV() [classic] <r>', function()
     gA.v = kf
     acc = acc + gB:getV()
     gA, gB = gB, gA
-end)
+end, "ref")
 local iA, iB = BenchProp_7b01(), BenchProp_7b01()
 bench('p.value [getter] <r>', function()
     kf = kf + 1
@@ -378,7 +380,7 @@ local ref_setget = bench('plain:setV()+getV() [classic] <rw>', function()
     jA:setV(kf)
     acc = acc + jB:getV()
     jA, jB = jB, jA
-end)
+end, "ref")
 local hA, hB = BenchProp_7b01(), BenchProp_7b01()
 bench('p.value [getter+setter] <rw>', function()
     kf = kf + 1
@@ -400,7 +402,7 @@ local ks = 0
 local ref_super = bench('sub:via_direct(x) [hardcode Base]', function()
     ks = ks + 1
     acc = acc + via_direct(subA, ks)
-end)
+end, "ref")
 bench('sub:via_base(x) [relative __base]', function()
     ks = ks + 1
     acc = acc + via_base(subA, ks)
