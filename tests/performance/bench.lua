@@ -20,7 +20,7 @@ package.path = table.concat({
     package.path,
 }, ';')
 
-local index = require "simpleclass"["index"]
+require "simpleclass"
 
 local JIT = rawget(_G, 'jit')
 print('interpreter:', _VERSION, JIT and ('LuaJIT ' .. JIT.version) or 'PUC Lua')
@@ -92,9 +92,6 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
     end;
     via_base = function(self, x)
         return BenchSuperSub_7b01["__base"].visit(self, x)
-    end;
-    via_index = function(self, x)
-        return index(BenchSuperSub_7b01, "visit", true)(self, x)
     end;
 }
 
@@ -395,7 +392,6 @@ local subA = BenchSuperSub_7b01()
 -- 避免混入查找实例方法本身的开销干扰测试关注点
 local via_direct  = BenchSuperSub_7b01["via_direct"]
 local via_base    = BenchSuperSub_7b01["via_base"]
-local via_index   = BenchSuperSub_7b01["via_index"]
 local via_super_x = BenchSuperSub_7b01["via_super_x"]
 local via_super0  = BenchSuperSub_7b01["via_super0"]
 local super_ctor  = BenchSuperSub_7b01["super_ctor"]
@@ -404,17 +400,10 @@ local ref_super = bench('sub:via_direct(x) [hardcode Base]', function()
     ks = ks + 1
     acc = acc + via_direct(subA, ks)
 end)
-if not index then
 bench('sub:via_base(x) [relative __base]', function()
     ks = ks + 1
     acc = acc + via_base(subA, ks)
 end, ref_super)
-else
-bench('sub:via_index(x) [call index()]', function()
-    ks = ks + 1
-    acc = acc + via_index(subA, ks)
-end, ref_super)
-end
 bench('sub:via_super_x(x) [explicit]', function()
     ks = ks + 1
     acc = acc + via_super_x(subA, ks)

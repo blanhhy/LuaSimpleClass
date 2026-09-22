@@ -146,12 +146,6 @@ function sc.type(obj) end
 ---@return type type
 function sc.type(v) end
 
----Get the field of the object or class, considering the inheritance chain
----@param this object|class
----@param super? boolean skip this class itself, default `false`
----@return any
-function sc.index(this, key, super) end
-
 ---Define a new class  
 ---eg:
 ---```lua
@@ -297,7 +291,6 @@ sc.property = {}
 ---@alias simpleclass.FIELD
 ---| "class"
 ---| "super"
----| "index"
 ---| "alias"
 ---| "interface"
 ---| "type"
