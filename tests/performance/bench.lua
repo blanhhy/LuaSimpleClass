@@ -1,17 +1,3 @@
--- simpleclass 实例运行期性能基准（对比原生 table 基线）
--- 运行：lua tests/performance/bench.lua 或 luajit tests/performance/bench.lua
---
--- 测量约定：
---   1) 每个被测函数都接受一个变化的实参 x 并把 x 返回/汇入 acc，
---      否则循环体退化成常量累加，JIT 会把它强度削减成 acc = acc + n，测到折叠残渣；
---   2) 接收者保持固定：固定接收者才是常态调用形状，交替接收者会把调用点变成多态，
---      测出的是多态惩罚而不是派发成本；
---   3) 属性写读采用「写 A 读 B 再交换」：写后立刻读同一张表会被 store→load 转发抹掉，
---      那样根本测不到写入。写读不同表则两者都必须真执行，与 simpleclass 路径可比；
---   4) 比值 ref 必须与被测项结构与实际功能对齐：
---      拿 {} (单表) 做分母，被测项共享的「表+元表」固定成本会以加法叠加，
---      所有比率坍缩成同一个 ~2x 平凡常数，这只证明了2倍分配量硬开销，毫无参考意义
-
 local source = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or 'tests/'
 local sep = package.config:sub(1, 1)
 source = source:gsub('[/\\]+$', '')
@@ -71,6 +57,12 @@ class "BenchCtorSelf_7b01" {
     end;
 }
 
+class "BenchOverrideNew_7b01" {
+    new = function(cls, x)
+        return setmetatable({ x = x }, cls)
+    end;
+}
+
 class "BenchCtorChild_7b01" : extends "BenchCtorSelf_7b01" {
     -- 不写构造器：沿链继承基类构造器
 }
@@ -88,7 +80,7 @@ class "BenchSuperSub_7b01" : extends "BenchSuperBase_7b01" {
         return super():visit(x)
     end;
     super_ctor = function(self, x)
-        return super(BenchSuperSub_7b01, self)(x) -- 构造器专线
+        return super(BenchSuperSub_7b01, self)(x)
     end;
     via_direct = function(self, x)
         return BenchSuperBase_7b01["visit"](self, x)
@@ -125,6 +117,10 @@ end
 
 local function plainMake(x)
     return plainInitFields(plainNew(), x)
+end
+
+local function newInOneGo(mt, x)
+    return setmetatable({ x = x }, mt)
 end
 
 local function rawNew(cls)
@@ -302,6 +298,14 @@ end, ref_init)
 
 section('完整实例创建（new + init）')
 local createK = 0
+local ref_iog = bench('newInOneGo(mt, x)', function()
+    createK = createK + 1
+    holder[1] = newInOneGo(plainMeta, createK)
+end, "ref")
+bench('BenchOverrideNew:new(x) [in one go]', function()
+    createK = createK + 1
+    holder[1] = BenchOverrideNew_7b01:new(createK)
+end, ref_iog)
 local ref_full = bench('plainMake(x) [factory func]', function()
     createK = createK + 1
     holder[1] = plainMake(createK)
