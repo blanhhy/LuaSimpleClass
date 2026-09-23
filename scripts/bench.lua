@@ -1,4 +1,4 @@
--- <lua> run bench
+-- <lua> run bench [-joff]
 
 local source = debug.getinfo(1, 'S').source:match('^@?(.*)[/\\]') or 'scripts/'
 local sep = package.config:sub(1, 1)
@@ -7,6 +7,11 @@ if root == 'scripts' then
     root = '.'
 else
     root = root:gsub('[/\\]scripts$', '')
+end
+
+local JIT = rawget(_G, 'jit')
+if arg and arg[1] == '-joff' and JIT then
+    JIT.off()
 end
 
 local function ujoin(...) return table.concat({...}, sep) end
