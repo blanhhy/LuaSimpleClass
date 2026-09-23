@@ -228,7 +228,7 @@ local function bench(name, f, ref)
             flag  = '  [?]REF=0'
         end
     end
-    print(pad(name, NAME_W) .. ('%7.6f us/op  %7.1fM ops%s%s'):format(
+    print(pad(name, NAME_W) .. ('%3.6f us/op  %5.1fM ops%s%s'):format(
         us, nn / 1e6, ratio, flag))
     return us
 end
@@ -282,7 +282,7 @@ local initPool = {}
 for i = 1, 16 do initPool[i] = {} end
 local initPos = 0
 local initK = 0
-local ctorSelf = BenchCtorSelf_7b01.__init
+local ctorSelf = BenchCtorSelf_7b01["__init"]
 local function nextInitTarget()
     initPos = initPos % #initPool + 1
     return initPool[initPos]
@@ -415,7 +415,7 @@ bench('sub:super_ctor(x) [init dedicated]', function()
     ks = ks + 1
     acc = acc + super_ctor(subA, ks)
 end, ref_super)
-bench('sub:via_super0(x) [0-arg] [debug req]', function()
+bench('sub:via_super0(x) [0-arg] [use debug]', function()
     ks = ks + 1
     acc = acc + via_super0(subA, ks)
 end, ref_super)
