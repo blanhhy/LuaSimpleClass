@@ -103,8 +103,7 @@ local function deep(src, cls, seen)
     for k, v in next, src do
         c[k] = (k == "__class" and v == cls) and cls
             or (type(v) == "table") and deep(v, rawgetmt(v), seen)
-            or v
-    end
+            or v end
     rawsetmt(c, cls)
     return c
 end
@@ -258,6 +257,7 @@ function cc:def(clazz, c2)
         base["__cmt"] = cmt
     end
     setmetatable(clazz, cmt)
+    clazz.__cmt = false
 
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)

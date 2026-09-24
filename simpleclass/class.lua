@@ -86,6 +86,7 @@ function cc:def(clazz, c2)
         base["__cmt"] = cmt
     end
     setmetatable(clazz, cmt)
+    clazz.__cmt = false
 
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)
