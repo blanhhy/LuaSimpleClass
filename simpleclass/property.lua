@@ -17,6 +17,8 @@ local function setitem(self, k, v)
     error("cannot set property."..k..", no setter defined.")
 end
 
+-- 仅在有属性声明时启用属性访问逻辑，避免影响无关类的性能  
+-- 永远自定义 index&newindex 访问器优先，未定义时框架自动实现 getter&setter
 return function(this_c, base_c, isTrivial)
     local base_p = base_c["__property"]
     local this_p = this_c["__property"] or (base_p and {})

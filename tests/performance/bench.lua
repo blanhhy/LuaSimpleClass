@@ -194,6 +194,7 @@ end
 
 -- 每项跑两次取小值。FOLDED 表示已到地板，FAST 表示计时段太短，UNSTABLE 表示两次偏差 >30%。
 local function bench(name, f, ref)
+    collectgarbage()
     local us1, n1, dt1 = measure(f)
     local us2, n2, dt2 = measure(f)
     local us, nn, dt = us1, n1, dt1
