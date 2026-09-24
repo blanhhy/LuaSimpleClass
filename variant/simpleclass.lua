@@ -103,7 +103,8 @@ local function deep(src, cls, seen)
     for k, v in next, src do
         c[k] = (k == "__class" and v == cls) and cls
             or (type(v) == "table") and deep(v, rawgetmt(v), seen)
-            or v end
+            or v
+    end
     rawsetmt(c, cls)
     return c
 end
@@ -247,17 +248,16 @@ function cc:def(clazz, c2)
     clazz.constructor = nil
     clazz.__classname = self.name
 
-    local this_cmt = class_MT
+    local cmt = M._CMT
     if not isDirectD then
-        local bc = base["__cmt"]
-        this_cmt = bc and bc.next or {
-            __call = this_cmt.__call;
-            __tostring = this_cmt.__tostring;
+        cmt = base["__cmt"] or {
+            __call = cmt.__call;
+            __tostring = cmt.__tostring;
             __index = base;
         }
-        if bc then bc.next = this_cmt end
+        base["__cmt"] = cmt
     end
-    setmetatable(clazz, this_cmt)
+    setmetatable(clazz, cmt)
 
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)
