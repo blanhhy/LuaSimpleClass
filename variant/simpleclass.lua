@@ -36,7 +36,7 @@ IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE. ]]
-local M = {}
+local M = {} ---@class _M
 local G = _G
 
 local type, getmetatable, setmetatable, error, select, next, rawset
@@ -247,7 +247,7 @@ function cc:def(clazz, c2)
     clazz.constructor = nil
     clazz.__classname = self.name
 
-    local cmt = M._CMT
+    local cmt = class_MT
     if not isDirectD then
         cmt = base["__cmt"] or {
             __call = cmt.__call;
