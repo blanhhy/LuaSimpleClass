@@ -8,18 +8,15 @@ local function trim(s)
     return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+local is_win = package.config:sub(1, 1) == "\\"
+local sep = is_win and "\\" or "/"
+
 local function quote_arg(s)
     s = tostring(s)
-    if package.config:sub(1, 1) == "\\" then
-        if s:find("[%s\"]") then
-            return '"' .. s:gsub('"', '""') .. '"'
-        end
-        return s
+    if is_win then
+        return '"' .. s:gsub('"', '""') .. '"'
     end
-    if s:find("[%s'\"`()<>|&;]") then
-        return "'" .. s:gsub("'", "'\\''") .. "'"
-    end
-    return s
+    return "'" .. s:gsub("'", "'\\''") .. "'"
 end
 
 local function which(exe)
@@ -44,8 +41,8 @@ local function file_exists(path)
 end
 
 local function dir_exists(path)
-    if package.config:sub(1, 1) == "\\" then
-        local handle = io.popen('if exist "' .. path .. '" (echo yes) else (echo no)')
+    if is_win then
+        local handle = io.popen('if exist ' .. quote_arg(path) .. ' (echo yes) else (echo no)')
         if handle then
             local result = trim(handle:read("*a"))
             handle:close()
@@ -53,7 +50,7 @@ local function dir_exists(path)
         end
         return false
     else
-        local handle = io.popen('test -d "' .. path .. '" && echo yes || echo no')
+        local handle = io.popen('test -d ' .. quote_arg(path) .. ' && echo yes || echo no')
         if handle then
             local result = trim(handle:read("*a"))
             handle:close()
@@ -61,6 +58,17 @@ local function dir_exists(path)
         end
         return false
     end
+end
+
+local function remove_dir(path)
+    if not path then return end
+    local command
+    if is_win then
+        command = 'rmdir /s /q ' .. quote_arg(path) .. ' >nul 2>nul'
+    else
+        command = 'rm -rf -- ' .. quote_arg(path) .. ' >/dev/null 2>&1'
+    end
+    os.execute(command)
 end
 
 local function find_vscode_extension_luals()
@@ -88,7 +96,7 @@ end
 
 local function find_workspace_config(root_dir)
     for _, name in ipairs({".luarc.json", ".luarc.lua"}) do
-        local path = root_dir .. "/" .. name
+        local path = root_dir .. sep .. name
         if file_exists(path) then return path end
     end
     return nil
@@ -147,6 +155,45 @@ local function json_stringify(val, indent)
         end
     end
     return "null"
+end
+
+local function strip_json_comments(text)
+    local out, i, n = {}, 1, #text
+    while i <= n do
+        local c = text:sub(i, i)
+        local next_c = text:sub(i + 1, i + 1)
+        if c == '"' then
+            local start = i
+            i = i + 1
+            while i <= n do
+                local ch = text:sub(i, i)
+                if ch == '\\' then
+                    i = i + 2
+                elseif ch == '"' then
+                    i = i + 1
+                    break
+                else
+                    i = i + 1
+                end
+            end
+            out[#out + 1] = text:sub(start, i - 1)
+        elseif c == '/' and next_c == '/' then
+            i = i + 2
+            while i <= n and text:sub(i, i) ~= '\n' do i = i + 1 end
+            if i <= n then out[#out + 1] = '\n'; i = i + 1 end
+        elseif c == '/' and next_c == '*' then
+            i = i + 2
+            while i <= n - 1 and text:sub(i, i + 1) ~= '*/' do
+                if text:sub(i, i) == '\n' then out[#out + 1] = '\n' end
+                i = i + 1
+            end
+            i = math.min(i + 2, n + 1)
+        else
+            out[#out + 1] = c
+            i = i + 1
+        end
+    end
+    return table.concat(out)
 end
 
 local function find_matching_brace(text, open_pos)
@@ -270,7 +317,7 @@ local function extract_settings(settings_path, prefix)
     if not settings_path or not file_exists(settings_path) then return nil end
     local f = io.open(settings_path, "r")
     if not f then return nil end
-    local content = f:read("*a")
+    local content = strip_json_comments(f:read("*a"))
     f:close()
 
     local config = {}
@@ -385,14 +432,60 @@ end
 local function deep_merge(base, override)
     if not override then return base end
     if not base then return override end
+    local function is_array(value)
+        if type(value) ~= "table" then return false end
+        for key in pairs(value) do
+            if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+                return false
+            end
+        end
+        return true
+    end
     for k, v in pairs(override) do
-        if type(v) == "table" and type(base[k]) == "table" then
+        if type(v) == "table" and type(base[k]) == "table"
+            and not is_array(v) and not is_array(base[k]) then
             deep_merge(base[k], v)
         else
             base[k] = v
         end
     end
     return base
+end
+
+local function is_absolute_path(path)
+    if type(path) ~= "string" then return false end
+    return is_win
+        and (path:match("^%a:[/\\]") or path:match("^[/\\]"))
+        or (not is_win and path:sub(1, 1) == "/")
+end
+
+local function absolutize_path(path, root_dir)
+    if type(path) ~= "string" or path == "" or is_absolute_path(path) then
+        return path
+    end
+    return root_dir .. sep .. path:gsub("^%.[/\\]", "")
+end
+
+local function absolutize_path_list(value, root_dir)
+    if type(value) == "string" then return absolutize_path(value, root_dir) end
+    if type(value) ~= "table" then return value end
+    for i, path in ipairs(value) do
+        value[i] = absolutize_path(path, root_dir)
+    end
+    return value
+end
+
+local function absolutize_config_paths(config, root_dir)
+    if type(config) ~= "table" then return end
+    local runtime = config.runtime
+    if type(runtime) == "table" then
+        runtime.plugin = absolutize_path_list(runtime.plugin, root_dir)
+    end
+    local workspace = config.workspace
+    if type(workspace) == "table" then
+        workspace.library = absolutize_path_list(workspace.library, root_dir)
+        workspace.ignoreDir = absolutize_path_list(workspace.ignoreDir, root_dir)
+    end
 end
 
 local function generate_temp_config(project_settings, user_settings, workspace_settings)
@@ -414,23 +507,34 @@ local function generate_temp_config(project_settings, user_settings, workspace_s
     for _ in pairs(merged) do has_config = true; break end
     if not has_config then return nil end
 
-    local is_win = package.config:sub(1, 1) == "\\"
     local temp_path = os.tmpname()
     os.remove(temp_path)
     
     if is_win then
-        os.execute('if not exist "' .. temp_path .. '" mkdir "' .. temp_path .. '"')
+        os.execute('if not exist ' .. quote_arg(temp_path) .. ' mkdir ' .. quote_arg(temp_path))
     else
-        os.execute('mkdir -p "' .. temp_path .. '"')
+        os.execute('mkdir -p ' .. quote_arg(temp_path))
     end
 
-    if not dir_exists(temp_path) then return nil end
+    if not dir_exists(temp_path) then
+        remove_dir(temp_path)
+        return nil
+    end
 
-    local luarc_path = temp_path .. (is_win and "\\.luarc.json" or "/.luarc.json")
+    local luarc_path = temp_path .. sep .. ".luarc.json"
     local f = io.open(luarc_path, "w")
-    if not f then return nil end
-    f:write(json_stringify(merged) .. "\n")
+    if not f then
+        remove_dir(temp_path)
+        return nil
+    end
+    local ok = pcall(function()
+        f:write(json_stringify(merged) .. "\n")
+    end)
     f:close()
+    if not ok then
+        remove_dir(temp_path)
+        return nil
+    end
 
     return temp_path
 end
@@ -438,6 +542,12 @@ end
 local source = debug.getinfo(1, "S").source
 local script_dir = source and source:match("@?(.*)[/\\]scripts[/\\]") or ""
 local root_dir = arg[1] or (script_dir ~= "" and script_dir or ".")
+if not is_absolute_path(root_dir) then
+    local handle = io.popen(is_win and "cd" or "pwd")
+    local cwd = handle and trim(handle:read("*a")) or "."
+    if handle then handle:close() end
+    root_dir = cwd .. sep .. root_dir
+end
 
 local luals = os.getenv("LUA_LS")
     or find_vscode_extension_luals()
@@ -449,7 +559,7 @@ local luals = os.getenv("LUA_LS")
 if not luals then
     io.stderr:write("lua-language-server not found. Please add it to PATH or set LUA_LS environment variable.\n")
     io.stderr:write("You can also install the sumneko.lua extension for VSCode.\n")
-    return 1
+    os.exit(1)
 end
 
 print("lua-language-server: " .. luals)
@@ -465,16 +575,19 @@ local workspace_settings = nil
 if project_config then
     print("Project configuration: " .. project_config)
     project_settings = extract_settings(project_config, nil)
+    absolutize_config_paths(project_settings, root_dir)
 end
 
 if user_settings_path then
     print("VSCode User settings: " .. user_settings_path)
     user_settings = extract_settings(user_settings_path, "Lua")
+    absolutize_config_paths(user_settings, root_dir)
 end
 
 if workspace_settings_path then
     print("VSCode Workspace settings: " .. workspace_settings_path)
     workspace_settings = extract_settings(workspace_settings_path, "Lua")
+    absolutize_config_paths(workspace_settings, root_dir)
 end
 
 local temp_config_dir = generate_temp_config(project_settings, user_settings, workspace_settings)
@@ -500,17 +613,36 @@ cmd_parts[#cmd_parts + 1] = "--check"
 cmd_parts[#cmd_parts + 1] = quote_arg(root_dir)
 
 local cmd = table.concat(cmd_parts, " ")
+if is_win then cmd = "call " .. cmd end
 print("Executing command: " .. cmd)
 print("---")
 
-local handle = assert(io.popen(cmd .. " 2>&1", "r"))
+local handle = io.popen(cmd .. " 2>&1", "r")
+if not handle then
+    remove_dir(temp_config_dir)
+    io.stderr:write("failed to start lua-language-server.\n")
+    os.exit(1)
+end
 local output = handle:read("*a")
-handle:close()
+local process_ok, process_reason, process_code = handle:close()
+remove_dir(temp_config_dir)
+
+local exited_ok = process_ok == true
+    or (type(process_ok) == "number" and process_ok == 0)
+    or process_code == 0
+local has_diagnostic = output and output:match("%.lua:%d+:%d+%s+%[[^]]+%]")
 
 if output and output ~= "" then
     print(output)
-    return 1
 end
 
+if not exited_ok then
+    io.stderr:write(("lua-language-server failed (%s, %s).\n"):
+        format(tostring(process_reason), tostring(process_code)))
+    os.exit(1)
+end
+
+if has_diagnostic then os.exit(1) end
+
 print("lua-language-server check passed: no diagnostics found.")
-return 0
+os.exit(0)
