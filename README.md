@@ -11,7 +11,7 @@
 
 ## 安装
 
-`simpleclass` 是纯 Lua 实现的，只需要下载 [此文件夹](simpleclass) 即可在任何地方使用
+`simpleclass` 是纯 Lua 实现的，只需要下载 [此文件夹](simpleclass) 即可使用
 
 > **All in One** 文件现在可用！！\
 > 可以方便地带到任何 Lua 项目中\
@@ -19,7 +19,7 @@
 
 兼容 Lua 5.1 及以上版本，含 LuaJIT
 
-如果你使用 [LuaRocks](https://luarocks.org/)，也可以用如下命令安装：
+如果你使用 [LuaRocks](https://luarocks.org/modules/blanhhy/simpleclass)，也可以用如下命令安装：
 
 ```bash
 luarocks install simpleclass

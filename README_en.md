@@ -11,7 +11,7 @@ Offered as a lightweight version of [Luaclass](https://github.com/blanhhy/luacla
 
 ## Installation
 
-`simpleclass` is implemented entirely in Lua; simply download [this folder](simpleclass) to use it anywhere.
+`simpleclass` is implemented entirely in Lua; simply download [this folder](simpleclass) to use.
 
 > **All in One** file is available!!\
 > Can be easily integrated into any Lua project\
@@ -19,7 +19,7 @@ Offered as a lightweight version of [Luaclass](https://github.com/blanhhy/luacla
 
 Compatible with Lua 5.1 and later, including LuaJIT.
 
-If you use [LuaRocks](https://luarocks.org/), you can also install it with the following command:
+If you use [LuaRocks](https://luarocks.org/modules/blanhhy/simpleclass), you can also install it with the following command:
 
 ```bash
 luarocks install simpleclass
