@@ -65,33 +65,45 @@ class "list" {
     -- （由于 jit 和 5.5 情况下有预分配空间的需求，所以用了 new 而不是 __init）
     ---@param ... any
     ---@overload fun(cls:list.class, array:any[]):list
+    ---@overload fun(cls:list.class, iterator:function, tbl?:table, idx?:any):list
     new = function(cls, ...)
         local nargs = select('#', ...)
 
+        -- ()：空数组
         if nargs == 0 then
             return setmetatable({__class = cls, length = 0}, cls)
         end
 
-        local array = nargs == 1 and type(...) == "table" and (...) or {...}
-        local newArr
+        local typ = type((...))
+        local arr = nil
 
-        if table_new then
-            newArr = table_new(#array, 2)
-            newArr.__class = cls
-            setmetatable(newArr, cls)
-        else
-            newArr = setmetatable({__class = cls}, cls)
-        end
-
+        local first = (...)
+        local array = nargs == 1 and typ == "table" and first or nil
+        local pairs = array and first.__class and first.__class.__pairs
         local count = 0
 
-        for i, v in ipairs(array) do
-            newArr[i] = v
-            count = i
+        -- (iterator [, table, index])：从泛型迭代器或可迭代对象构造
+        if typ == "function" or pairs then
+            local iter, tbl, key = ...
+            if pairs then iter, tbl = pairs(iter), iter end
+            arr = cls:_newContainter(0)
+            for val in iter, tbl, key do
+                count = count + 1
+                arr[count] = val
+            end
+            arr.length = count
+            return arr
         end
 
-        newArr.length = count
-        return newArr
+        -- {...}/(...)：从数组或参数列表构造
+        array = array or {...}
+        arr = cls:_newContainter(#array)
+        for i, v in ipairs(array) do
+            arr[i] = v
+            count = i
+        end
+        arr.length = count -- 实际 length 可能不等于 #array，需修正
+        return arr
     end;
 
     ---@static

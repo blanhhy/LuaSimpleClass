@@ -14,7 +14,7 @@ local type, select, error
 -- 因此只应对真正当作函数使用的类这样做
 
 -- 仿 Python 的 range 类
----@type range.constructor|range.class
+---@type range.class|range.constructor
 local range = class "range" {
     ---@field private   _i          number
     ---@field private   _LEN        number
@@ -81,8 +81,8 @@ local range = class "range" {
         return self._LEN
     end;
 
-    __len = function (self) return self.length end;
-
+    __len      = function (self) return self.length end;
+    __pairs    = function (self) return self end; -- 兼容 pairs 迭代器协议
     __tostring = function (self)
         return ("range(%d, %d, %d)"):format(self.START, self.STOP, self.STEP)
     end;
