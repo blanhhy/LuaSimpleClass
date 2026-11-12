@@ -146,6 +146,17 @@ function sc.type(obj) end
 ---@return type type
 function sc.type(v) end
 
+---Obtain an iterator for traversing all members along the class inheritance chain.  
+---Usage is the same as `pairs()`.  
+---```lua
+---     for k, v in enum(MyClass) do end
+---```
+---@generic T:class, K, V
+---@param cls T
+---@return fun(cls: {[K]:V}, key?: K):K, V
+---@return T
+function sc.enum(cls) end
+
 ---Define a new class  
 ---eg:
 ---```lua

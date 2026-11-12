@@ -1,5 +1,6 @@
-local type = type
-_ENV = nil
+local type, next, pairs
+    = type, next, pairs
+--_ENV = nil
 
 -- 基本类元表，每个类元表都在此基础上改装
 local class_MT = {
@@ -36,6 +37,28 @@ function M.type(val)
     end
     return typ
 end
+
+---Obtain an iterator for traversing all members along the class inheritance chain.
+---@generic T:class, K, V
+---@param this T
+---@return fun(clazz: {[K]:V}, index?: K):K, V
+---@return T
+function M.enum(this)
+    if this["__class"] ~= nil or this["__base"] == nil then
+        return pairs(this)
+    end
+    local seen = {}
+    local function iter(_, pk)
+        if not this then return end
+        local k, v = next(this, pk)
+        if k == nil then this = this["__base"] return iter() end
+        if seen [k] then return iter(nil, k) end
+        seen[k] = true
+        return k, v
+    end
+    return iter, this
+end
+
 
 ---Check if the class extends the base class
 ---@param this class
