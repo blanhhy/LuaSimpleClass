@@ -643,7 +643,7 @@ local sliceStep2 = uniqueValues[[2:-2:2]] -- 从第二个到倒数第二个, 间
 print("   slice[2:-2:2]: " .. tostring(sliceStep2))
 print()
 
--- 数组切片用小括号和调用 sub 方法是一样的, 同一个函数
+-- 数组切片与 sub 等价, 实际会调用 sub 方法 (sub 支持步长)
 -- 数组切片与 python 类似, 也有切片步长 step 参数
 -- 但是要注意索引的原则, 应该参考 string.sub 的规则
 
