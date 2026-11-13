@@ -7,6 +7,7 @@ local sc = {}
 ---@class class<o>
 ---@field protected __proto o
 ---@field protected __classname string
+---@field super o
 
 ---@class object
 ---@class object.class : class<object>

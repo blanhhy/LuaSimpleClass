@@ -1656,7 +1656,7 @@ function OnSetText(uri, text)
                 for _, mn in ipairs(metaMembers) do
                     out[#out + 1] = '---@field protected ' .. mn .. ' function'
                 end
-                local classTypeLine = '---@class ' .. className .. '.class : class, ' .. className .. '.meta'
+                local classTypeLine = '---@class ' .. className .. '.class : class<' .. className .. '>, ' .. className .. '.meta'
                 out[#out + 1] = classTypeLine
                 out[#out + 1] = '---@operator call:' .. className
                 out[#out + 1] = 'local ' .. className .. ' = {}'

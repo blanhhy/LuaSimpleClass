@@ -82,6 +82,7 @@ function cc:def(clazz, c2)
     clazz.constructor = nil
     clazz.__classname = self.name
     clazz.__cmt = false
+    clazz.super = clazz
 
     local cmt = M._CMT
     if not isDirectD then
