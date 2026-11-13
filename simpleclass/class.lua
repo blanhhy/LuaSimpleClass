@@ -42,11 +42,18 @@ function cc:def(clazz, c2)
     if self == clazz then clazz = c2 end
     local base = self.base
 
-    -- 继承元方法（元方法只能由raw字段触发）
+    --#========================================================
+    --# 1. 继承元方法（元方法只能由raw字段触发）
+    --#========================================================
+
     for i = 1, #M._MMS do
         local mm = M._MMS[i]
         if not clazz[mm] then clazz[mm] = base[mm] end
     end
+
+    --#========================================================
+    --# 2. 识别平凡与直接派生优化
+    --#========================================================
 
     local isTrivial = base == clazz.__index -- 平凡 __index 的类
     local isDirectD = base == object        -- object 直接派生类
@@ -57,24 +64,24 @@ function cc:def(clazz, c2)
         -- 可以直接本地化少量实例方法，加速访问，而不真正继承
         -- 同时不设置 __index（已无意义），应用默认 CMT 即可
         clazz.is         = clazz.is         or object.is
+        clazz.new        = clazz.new        or object.new
         clazz.clone      = clazz.clone      or object.clone
         clazz.getClass   = clazz.getClass   or object.getClass
         clazz.toString   = clazz.toString   or object.toString
         clazz.isInstance = clazz.isInstance or object.isInstance
     end
 
-    -- 始终本地化继承 new 以加快实例化速度
-    clazz.new = clazz.new or base.new
-
-    interpret(clazz, base, #clazz)
-    mergeprop(clazz, base, isTrivial)
-
+    --#========================================================
+    --# 3. 设置必要字段
+    --#========================================================
+    
     local ctor = clazz.constructor
     local init = clazz.__init or ctor
     clazz.__base = base
     clazz.__init = init
     clazz.constructor = nil
     clazz.__classname = self.name
+    clazz.__cmt = false
 
     local cmt = M._CMT
     if not isDirectD then
@@ -85,13 +92,32 @@ function cc:def(clazz, c2)
         }
         base["__cmt"] = cmt
     end
+
+    --#========================================================
+    --# 4. 声明语句处理
+    --#========================================================
+    
+    interpret(clazz, base, #clazz)
+    mergeprop(clazz, base, isTrivial)
+
+    --#========================================================
+    --# 5. 成为类
+    --#========================================================
+
     setmetatable(clazz, cmt)
-    clazz.__cmt = false
+
+    --#========================================================
+    --# 6. 接口实现检查
+    --#========================================================
 
     if self.ifaces and self.iCheck then
         local ok, er = self:iCheck(clazz)
         if not ok then error(er, 2) end
     end
+
+    --#========================================================
+    --# 7. 环境注册
+    --#========================================================
 
     if self.name ~= "<anonymous>" then
         -- 自动注册为全局变量，但不覆盖已存在的非类全局变量
