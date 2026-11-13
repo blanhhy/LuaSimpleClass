@@ -99,6 +99,11 @@ local cc = {}
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function cc:extends(basename) end
 
+---@generic T
+---@param ... table
+---@return _ClassCreator<T>|_ClassDefiner<T>
+function cc:mixins(...) end
+
 ---Implements the interfaces
 ---@generic T
 ---@param ... interface

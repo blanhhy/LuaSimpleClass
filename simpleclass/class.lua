@@ -34,6 +34,12 @@ function cc:extends(basename)
     return self
 end
 
+---@param ... table
+function cc:mixins(...)
+    self.mixins = {...}
+    return self
+end
+
 ---Define the class body
 ---@generic T
 ---@param clazz table
@@ -100,6 +106,11 @@ function cc:def(clazz, c2)
     
     interpret(clazz, base, #clazz)
     mergeprop(clazz, base, isTrivial)
+
+    if M.mixins and self.mixins ~= cc.mixins then
+        local ok, er = M.mixins(clazz, self.mixins --[[@as {}]])
+        if not ok then error(er, 2) end
+    end
 
     --#========================================================
     --# 5. 成为类
