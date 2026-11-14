@@ -96,10 +96,10 @@ end, perror)
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {
     eat = function(self)
-        print(self:getClass():toString().." eats bugs")
+        print(self:getClass().." eats bugs")
     end;
     fly = function(self)
-        print(self:getClass():toString().." is flying")
+        print(self:getClass().." is flying")
     end;
 }
 
@@ -116,10 +116,10 @@ interface "BirdLike" : extends(CanEat, CanFly) {
 -- 同时进行继承与实现接口
 class "Eagle" : extends "Bird" : implements(BirdLike) {
     spawn = function(self)
-        print(self:getClass():toString().." is spawning")
+        print(self:getClass().." is spawning")
     end;
     nest = function(self)
-        print(self:getClass():toString().." is nesting")
+        print(self:getClass().." is nesting")
     end;
 }
 

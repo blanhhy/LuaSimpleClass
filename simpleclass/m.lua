@@ -2,10 +2,13 @@ local type, next, pairs, getmetatable
     = type, next, pairs, getmetatable
 _ENV = nil
 
+local function to_s(cls) return cls.__classname end
+
 -- 基本类元表，每个类元表都在此基础上改装
 local class_MT = {
-    __tostring = function(self) return self.__classname end;
-    __call = function(self, ...) return self:new(...) end;
+    __tostring = to_s;
+    __concat   = to_s;
+    __call = function(cls, ...) return cls:new(...) end;
 }
 
 local mm_names = {

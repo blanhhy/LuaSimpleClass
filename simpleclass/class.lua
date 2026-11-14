@@ -94,6 +94,7 @@ function cc:def(clazz, c2)
     if not isDirectD then
         cmt = base["__cmt"] or {
             __call = cmt.__call;
+            __concat = cmt.__concat;
             __tostring = cmt.__tostring;
             __index = base;
         }

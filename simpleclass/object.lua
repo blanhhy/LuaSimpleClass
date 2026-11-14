@@ -19,6 +19,7 @@ local object = {
     is = rawequal;
 }
 
+object.__concat = object.__tostring
 object.__index = object
 _ENV = nil
 
