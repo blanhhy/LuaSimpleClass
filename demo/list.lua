@@ -426,9 +426,12 @@ class "list" {
     ---@param arr2 list
     ---@return list
     __concat = function(arr1, arr2)
-        if not isinstance(arr1, list) or not isinstance(arr2, list) then
+        local t1, t2 = ctype(arr1), ctype(arr2)
+        if t1 == "string" then return arr1 .. arr2:toString() end
+        if t2 == "string" then return arr1:toString() .. arr2 end
+        if not issubclass(t1, list) or not issubclass(t2, list) then
             error(("attempt to concat list with a %s value")
-                :format(isinstance(arr1, list) and ctype(arr2) or ctype(arr1)), 2)
+                :format(issubclass(t1, list) and t2 or t1), 2)
         end
 
         local newArr = list:_newContainter(arr1.length + arr2.length)
@@ -523,7 +526,7 @@ if ... then return list end
 
 -- 创建一个list实例
 local originalNumbers = list(34, 6577, 8, 1, 85, 5635, 3)
-print("创建数组: originalNumbers = " .. tostring(originalNumbers))
+print("创建数组: originalNumbers = " .. originalNumbers)
 print()
 
 -- list 可以从参数列表或已有的数组来创建, 或创建空数组
@@ -535,8 +538,8 @@ print()
 local sortedNumbers = originalNumbers:copy()
 sortedNumbers:sort()
 print("排序操作:")
-print("   before: " .. tostring(originalNumbers))
-print("   after:  " .. tostring(sortedNumbers))
+print("   before: " .. originalNumbers)
+print("   after:  " .. sortedNumbers)
 print()
 
 -- 排序方法就是 table.sort 函数
@@ -545,8 +548,8 @@ print()
 local reversedNumbers = sortedNumbers:copy()
 reversedNumbers:reverse()
 print("反转操作:")
-print("   before: " .. tostring(sortedNumbers))
-print("   after:  " .. tostring(reversedNumbers))
+print("   before: " .. sortedNumbers)
+print("   after:  " .. reversedNumbers)
 print()
 
 -- 反转方法是原地操作, 同时会返回 self
@@ -554,8 +557,8 @@ print()
 -- 截取子数组
 local subArray = reversedNumbers:sub(3, 5)
 print("截取子数组:")
-print("   source:  " .. tostring(reversedNumbers))
-print("   slice(3,5): " .. tostring(subArray))
+print("   source:  " .. reversedNumbers)
+print("   slice(3,5): " .. subArray)
 print("   获取了索引3到5的元素：[索引3]" .. reversedNumbers[3] .. ", [索引4]" .. reversedNumbers[4] .. ", [索引5]" .. reversedNumbers[5])
 print()
 
@@ -566,9 +569,9 @@ local extendedArray = reversedNumbers:copy()
 local newElements = {1, 3, 6, 3, 9}
 extendedArray:extend(newElements)
 print("扩展操作:")
-print("   original: " .. tostring(reversedNumbers))
+print("   original: " .. reversedNumbers)
 print("   newElements: " .. "{1, 3, 6, 3, 9}")
-print("   extended: " .. tostring(extendedArray))
+print("   extended: " .. extendedArray)
 print()
 
 -- extend 可以批量扩充元素, 也可以用来连接数组
@@ -577,8 +580,8 @@ print()
 -- 查找所有匹配值的索引
 local indicesOf3 = extendedArray:indices(3)
 print("查找值3的所有索引:")
-print("   array: " .. tostring(extendedArray))
-print("   indicesOf3: " .. tostring(indicesOf3))
+print("   array: " .. extendedArray)
+print("   indicesOf3: " .. indicesOf3)
 print("   unpack: " .. table.concat({indicesOf3:unpack()}, ", "))
 print()
 
@@ -590,16 +593,16 @@ print()
 local withoutFirst3 = extendedArray:copy()
 withoutFirst3:remove(3)
 print("删除第一个3:")
-print("   before: " .. tostring(extendedArray))
-print("   after:  " .. tostring(withoutFirst3))
+print("   before: " .. extendedArray)
+print("   after:  " .. withoutFirst3)
 print()
 
 -- 删除最后一个匹配值
 local withoutLast3 = withoutFirst3:copy()
 withoutLast3:removeLast(3)
 print("删除最后一个3:")
-print("   before: " .. tostring(withoutFirst3))
-print("   after:  " .. tostring(withoutLast3))
+print("   before: " .. withoutFirst3)
+print("   after:  " .. withoutLast3)
 print()
 
 -- 移除值也有 remove, removeLast, removeAll 三个方法
@@ -609,8 +612,8 @@ print()
 -- 获取唯一值数组
 local uniqueValues = withoutLast3:unique()
 print("去重操作:")
-print("   before: " .. tostring(withoutLast3))
-print("   unique: " .. tostring(uniqueValues))
+print("   before: " .. withoutLast3)
+print("   unique: " .. uniqueValues)
 print()
 
 -- unique 用于去重, 得到一个新的数组, 原数组不变
@@ -620,27 +623,27 @@ print()
 -- 创建和填充数组
 print("创建和操作:")
 local defaultArray = list.create(5)
-print("   list.create(5) = " .. tostring(defaultArray))
+print("   list.create(5) = " .. defaultArray)
 
 -- create 不指定填充值的话, 默认是 0
 -- 在 jit 环境下有优化, 会调用 table.new 来预分配空间
 
 defaultArray:fill(7)
-print("   fill(7) -> " .. tostring(defaultArray))
+print("   fill(7) -> " .. defaultArray)
 
 -- fill 可以指定填充区间, 默认是整个数组
 
 defaultArray:clear()
-print("   clear() -> " .. tostring(defaultArray) .. ", length = " .. defaultArray.length)
+print("   clear() -> " .. defaultArray .. ", length = " .. defaultArray.length)
 print()
 
 -- clear 在 jit 环境下会调用 table.clear
 
 -- 切片操作
 print("切片操作:")
-print("   source: " .. tostring(uniqueValues))
+print("   source: " .. uniqueValues)
 local sliceStep2 = uniqueValues[[2:-2:2]] -- 从第二个到倒数第二个, 间隔为2的切片
-print("   slice[2:-2:2]: " .. tostring(sliceStep2))
+print("   slice[2:-2:2]: " .. sliceStep2)
 print()
 
 -- 数组切片与 sub 等价, 实际会调用 sub 方法 (sub 支持步长)
@@ -651,14 +654,14 @@ print()
 print("重复和连接操作:")
 local smallArray1 = list(1, 2, 3)
 local repeatedArray = smallArray1 * 2
-print("   {1,2,3} * 2 = " .. tostring(repeatedArray))
+print("   {1,2,3} * 2 = " .. repeatedArray)
 
 -- 重复可以用 * 符号, 也可以用 rep 方法
 -- 为了模仿 python 风格, * 会调用 rep 方法
 
 local smallArray2 = list(4, 5, 6)
 local concatenatedArray = smallArray1 .. smallArray2
-print("   {1,2,3} .. {4,5,6} = " .. tostring(concatenatedArray))
+print("   {1,2,3} .. {4,5,6} = " .. concatenatedArray)
 print()
 
 -- 注意:
@@ -671,7 +674,7 @@ local randomArray = list()
 for _ = 1, 20 do
     randomArray:append(math.random(1, 16))
 end
-print("   randomArray: " .. tostring(randomArray))
+print("   randomArray: " .. randomArray)
 print("   max: " .. randomArray:max() .. ", min: " .. randomArray:min())
 
 local targetValue = randomArray[10]
@@ -686,8 +689,8 @@ print()
 print("数组比较:")
 local arrA = list(1, 2, 3, 4, 5)
 local arrB = list(1, 2, 3, 4, 5)
-print("   arrA = " .. tostring(arrA))
-print("   arrB = " .. tostring(arrB))
+print("   arrA = " .. arrA)
+print("   arrB = " .. arrB)
 print("   arrA == arrB? " .. tostring(arrA == arrB)) -- 是否相等, 比较的是内容
 print("   arrA is arrB? " .. tostring(arrA:is(arrB))) -- 是否为同一个对象, 比较的是地址
 
@@ -695,7 +698,7 @@ print("   arrA is arrB? " .. tostring(arrA:is(arrB))) -- 是否为同一个对�
 -- is 方法来自 object, 和 rawequal 是同一个函数
 
 arrA:insert(2, 6)
-print("   arrA插入6后: " .. tostring(arrA))
+print("   arrA插入6后: " .. arrA)
 print("   arrA > arrB? " .. tostring(arrA > arrB)) -- 比较的是第一个不等元素
 print()
 
