@@ -2,7 +2,7 @@ local sc = require "simpleclass"
 local ctype = sc.type
 
 --#==========================================
---# 基础使用
+--# 类与对象
 --#==========================================
 
 class "Person" {
@@ -17,35 +17,57 @@ class "Person" {
     end;
 }
 
-class "Student" : extends "Person" {
-    ---@param grade string
-    __init = function(self, name, age, grade)
-        super(Student, self):__init(name, age)
-        self.grade = grade
-    end;
-    ---@override
-    sayHello = function(self)
-        print("Hello, my name is ".. self.name.. " and I am a ".. self.grade.. " year old student.")
-    end;
-}
-
 local p1 = Person:new("John", 25)
 p1:sayHello()
 
 -- Output: Hello, my name is John and I am 25 years old.
 
--- 使用 :new 可以获得 LuaLS 的参数提示和类型检查
-local s1 = Student:new("Jane", 20, "senior")
-s1:sayHello()
+--#==========================================
+--# 类的继承
+--#==========================================
 
--- Output: Hello, my name is Jane and I am a senior year old student.
+class "Student" : extends "Person" {
+    ---@param grade string
+    __init = function(self, name, age, grade)
+        super():__init(name, age)
+        self.grade = grade
+    end;
+    ---@override
+    sayHello = function(self)
+        super():sayHello()
+        print("I am a " .. self.grade .. " Student.")
+    end;
+}
 
-print(s1:isInstance(Student))  --> true
-print(s1:isInstance(Person))   --> true
-print(s1:isInstance(object))   --> true
-print(isinstance(s1, "table")) --> true
+class "CollageStu" : extends "Student" {
+    ---@param college string
+    __init = function(self, name, age, grade, college)
+        super():__init(name, age, grade)
+        self.college = college
+    end;
+    sayHello = function(self)
+        super():sayHello()
+        print("I am from " .. self.college .. ".")
+    end
+}
 
+local s1 = Student:new("Peter", 16, "first")
+local c1 = CollageStu:new("Jane", 20, "first", "MIT")
+
+c1:sayHello()
+-- Output: 
+-- Hello, my name is Jane and I am 20 years old.
+-- I am a first Student.
+-- I am from MIT.
+
+-- simpeleclass.type 可以检查对象的类，
+-- 而 isinstance 则校验继承关系
 print(ctype(s1)) --> Student
+
+print("Is s1 a Student?", s1:isInstance(Student))  --> true
+print("Is s1 a Person?\t", s1:isInstance(Person))  --> true
+print("Is s1 an object?", s1:isInstance(object))   --> true
+print("Is s1 a table?\t", isinstance(s1, "table")) --> true
 
 --#==========================================
 --# 接口使用
@@ -53,6 +75,11 @@ print(ctype(s1)) --> Student
 
 interface "CanEat" {"eat"}
 interface "CanFly" {"fly"}
+
+local function perror(...)
+    print("Caught some errors：")
+    print(...)
+end
 
 -- 错误的定义
 xpcall(function()
@@ -64,7 +91,7 @@ xpcall(function()
         end;
     }
     -- Output: class 'Bird_wrong' implements interface 'CanFly' but does not implement method 'fly'.
-end, print)
+end, perror)
 
 -- 正确的定义
 class "Bird" : implements(CanEat, CanFly) {
@@ -112,14 +139,14 @@ print(isinstance(eagle, BirdLike))                   --> true
 -- 接口的多态
 ---@param flyable CanFly
 local function makeFly(flyable)
-    assert(isinstance(flyable, CanFly), "flyable must be a CanFly object")
+    assert(isinstance(flyable, CanFly), "flyable must be a CanFly object.")
     flyable:fly()
 end
 
 -- 继承的多态
 ---@param bird Bird
 local function makeBirdFly(bird)
-    assert(isinstance(bird, Bird), "bird must be a Bird object")
+    assert(isinstance(bird, Bird), "bird must be a Bird object.")
     makeFly(bird)
 end
 
@@ -132,4 +159,4 @@ xpcall(function()
     ---@diagnostic disable-next-line: param-type-mismatch
     makeFly(Person())
     -- Output: flyable must be a CanFly object
-end, print)
+end, perror)
