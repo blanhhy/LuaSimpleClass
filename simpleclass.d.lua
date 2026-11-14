@@ -99,6 +99,9 @@ local cc = {}
 ---@return _ClassCreator<T>|_ClassDefiner<T>
 function cc:extends(basename) end
 
+---[Experiment] 实验性的 Mix-in 功能  
+---类似继承但不自同步，允许多 Mixin，冲突时需覆写  
+---Mixin 的对象可以是类，也可以是普通的含方法的表
 ---@generic T
 ---@param ... table
 ---@return _ClassCreator<T>|_ClassDefiner<T>

@@ -78,7 +78,8 @@ end
 function M.mixins(this, mixins)
     local merged = {}
     -- 混入之前，先排除冲突
-    for i = 1, #mixins do for k in next, mixins[i] do
+    -- Mixin 的对象可能是类，用 enum 保证继承字段的处理
+    for i = 1, #mixins do for k in M.enum(mixins[i]) do
         if this[k] == nil then
             if merged[k] then
                 local t1, t2 = mixins[merged[k]], mixins[i]
