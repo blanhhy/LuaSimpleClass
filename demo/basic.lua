@@ -36,7 +36,7 @@ class "Student" : extends "Person" {
     ---@override
     sayHello = function(self)
         super():sayHello()
-        print("I am a " .. self.grade .. " Student.")
+        print("I am a " .. self.grade .. " grade Student.")
     end;
 }
 
@@ -60,7 +60,7 @@ local c1 = CollageStu:new("Jane", 20, "first", "MIT")
 c1:sayHello()
 -- Output: 
 -- Hello, my name is Jane and I am 20 years old.
--- I am a first Student.
+-- I am a first grade Student.
 -- I am from MIT.
 
 -- simpeleclass.type 可以检查对象的类，
@@ -79,10 +79,7 @@ print("Is s1 a table?\t", isinstance(s1, "table")) --> true
 interface "CanEat" {"eat"}
 interface "CanFly" {"fly"}
 
-local function perror(...)
-    print("Caught some errors：")
-    print(...)
-end
+local function perror(...) return print("Caught some errors：", ...) end
 
 -- 错误的定义
 xpcall(function()
