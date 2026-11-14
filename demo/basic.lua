@@ -27,6 +27,7 @@ p1:sayHello()
 --#==========================================
 
 class "Student" : extends "Person" {
+    ---@override
     ---@param grade string
     __init = function(self, name, age, grade)
         super():__init(name, age)
@@ -40,11 +41,13 @@ class "Student" : extends "Person" {
 }
 
 class "CollageStu" : extends "Student" {
+    ---@override
     ---@param college string
     __init = function(self, name, age, grade, college)
         super():__init(name, age, grade)
         self.college = college
     end;
+    ---@override
     sayHello = function(self)
         super():sayHello()
         print("I am from " .. self.college .. ".")
