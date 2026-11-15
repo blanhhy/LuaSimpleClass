@@ -144,10 +144,10 @@ local function makeFly(flyable)
 end
 
 -- 继承的多态
----@param bird Bird
-local function makeBirdFly(bird)
-    assert(isinstance(bird, Bird), "bird must be a Bird object.")
-    makeFly(bird)
+---@param _bird Bird
+local function makeBirdFly(_bird)
+    assert(isinstance(_bird, Bird), "bird must be a Bird object.")
+    makeFly(_bird)
 end
 
 -- 合法调用

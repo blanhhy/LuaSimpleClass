@@ -1647,7 +1647,7 @@ function OnSetText(uri, text)
                 -- 类对象只继承公共 class 能力和本类的元方法视图。
                 -- 元方法单独沿实例类的继承链继承，普通静态成员不继承。
                 out[#out + 1] = 'if false then'
-                out[#out + 1] = '---@diagnostic disable: unused-local, redefined-local'
+                out[#out + 1] = '---@diagnostic disable: unused-local, redefined-local, unused-vararg'
                 local metaTypeLine = '---@class ' .. className .. '.meta'
                 if parentName then
                     metaTypeLine = metaTypeLine .. ' : ' .. parentName .. '.meta'
@@ -1916,7 +1916,7 @@ function OnSetText(uri, text)
                     out[#out + 1] = originOwner .. '.' .. a.origin .. ' = '
                         .. targetOwner .. '.' .. a.target
                 end
-                out[#out + 1] = '---@diagnostic enable: unused-local, redefined-local'
+                out[#out + 1] = '---@diagnostic enable: unused-local, redefined-local, unused-vararg'
                 out[#out + 1] = 'end'
                 if #declareFields > 0 then
                     -- 原始类体里的 ---@field（其前无 ---@class）会触发 doc-field-no-class。
