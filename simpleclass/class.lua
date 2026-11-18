@@ -90,17 +90,6 @@ function cc:def(clazz, c2)
     clazz.__cmt = false
     clazz.super = clazz
 
-    local cmt = M._CMT
-    if not isDirectD then
-        cmt = base["__cmt"] or {
-            __call = cmt.__call;
-            __concat = cmt.__concat;
-            __tostring = cmt.__tostring;
-            __index = base;
-        }
-        base["__cmt"] = cmt
-    end
-
     --#========================================================
     --# 4. 声明语句处理
     --#========================================================
@@ -116,6 +105,17 @@ function cc:def(clazz, c2)
     --#========================================================
     --# 5. 成为类
     --#========================================================
+
+    local cmt = M._CMT
+    if not isDirectD then
+        cmt = base["__cmt"] or {
+            __call = cmt.__call;
+            __concat = cmt.__concat;
+            __tostring = cmt.__tostring;
+            __index = base;
+        }
+        base["__cmt"] = cmt
+    end
 
     setmetatable(clazz, cmt)
 

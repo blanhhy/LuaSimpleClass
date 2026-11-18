@@ -5,9 +5,7 @@
 
 # Lua Simple Class
 
-可能是第一个有着现代语法，但不干扰——反而增强静态检查工具的 Lua 类库
-
-作为 [Luaclass](https://github.com/blanhhy/luaclass) 的轻量版提供，简化了运行时行为，但保留核心 OOP 能力
+SimpleClass 是一个简单的，通用的，高性能的，LSP 友好的 LuaOOP 框架
 
 ## 安装
 
